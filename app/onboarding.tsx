@@ -6,7 +6,7 @@ import useStore from '@/store/useStore';
 import { Behavior } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { scheduleForBehavior } from '@/services/notifications';
-import { INITIAL_DIFFICULTY, INITIAL_STABILITY } from '@/services/fsrs';
+import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from '@/services/levels';
 
 const templates = [
   {
@@ -44,14 +44,14 @@ export default function OnboardingScreen() {
   const addTemplate = async (template: (typeof templates)[0]) => {
     const behavior: Behavior = {
       id: generateUUID(),
+      kind: 'adopt',
       title: template.title,
       pingMessage: template.pingMessage,
       window: template.window,
       activeDays: template.activeDays,
       intervalMinutes: 15,
-      stability: INITIAL_STABILITY,
-      difficulty: INITIAL_DIFFICULTY,
-      lastNoStreak: 0,
+      level: INITIAL_LEVEL,
+      lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
       createdAt: Date.now(),
       hidden: false,
       bookmarked: false,

@@ -1,26 +1,30 @@
+/**
+ * Deprecated: legacy FSRS-style API. Kept as a thin shim over the level-based
+ * scheduler in `./levels.ts`. New code should import from `./levels.ts`.
+ */
 import { Behavior } from '../types';
+import {
+  INITIAL_LEVEL,
+  effectiveIntervalMinutes as effIntervalLevel,
+  perBehaviorDailyCap as perBehaviorDailyCapLevel,
+  applyLevelUp,
+  applyLapse,
+  LAPSE_NO_THRESHOLD,
+  INTERVAL_PRESETS as INTERVAL_PRESETS_NEW,
+} from './levels';
+import { calculateStreak } from './streak';
 
 export const STABILITY_MIN = 0.5;
 export const STABILITY_MAX = 168;
 export const DIFFICULTY_MIN = 0;
 export const DIFFICULTY_MAX = 1;
-
 export const INITIAL_STABILITY = 4;
 export const INITIAL_DIFFICULTY = 0.3;
+export const INTERVAL_PRESETS = INTERVAL_PRESETS_NEW;
 
-export const INTERVAL_PRESETS = [1, 2, 5, 10, 15, 20, 30, 45, 60] as const;
-
-const NO_CASCADE = [0.8, 0.7, 0.5] as const;
-const EFFECTIVE_INTERVAL_CAP_MIN = 120;
-const PER_BEHAVIOR_DAILY_CAP = 20;
-
-function clamp(x: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, x));
-}
-
-export function effectiveIntervalMinutes(intervalMinutes: number, stability: number): number {
-  const g = 1 + Math.log2(1 + stability / 4);
-  return clamp(intervalMinutes * g, intervalMinutes, EFFECTIVE_INTERVAL_CAP_MIN);
+export function effectiveIntervalMinutes(intervalMinutes: number, stabilityOrLevel: number): number {
+  const level = stabilityOrLevel > 5 ? Math.min(5, Math.ceil(stabilityOrLevel / 16) + 1) : stabilityOrLevel;
+  return effIntervalLevel(intervalMinutes, level);
 }
 
 export function bucketLevel(stability: number): 1 | 2 | 3 | 4 | 5 {
@@ -31,32 +35,25 @@ export function bucketLevel(stability: number): 1 | 2 | 3 | 4 | 5 {
   return 5;
 }
 
-export function onYes(b: Behavior): Behavior {
-  const growth = 0.5 * (1 - b.difficulty) * Math.exp(-b.stability / 72);
-  return {
-    ...b,
-    stability: clamp(b.stability * (1 + growth), STABILITY_MIN, STABILITY_MAX),
-    difficulty: clamp(b.difficulty - 0.05, DIFFICULTY_MIN, DIFFICULTY_MAX),
-    lastNoStreak: 0,
-  };
+/**
+ * Deprecated: caller should call `applyLevelUp` / `applyLapse` based on
+ * streak rather than per-tap mutations. Kept for back-compat callers.
+ */
+export function onYes(b: Behavior, _checkInsForBehavior?: number): Behavior {
+  return b;
 }
 
 export function onNo(b: Behavior): Behavior {
-  const factor = NO_CASCADE[Math.min(b.lastNoStreak, NO_CASCADE.length - 1)];
-  return {
-    ...b,
-    stability: clamp(b.stability * factor, STABILITY_MIN, STABILITY_MAX),
-    difficulty: clamp(b.difficulty + 0.1, DIFFICULTY_MIN, DIFFICULTY_MAX),
-    lastNoStreak: b.lastNoStreak + 1,
-  };
+  return b;
 }
 
 export function perBehaviorDailyCap(
   intervalMinutes: number,
-  stability: number,
+  stabilityOrLevel: number,
   windowHours: number
 ): number {
-  const effMin = effectiveIntervalMinutes(intervalMinutes, stability);
-  const target = Math.floor((windowHours * 60) / effMin);
-  return Math.max(1, Math.min(PER_BEHAVIOR_DAILY_CAP, target));
+  const level = stabilityOrLevel > 5 ? Math.min(5, Math.ceil(stabilityOrLevel / 16) + 1) : stabilityOrLevel;
+  return perBehaviorDailyCapLevel(intervalMinutes, level, windowHours);
 }
+
+export { INITIAL_LEVEL, applyLevelUp, applyLapse, LAPSE_NO_THRESHOLD, calculateStreak };

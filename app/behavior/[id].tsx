@@ -14,7 +14,7 @@ import useStore from '@/store/useStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { cancelForBehavior, sendTestNotification } from '@/services/notifications';
-import { bucketLevel } from '@/services/fsrs';
+import { deriveStage, stageLabel } from '@/services/levels';
 
 export default function BehaviorDetailScreen() {
   const router = useRouter();
@@ -139,7 +139,7 @@ export default function BehaviorDetailScreen() {
         <View style={[styles.detailItem, { borderBottomColor: colors.text + '20' }]}>
           <Text style={[styles.detailLabel, { color: colors.text }]}>Level</Text>
           <Text style={[styles.detailValue, { color: colors.text }]}>
-            L{bucketLevel(behavior.stability)} · stability {behavior.stability.toFixed(1)}h
+            L{behavior.level} · {stageLabel(deriveStage(behavior.level, streak))}
           </Text>
         </View>
       </View>

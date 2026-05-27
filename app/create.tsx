@@ -16,11 +16,11 @@ import { Behavior } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { cancelForBehavior, scheduleForBehavior } from '@/services/notifications';
 import {
-  INITIAL_DIFFICULTY,
-  INITIAL_STABILITY,
+  INITIAL_LEVEL,
+  INITIAL_LAST_LEVELUP_STREAK,
   INTERVAL_PRESETS,
   effectiveIntervalMinutes,
-} from '@/services/fsrs';
+} from '@/services/levels';
 import { useState, useMemo } from 'react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
@@ -92,8 +92,8 @@ export default function CreateScreen() {
     const endMin = hhmmToMinutes(endTime);
     const durationMin = endMin - startMin;
     if (durationMin <= 0 || intervalMinutes <= 0) return 'Invalid time window';
-    const stability = editingBehavior?.stability ?? INITIAL_STABILITY;
-    const effMin = effectiveIntervalMinutes(intervalMinutes, stability);
+    const level = editingBehavior?.level ?? INITIAL_LEVEL;
+    const effMin = effectiveIntervalMinutes(intervalMinutes, level);
     const totalPings = Math.max(1, Math.floor(durationMin / effMin));
     let spacingLabel: string;
     if (effMin >= 60) {
@@ -103,9 +103,9 @@ export default function CreateScreen() {
     } else {
       spacingLabel = `${Math.round(effMin)} min`;
     }
-    const tail = effMin !== intervalMinutes ? ` (adapted from ${intervalMinutes}m)` : '';
+    const tail = effMin !== intervalMinutes ? ` (level ${level}, every ${intervalMinutes}m base)` : '';
     return `~${totalPings} pings today, ~every ${spacingLabel}${tail}`;
-  }, [startTime, endTime, intervalMinutes, editingBehavior?.stability]);
+  }, [startTime, endTime, intervalMinutes, editingBehavior?.level]);
 
   const handleTimeChange = (which: 'start' | 'end') => (
     event: DateTimePickerEvent,
@@ -151,14 +151,14 @@ export default function CreateScreen() {
     } else {
       const behavior: Behavior = {
         id: generateUUID(),
+        kind: 'adopt',
         title,
         pingMessage: title,
         window: { from: startTime, to: endTime },
         intervalMinutes,
         activeDays,
-        stability: INITIAL_STABILITY,
-        difficulty: INITIAL_DIFFICULTY,
-        lastNoStreak: 0,
+        level: INITIAL_LEVEL,
+        lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
         createdAt: Date.now(),
         hidden: false,
         bookmarked: false,
