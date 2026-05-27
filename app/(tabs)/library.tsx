@@ -1,170 +1,311 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
+import { useState, useMemo } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, type ThemeColors } from '@/constants/theme';
+import useStore from '@/store/useStore';
+import { generateUUID } from '@/utils/uuid';
+import { scheduleForBehavior } from '@/services/notifications';
+import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from '@/services/levels';
+import {
+  LIBRARY_GUIDES,
+  LIBRARY_PACKAGES,
+  ADOPT_TEMPLATES,
+  ELIMINATE_TEMPLATES,
+  domainLabel,
+  type LibraryGuide,
+  type LibraryPackage,
+  type AdoptTemplate,
+  type EliminateTemplate,
+} from '@/services/library-content';
+import type { Behavior } from '@/types';
 
-/**
- * Library content is intentionally scoped to **support practice** — short
- * articles that explain why a state matters or how to practice it well —
- * rather than general mental-health editorial. This keeps the app aligned
- * with its identity as a practice amplifier (not a wellness content
- * platform). Replace this in-memory data with a real content source when
- * available.
- */
-interface Article {
-  id: string;
-  title: string;
-  minutes: number;
-  /** Optional state the article links to — surfaces "Try this state" CTA. */
-  linkedStateId?: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  articles: Article[];
-}
-
-const CATEGORIES: Category[] = [
-  {
-    id: 'productivity',
-    name: 'Productivity',
-    articles: [
-      { id: 'p-1', title: 'Why a single intention beats a to-do list', minutes: 5 },
-      { id: 'p-2', title: 'Practicing the pause before context switching', minutes: 4 },
-    ],
-  },
-  {
-    id: 'assertiveness',
-    name: 'Assertiveness',
-    articles: [
-      { id: 'a-1', title: 'Saying no without explaining yourself', minutes: 6 },
-      { id: 'a-2', title: 'How body language shifts before you do', minutes: 5 },
-    ],
-  },
-  {
-    id: 'fearlessness',
-    name: 'Fearlessness',
-    articles: [
-      { id: 'f-1', title: 'Noticing the freeze response in conversation', minutes: 5 },
-      { id: 'f-2', title: 'Small reps build courage faster than big leaps', minutes: 4 },
-    ],
-  },
-];
+type Tab = 'programs' | 'states' | 'packages';
 
 export default function LibraryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [tab, setTab] = useState<Tab>('programs');
+  const { behaviors, addBehavior } = useStore();
+
+  const addedTemplateIds = useMemo(
+    () => new Set(behaviors.map((b) => b.title)),
+    [behaviors]
+  );
+
+  const handleAddAdopt = async (template: AdoptTemplate) => {
+    const behavior: Behavior = {
+      id: generateUUID(),
+      kind: 'adopt',
+      title: template.title,
+      pingMessage: template.pingMessage,
+      practiceType: template.practiceType,
+      domain: template.domain,
+      libraryGuideId: template.libraryGuideId,
+      window: template.window,
+      activeDays: [0, 1, 2, 3, 4, 5, 6],
+      intervalMinutes: template.intervalMinutes,
+      level: INITIAL_LEVEL,
+      lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
+      createdAt: Date.now(),
+      hidden: false,
+      bookmarked: false,
+    };
+    await addBehavior(behavior);
+    await scheduleForBehavior(behavior);
+    Alert.alert('Added', `"${template.title}" is now in your active states.`);
+  };
+
+  const handleAddEliminate = async (template: EliminateTemplate) => {
+    const replacement = behaviors.find(
+      (b) => b.kind === 'adopt' && (b.id === template.replacementAdoptId || b.title === ADOPT_TEMPLATES.find((a) => a.id === template.replacementAdoptId)?.title)
+    );
+    if (!replacement) {
+      const adoptTemplate = ADOPT_TEMPLATES.find((a) => a.id === template.replacementAdoptId);
+      Alert.alert(
+        'Add replacement first',
+        `"${template.title}" needs an active "${adoptTemplate?.title ?? 'replacement'}" Adopt state. Add that one first, then come back.`
+      );
+      return;
+    }
+    const behavior: Behavior = {
+      id: generateUUID(),
+      kind: 'eliminate',
+      title: template.title,
+      pingMessage: template.pingMessage,
+      domain: template.domain,
+      replacementStateId: replacement.id,
+      window: { from: '09:00', to: '21:00' },
+      activeDays: [0, 1, 2, 3, 4, 5, 6],
+      intervalMinutes: 30,
+      level: INITIAL_LEVEL,
+      lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
+      createdAt: Date.now(),
+      hidden: false,
+      bookmarked: false,
+    };
+    await addBehavior(behavior);
+    await scheduleForBehavior(behavior);
+    Alert.alert('Added', `"${template.title}" is now in your active states.`);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Library</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          Short reads that support what you&apos;re practicing.
+          16 guides, 17 adopt templates, 12 eliminate templates.
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {CATEGORIES.map((category) => (
-          <View key={category.id} style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                {category.name}
-              </Text>
-              <Pressable style={styles.viewAll} accessibilityLabel={`View all in ${category.name}`}>
-                <Text style={[styles.viewAllText, { color: colors.info }]}>View all</Text>
-                <IconSymbol name="chevron.right" size={14} color={colors.info} />
-              </Pressable>
-            </View>
-
-            {/* Featured article card per category */}
-            <Pressable
+      <View style={styles.tabRow}>
+        {(['programs', 'states', 'packages'] as const).map((t) => (
+          <Pressable
+            key={t}
+            onPress={() => setTab(t)}
+            style={[
+              styles.tabButton,
+              {
+                backgroundColor: tab === t ? colors.tint : 'transparent',
+                borderColor: tab === t ? colors.tint : colors.border,
+              },
+            ]}
+          >
+            <Text
               style={[
-                styles.articleCard,
-                { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+                styles.tabButtonText,
+                { color: tab === t ? colors.textOnBrand : colors.text },
               ]}
             >
-              <Text
-                numberOfLines={2}
-                style={[styles.articleTitle, { color: colors.text }]}
-              >
-                {category.articles[0].title}
-              </Text>
-              <View style={styles.articleFooter}>
-                <Text style={[styles.articleMeta, { color: colors.textMuted }]}>
-                  {category.articles[0].minutes} minutes read
-                </Text>
-                <IconSymbol name="chevron.right" size={16} color={colors.textMuted} />
-              </View>
-            </Pressable>
-          </View>
+              {t === 'programs' ? 'Programs' : t === 'states' ? 'States' : 'Packages'}
+            </Text>
+          </Pressable>
         ))}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {tab === 'programs' && (
+          <View style={styles.section}>
+            {LIBRARY_GUIDES.map((guide) => (
+              <GuideCard key={guide.id} guide={guide} colors={colors} />
+            ))}
+          </View>
+        )}
+
+        {tab === 'states' && (
+          <View style={styles.section}>
+            <Text style={[styles.subSectionTitle, { color: colors.text }]}>Adopt</Text>
+            {ADOPT_TEMPLATES.map((t) => (
+              <TemplateCard
+                key={t.id}
+                title={t.title}
+                domain={domainLabel(t.domain)}
+                message={t.pingMessage}
+                added={addedTemplateIds.has(t.title)}
+                colors={colors}
+                onAdd={() => handleAddAdopt(t)}
+              />
+            ))}
+            <Text
+              style={[styles.subSectionTitle, { color: colors.text, marginTop: 16 }]}
+            >
+              Eliminate
+            </Text>
+            {ELIMINATE_TEMPLATES.map((t) => (
+              <TemplateCard
+                key={t.id}
+                title={t.title}
+                domain={domainLabel(t.domain)}
+                message={t.pingMessage}
+                added={addedTemplateIds.has(t.title)}
+                colors={colors}
+                onAdd={() => handleAddEliminate(t)}
+              />
+            ))}
+          </View>
+        )}
+
+        {tab === 'packages' && (
+          <View style={styles.section}>
+            {LIBRARY_PACKAGES.map((pkg) => (
+              <PackageCard key={pkg.id} pkg={pkg} colors={colors} />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
+function GuideCard({ guide, colors }: { guide: LibraryGuide; colors: ThemeColors }) {
+  return (
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+      ]}
+    >
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{guide.title}</Text>
+      <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
+        {domainLabel(guide.domain)} · {guide.estimatedMinutes} min read
+      </Text>
+      <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={3}>
+        {guide.summary}
+      </Text>
+    </View>
+  );
+}
+
+function TemplateCard({
+  title,
+  domain,
+  message,
+  added,
+  colors,
+  onAdd,
+}: {
+  title: string;
+  domain: string;
+  message: string;
+  added: boolean;
+  colors: ThemeColors;
+  onAdd: () => void;
+}) {
+  return (
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
+      <View style={styles.cardHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.cardMeta, { color: colors.textMuted }]}>{domain}</Text>
+        </View>
+        <Pressable
+          onPress={onAdd}
+          disabled={added}
+          style={[
+            styles.addButton,
+            {
+              backgroundColor: added ? colors.surfaceMuted : colors.tint,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.addButtonText,
+              { color: added ? colors.textMuted : colors.textOnBrand },
+            ]}
+          >
+            {added ? 'Added' : 'Add'}
+          </Text>
+        </Pressable>
+      </View>
+      <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={2}>
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+function PackageCard({ pkg, colors }: { pkg: LibraryPackage; colors: ThemeColors }) {
+  return (
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+      ]}
+    >
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{pkg.title}</Text>
+      <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
+        {pkg.guideIds.length} guides
+      </Text>
+      <Text style={[styles.cardBody, { color: colors.text }]}>{pkg.description}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     paddingTop: 60,
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 8,
-    gap: 24,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionHeader: {
+  title: { fontSize: 28, fontWeight: '700' },
+  subtitle: { fontSize: 13, marginTop: 4 },
+  tabRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
     alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  viewAll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  viewAllText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  articleCard: {
-    borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
-    gap: 12,
   },
-  articleTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    lineHeight: 20,
+  tabButtonText: { fontSize: 13, fontWeight: '600' },
+  scrollContent: { padding: 16, paddingTop: 8, gap: 12 },
+  section: { gap: 10 },
+  subSectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    gap: 6,
   },
-  articleFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  cardTitle: { fontSize: 15, fontWeight: '600' },
+  cardMeta: { fontSize: 11, marginTop: 2 },
+  cardBody: { fontSize: 13, lineHeight: 18, marginTop: 4 },
+  addButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
-  articleMeta: {
-    fontSize: 12,
-  },
+  addButtonText: { fontSize: 12, fontWeight: '700' },
 });

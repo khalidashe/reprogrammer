@@ -7,33 +7,9 @@ import { Behavior } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { scheduleForBehavior } from '@/services/notifications';
 import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from '@/services/levels';
+import { featuredTemplates } from '@/services/library-content';
 
-const templates = [
-  {
-    title: 'Confident Posture',
-    window: { from: '09:00', to: '21:00' },
-    pingMessage: 'Sit up straight',
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-  },
-  {
-    title: 'Unreactive Listening',
-    window: { from: '09:00', to: '21:00' },
-    pingMessage: 'Listen without interrupting',
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-  },
-  {
-    title: 'Poker Face',
-    window: { from: '09:00', to: '21:00' },
-    pingMessage: 'Keep a neutral expression',
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-  },
-  {
-    title: 'Eye Contact',
-    window: { from: '09:00', to: '21:00' },
-    pingMessage: 'Make eye contact',
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-  },
-];
+const templates = featuredTemplates();
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -47,9 +23,12 @@ export default function OnboardingScreen() {
       kind: 'adopt',
       title: template.title,
       pingMessage: template.pingMessage,
+      practiceType: template.practiceType,
+      domain: template.domain,
+      libraryGuideId: template.libraryGuideId,
       window: template.window,
-      activeDays: template.activeDays,
-      intervalMinutes: 15,
+      activeDays: [0, 1, 2, 3, 4, 5, 6],
+      intervalMinutes: template.intervalMinutes,
       level: INITIAL_LEVEL,
       lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
       createdAt: Date.now(),
