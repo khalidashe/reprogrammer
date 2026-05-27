@@ -113,9 +113,11 @@ export default function BehaviorDetailScreen() {
       </View>
 
       <View style={[styles.streakCard, { backgroundColor: colors.tint }]}>
-        <Text style={styles.streakLabel}>Current Streak</Text>
+        <Text style={styles.streakLabel}>
+          {stageLabel(deriveStage(behavior.level, streak))}
+        </Text>
         <Text style={styles.streakValue}>{streak}</Text>
-        <Text style={styles.streakDays}>days</Text>
+        <Text style={styles.streakDays}>day streak</Text>
       </View>
 
       <View style={styles.section}>
