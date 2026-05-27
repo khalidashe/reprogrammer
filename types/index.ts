@@ -1,9 +1,25 @@
+export type BehaviorKind = 'adopt' | 'eliminate';
+export type PracticeType = 'mental' | 'physical' | 'learning' | 'dual';
+export type Domain =
+  | 'language_cognitive'
+  | 'physical'
+  | 'social'
+  | 'emotional'
+  | 'creative'
+  | 'professional';
+export type Stage = 'starting' | 'in_progress' | 'habitual';
+
 export interface Behavior {
   id: string;
+  kind: BehaviorKind;
   title: string;
+  pingMessage: string;
+  practiceType?: PracticeType;
+  domain?: Domain;
+  libraryGuideId?: string;
+  replacementStateId?: string;
   behaviorsToEliminate?: string[];
   tags?: string[];
-  pingMessage: string;
   journal?: string;
   activeDays: number[];
   window: {
@@ -11,19 +27,20 @@ export interface Behavior {
     to: string;
   };
   intervalMinutes: number;
-  stability: number;
-  difficulty: number;
-  lastNoStreak: number;
+  level: number;
+  lastLevelUpStreak: number;
   pausedUntil?: number;
   createdAt: number;
   hidden: boolean;
   bookmarked: boolean;
-  /** @deprecated use intervalMinutes; kept for v1 rollback */
+  /** @deprecated v1 rollback only */
   frequency?: { pingsPerHour: number };
-  /** @deprecated derived from stability via bucketLevel(); kept for v1 rollback */
-  level?: number;
-  /** @deprecated no longer used; kept for v1 rollback */
-  lastLevelUpStreak?: number;
+  /** @deprecated v1 rollback only — replaced by `level` */
+  stability?: number;
+  /** @deprecated v1 rollback only */
+  difficulty?: number;
+  /** @deprecated v1 rollback only */
+  lastNoStreak?: number;
 }
 
 export interface CheckIn {

@@ -12,15 +12,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import useStore from '@/store/useStore';
-import { Behavior } from '@/types';
+import { Behavior, BehaviorKind } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { cancelForBehavior, scheduleForBehavior } from '@/services/notifications';
 import {
-  INITIAL_DIFFICULTY,
-  INITIAL_STABILITY,
+  INITIAL_LEVEL,
+  INITIAL_LAST_LEVELUP_STREAK,
   INTERVAL_PRESETS,
   effectiveIntervalMinutes,
-} from '@/services/fsrs';
+} from '@/services/levels';
 import { useState, useMemo } from 'react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
@@ -77,6 +77,15 @@ export default function CreateScreen() {
   const [activeDays, setActiveDays] = useState<number[]>(
     editingBehavior?.activeDays || [0, 1, 2, 3, 4, 5, 6]
   );
+  const [kind, setKind] = useState<BehaviorKind>(editingBehavior?.kind ?? 'adopt');
+  const [replacementStateId, setReplacementStateId] = useState<string | undefined>(
+    editingBehavior?.replacementStateId
+  );
+
+  const adoptStateOptions = useMemo(
+    () => behaviors.filter((b) => b.kind === 'adopt' && !b.hidden && b.id !== editingBehavior?.id),
+    [behaviors, editingBehavior?.id]
+  );
 
   const startDisplay = formatTimeForDisplay(startTime);
   const endDisplay = formatTimeForDisplay(endTime);
@@ -92,8 +101,8 @@ export default function CreateScreen() {
     const endMin = hhmmToMinutes(endTime);
     const durationMin = endMin - startMin;
     if (durationMin <= 0 || intervalMinutes <= 0) return 'Invalid time window';
-    const stability = editingBehavior?.stability ?? INITIAL_STABILITY;
-    const effMin = effectiveIntervalMinutes(intervalMinutes, stability);
+    const level = editingBehavior?.level ?? INITIAL_LEVEL;
+    const effMin = effectiveIntervalMinutes(intervalMinutes, level);
     const totalPings = Math.max(1, Math.floor(durationMin / effMin));
     let spacingLabel: string;
     if (effMin >= 60) {
@@ -103,9 +112,9 @@ export default function CreateScreen() {
     } else {
       spacingLabel = `${Math.round(effMin)} min`;
     }
-    const tail = effMin !== intervalMinutes ? ` (adapted from ${intervalMinutes}m)` : '';
+    const tail = effMin !== intervalMinutes ? ` (level ${level}, every ${intervalMinutes}m base)` : '';
     return `~${totalPings} pings today, ~every ${spacingLabel}${tail}`;
-  }, [startTime, endTime, intervalMinutes, editingBehavior?.stability]);
+  }, [startTime, endTime, intervalMinutes, editingBehavior?.level]);
 
   const handleTimeChange = (which: 'start' | 'end') => (
     event: DateTimePickerEvent,
@@ -136,14 +145,24 @@ export default function CreateScreen() {
       return;
     }
 
+    if (kind === 'eliminate' && !replacementStateId) {
+      Alert.alert(
+        'Replacement required',
+        'An Eliminate state must be linked to an Adopt state. Create the Adopt first, then come back.'
+      );
+      return;
+    }
+
     if (editingBehavior) {
       const updated: Behavior = {
         ...editingBehavior,
+        kind,
         title,
         pingMessage: title,
         window: { from: startTime, to: endTime },
         intervalMinutes,
         activeDays,
+        replacementStateId: kind === 'eliminate' ? replacementStateId : undefined,
       };
       await cancelForBehavior(editingBehavior.id);
       await updateBehavior(updated);
@@ -151,14 +170,15 @@ export default function CreateScreen() {
     } else {
       const behavior: Behavior = {
         id: generateUUID(),
+        kind,
         title,
         pingMessage: title,
         window: { from: startTime, to: endTime },
         intervalMinutes,
         activeDays,
-        stability: INITIAL_STABILITY,
-        difficulty: INITIAL_DIFFICULTY,
-        lastNoStreak: 0,
+        level: INITIAL_LEVEL,
+        lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
+        replacementStateId: kind === 'eliminate' ? replacementStateId : undefined,
         createdAt: Date.now(),
         hidden: false,
         bookmarked: false,
@@ -201,6 +221,81 @@ export default function CreateScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
+        <View style={styles.kindToggle}>
+          <Pressable
+            onPress={() => setKind('adopt')}
+            style={[
+              styles.kindButton,
+              {
+                backgroundColor: kind === 'adopt' ? ACCENT : colors.text + '15',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.kindButtonText,
+                { color: kind === 'adopt' ? 'white' : colors.text },
+              ]}
+            >
+              Adopt
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setKind('eliminate')}
+            style={[
+              styles.kindButton,
+              {
+                backgroundColor: kind === 'eliminate' ? ACCENT : colors.text + '15',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.kindButtonText,
+                { color: kind === 'eliminate' ? 'white' : colors.text },
+              ]}
+            >
+              Eliminate
+            </Text>
+          </Pressable>
+        </View>
+
+        {kind === 'eliminate' && (
+          <View style={styles.replacementRow}>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>Replace with:</Text>
+            <View style={styles.replacementChips}>
+              {adoptStateOptions.length === 0 ? (
+                <Text style={{ color: colors.text + '99', fontSize: 12, flex: 1 }}>
+                  No Adopt states yet — create one first.
+                </Text>
+              ) : (
+                adoptStateOptions.map((b) => {
+                  const active = replacementStateId === b.id;
+                  return (
+                    <Pressable
+                      key={b.id}
+                      onPress={() => setReplacementStateId(b.id)}
+                      style={[
+                        styles.replacementChip,
+                        { backgroundColor: active ? ACCENT : colors.text + '15' },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.replacementChipText,
+                          { color: active ? 'white' : colors.text },
+                        ]}
+                      >
+                        {b.title}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+          </View>
+        )}
+
         <View style={styles.timeBlock}>
           <View style={styles.timeColumn}>
             <Text style={[styles.timeColumnLabel, { color: colors.text + 'AA' }]}>From</Text>
@@ -448,6 +543,41 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 15,
+    fontWeight: '600',
+  },
+  kindToggle: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  kindButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  kindButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  replacementRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  replacementChips: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  replacementChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  replacementChipText: {
+    fontSize: 12,
     fontWeight: '600',
   },
 });

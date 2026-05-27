@@ -1,22 +1,35 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Behavior, CheckIn, ReminderAttempt, AppProfile } from '../types';
+import { Behavior, CheckIn, ReminderAttempt, AppProfile, BehaviorKind } from '../types';
 import { calculateStreak } from '../services/streak';
-import { INITIAL_DIFFICULTY, INITIAL_STABILITY } from '../services/fsrs';
+import {
+  INITIAL_LEVEL,
+  INITIAL_LAST_LEVELUP_STREAK,
+  LEVEL_MIN,
+  LEVEL_MAX,
+} from '../services/levels';
 
-const BEHAVIORS_KEY = 'rpg.behaviors.v2';
-const BEHAVIORS_LEGACY_KEY = 'rpg.behaviors.v1';
+const BEHAVIORS_KEY = 'rpg.behaviors.v3';
+const BEHAVIORS_V2_KEY = 'rpg.behaviors.v2';
+const BEHAVIORS_V1_KEY = 'rpg.behaviors.v1';
 
-const LEGACY_LEVEL_TO_STABILITY: Record<number, number> = {
-  1: 4,
-  2: 8,
-  3: 16,
-  4: 32,
-  5: 64,
-};
+const LEGACY_STABILITY_TO_LEVEL: Array<[number, number]> = [
+  [6, 1],
+  [12, 2],
+  [24, 3],
+  [48, 4],
+];
+
+function stabilityToLevel(stability: number): number {
+  for (const [threshold, level] of LEGACY_STABILITY_TO_LEVEL) {
+    if (stability < threshold) return level;
+  }
+  return LEVEL_MAX;
+}
 
 interface LegacyBehavior {
   id: string;
+  kind?: BehaviorKind;
   title: string;
   pingMessage: string;
   activeDays: number[];
@@ -35,34 +48,47 @@ interface LegacyBehavior {
   stability?: number;
   difficulty?: number;
   lastNoStreak?: number;
+  practiceType?: Behavior['practiceType'];
+  domain?: Behavior['domain'];
+  libraryGuideId?: string;
+  replacementStateId?: string;
 }
 
 function migrateBehavior(b: LegacyBehavior): Behavior {
   const intervalMinutes =
     b.intervalMinutes ??
     Math.max(1, Math.min(60, Math.round(60 / (b.frequency?.pingsPerHour ?? 4))));
-  const stability =
-    b.stability ?? LEGACY_LEVEL_TO_STABILITY[b.level ?? 1] ?? INITIAL_STABILITY;
-  const difficulty = b.difficulty ?? INITIAL_DIFFICULTY;
-  const lastNoStreak = b.lastNoStreak ?? 0;
+
+  let level: number;
+  if (typeof b.level === 'number') {
+    level = Math.min(LEVEL_MAX, Math.max(LEVEL_MIN, b.level));
+  } else if (typeof b.stability === 'number') {
+    level = stabilityToLevel(b.stability);
+  } else {
+    level = INITIAL_LEVEL;
+  }
 
   return {
     id: b.id,
+    kind: b.kind ?? 'adopt',
     title: b.title,
     pingMessage: b.pingMessage,
+    practiceType: b.practiceType,
+    domain: b.domain,
+    libraryGuideId: b.libraryGuideId,
+    replacementStateId: b.replacementStateId,
+    behaviorsToEliminate: b.behaviorsToEliminate,
+    tags: b.tags,
+    journal: b.journal,
     activeDays: b.activeDays,
     window: b.window,
     intervalMinutes,
-    stability,
-    difficulty,
-    lastNoStreak,
+    level,
+    lastLevelUpStreak: b.lastLevelUpStreak ?? INITIAL_LAST_LEVELUP_STREAK,
     pausedUntil: b.pausedUntil,
     createdAt: b.createdAt,
     hidden: b.hidden,
     bookmarked: b.bookmarked,
-    behaviorsToEliminate: b.behaviorsToEliminate,
-    tags: b.tags,
-    journal: b.journal,
   };
 }
 
@@ -94,20 +120,21 @@ const useStore = create<StoreState>((set, get) => ({
 
   hydrate: async () => {
     try {
-      const [v2Data, v1Data, checkInsData, reminderAttemptsData, appProfileData] =
+      const [v3Data, v2Data, v1Data, checkInsData, reminderAttemptsData, appProfileData] =
         await Promise.all([
           AsyncStorage.getItem(BEHAVIORS_KEY),
-          AsyncStorage.getItem(BEHAVIORS_LEGACY_KEY),
+          AsyncStorage.getItem(BEHAVIORS_V2_KEY),
+          AsyncStorage.getItem(BEHAVIORS_V1_KEY),
           AsyncStorage.getItem('rpg.checkins.v1'),
           AsyncStorage.getItem('rpg.reminderAttempts.v1'),
           AsyncStorage.getItem('rpg.app.v1'),
         ]);
 
       let behaviors: Behavior[];
-      if (v2Data) {
-        behaviors = JSON.parse(v2Data);
-      } else if (v1Data) {
-        const legacy: LegacyBehavior[] = JSON.parse(v1Data);
+      if (v3Data) {
+        behaviors = JSON.parse(v3Data);
+      } else if (v2Data || v1Data) {
+        const legacy: LegacyBehavior[] = JSON.parse(v2Data ?? v1Data ?? '[]');
         behaviors = legacy.map(migrateBehavior);
         await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(behaviors));
       } else {
@@ -136,15 +163,15 @@ const useStore = create<StoreState>((set, get) => ({
 
   updateBehavior: async (behavior: Behavior) => {
     const state = get();
-    const updated = state.behaviors.map(b => (b.id === behavior.id ? behavior : b));
+    const updated = state.behaviors.map((b) => (b.id === behavior.id ? behavior : b));
     set({ behaviors: updated });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
   },
 
   deleteBehavior: async (id: string) => {
     const state = get();
-    const updated = state.behaviors.filter(b => b.id !== id);
-    const checkInsUpdated = state.checkIns.filter(c => c.behaviorId !== id);
+    const updated = state.behaviors.filter((b) => b.id !== id);
+    const checkInsUpdated = state.checkIns.filter((c) => c.behaviorId !== id);
     set({ behaviors: updated, checkIns: checkInsUpdated });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(checkInsUpdated));
@@ -178,7 +205,7 @@ const useStore = create<StoreState>((set, get) => ({
 
   updateReminderAttempt: async (attempt: ReminderAttempt) => {
     const state = get();
-    const updated = state.reminderAttempts.map(ra =>
+    const updated = state.reminderAttempts.map((ra) =>
       ra.id === attempt.id ? attempt : ra
     );
     set({ reminderAttempts: updated });
@@ -187,7 +214,7 @@ const useStore = create<StoreState>((set, get) => ({
 
   getReminderAttempts: (behaviorId: string) => {
     const state = get();
-    return state.reminderAttempts.filter(ra => ra.behaviorId === behaviorId);
+    return state.reminderAttempts.filter((ra) => ra.behaviorId === behaviorId);
   },
 }));
 

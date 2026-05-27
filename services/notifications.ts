@@ -4,46 +4,38 @@ import { Behavior, ReminderAttempt } from '../types';
 import { addDays, addMinutes, startOfDay } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import useStore from '../store/useStore';
+import { calculateStreak, consecutiveNoCount } from './streak';
 import {
-  effectiveIntervalMinutes,
-  onNo,
-  onYes,
   perBehaviorDailyCap,
-} from './fsrs';
+  shouldLevelUp,
+  applyLevelUp,
+  applyLapse,
+  LAPSE_NO_THRESHOLD,
+} from './levels';
+import {
+  generateTimesForDay,
+  setLocalTimeOnDate,
+  dateKey,
+  hashSeed,
+  mulberry32,
+  SCHEDULE_LEAD_MS,
+} from './scheduler-core';
+
+export { generateTimesForDay } from './scheduler-core';
 
 const MAX_SCHEDULED = 60;
 const RESCHEDULE_THROTTLE_MS = 60 * 1000;
-const MIN_GAP_RATIO = 0.4;
+const DAYS_HORIZON = 7;
+const ANDROID_CHANNEL_ID = 'reprogrammer-checkin';
+
 let lastRescheduleAt = 0;
+let categoryRegistered = false;
+let channelRegistered = false;
 
 export const CHECKIN_CATEGORY = 'behavior_checkin';
 export const ACTION_YES = 'CHECKIN_YES';
 export const ACTION_NO = 'CHECKIN_NO';
 export const ACTION_OFF = 'CHECKIN_OFF';
-
-let categoryRegistered = false;
-
-export async function setupNotificationCategory(): Promise<void> {
-  if (categoryRegistered) return;
-  await Notifications.setNotificationCategoryAsync(CHECKIN_CATEGORY, [
-    {
-      identifier: ACTION_YES,
-      buttonTitle: '✓ Did it',
-      options: { opensAppToForeground: false },
-    },
-    {
-      identifier: ACTION_NO,
-      buttonTitle: '✗ Missed',
-      options: { opensAppToForeground: false, isDestructive: true },
-    },
-    {
-      identifier: ACTION_OFF,
-      buttonTitle: 'Turn off',
-      options: { opensAppToForeground: false },
-    },
-  ]);
-  categoryRegistered = true;
-}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -55,69 +47,44 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function requestNotificationPermission(): Promise<boolean> {
-  if (Platform.OS === 'android') {
-    return true;
+export async function setupNotificationCategory(): Promise<void> {
+  if (!categoryRegistered) {
+    await Notifications.setNotificationCategoryAsync(CHECKIN_CATEGORY, [
+      {
+        identifier: ACTION_YES,
+        buttonTitle: 'Check-in',
+        options: { opensAppToForeground: false },
+      },
+      {
+        identifier: ACTION_NO,
+        buttonTitle: 'Snooze',
+        options: { opensAppToForeground: false, isDestructive: false },
+      },
+      {
+        identifier: ACTION_OFF,
+        buttonTitle: 'Pause today',
+        options: { opensAppToForeground: false },
+      },
+    ]);
+    categoryRegistered = true;
   }
+  if (Platform.OS === 'android' && !channelRegistered) {
+    await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+      name: 'Check-ins',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+    channelRegistered = true;
+  }
+}
 
+export async function requestNotificationPermission(): Promise<boolean> {
+  const existing = await Notifications.getPermissionsAsync();
+  if (existing.status === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
-}
-
-function parseHHmmOnDay(time: string, date: Date): number {
-  const [h, m] = time.split(':').map((n) => parseInt(n, 10));
-  const d = new Date(date);
-  d.setHours(h, m, 0, 0);
-  return d.getTime();
-}
-
-function sampleExponential(meanMs: number, rng: () => number): number {
-  const u = Math.max(rng(), 1e-9);
-  return -Math.log(u) * meanMs;
-}
-
-export function generateTimesForDay(args: {
-  date: Date;
-  windowFrom: string;
-  windowTo: string;
-  intervalMinutes: number;
-  stability: number;
-  now: number;
-  rng?: () => number;
-  maxPings?: number;
-}): number[] {
-  const {
-    date,
-    windowFrom,
-    windowTo,
-    intervalMinutes,
-    stability,
-    now,
-    rng = Math.random,
-    maxPings,
-  } = args;
-  const windowStart = parseHHmmOnDay(windowFrom, date);
-  const windowEnd = parseHHmmOnDay(windowTo, date);
-  const fullWindowMs = windowEnd - windowStart;
-  if (fullWindowMs <= 0 || intervalMinutes <= 0) return [];
-
-  const effMin = effectiveIntervalMinutes(intervalMinutes, stability);
-  const meanMs = effMin * 60 * 1000;
-  const minGapMs = meanMs * MIN_GAP_RATIO;
-  const earliest = Math.max(now, windowStart);
-
-  const times: number[] = [];
-  let t = windowStart;
-  let safety = 0;
-  while (safety++ < 5000) {
-    const gap = Math.max(sampleExponential(meanMs, rng), minGapMs);
-    t += gap;
-    if (t >= windowEnd) break;
-    if (t < earliest) continue;
-    times.push(Math.floor(t));
-    if (maxPings && times.length >= maxPings) break;
-  }
-  return times;
 }
 
 interface Candidate {
@@ -128,29 +95,32 @@ interface Candidate {
 function buildCandidatesForBehavior(
   behavior: Behavior,
   now: number,
-  daysHorizon: number = 7
+  daysHorizon: number
 ): Candidate[] {
   const results: Candidate[] = [];
-  const windowHours =
-    (parseHHmmOnDay(behavior.window.to, new Date(now)) -
-      parseHHmmOnDay(behavior.window.from, new Date(now))) /
-    (60 * 60 * 1000);
-  const dailyCap = perBehaviorDailyCap(
-    behavior.intervalMinutes,
-    behavior.stability,
-    Math.max(0, windowHours)
-  );
+  const baseDate = new Date(now);
+  const windowFromMin =
+    setLocalTimeOnDate(baseDate, behavior.window.from) - startOfDay(baseDate).getTime();
+  const windowToMin =
+    setLocalTimeOnDate(baseDate, behavior.window.to) - startOfDay(baseDate).getTime();
+  const windowMs = Math.max(0, windowToMin - windowFromMin);
+  const windowHours = windowMs / (60 * 60 * 1000);
+  const dailyCap = perBehaviorDailyCap(behavior.intervalMinutes, behavior.level, windowHours);
+
   for (let dayOffset = 0; dayOffset < daysHorizon; dayOffset++) {
     const date = addDays(startOfDay(now), dayOffset);
     if (!behavior.activeDays.includes(date.getDay())) continue;
     if (behavior.pausedUntil && date.getTime() < behavior.pausedUntil) continue;
+
+    const rng = mulberry32(hashSeed(behavior.id, dateKey(date)));
     const times = generateTimesForDay({
       date,
       windowFrom: behavior.window.from,
       windowTo: behavior.window.to,
       intervalMinutes: behavior.intervalMinutes,
-      stability: behavior.stability,
+      level: behavior.level,
       now,
+      rng,
       maxPings: dailyCap,
     });
     for (const ts of times) {
@@ -160,30 +130,36 @@ function buildCandidatesForBehavior(
   return results;
 }
 
-const SCHEDULE_LEAD_MS = 1000;
-
 async function scheduleCandidate(c: Candidate): Promise<void> {
   if (c.timestamp <= Date.now() + SCHEDULE_LEAD_MS) return;
   const store = useStore.getState();
   const attemptId = generateUUID();
+
+  const body =
+    c.behavior.kind === 'eliminate'
+      ? `CATCH IT — ${c.behavior.pingMessage}`
+      : c.behavior.pingMessage;
+
   try {
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: c.behavior.title,
-        body: c.behavior.pingMessage,
-        sound: true,
-        vibrate: [0, 250, 250, 250],
-        categoryIdentifier: CHECKIN_CATEGORY,
-        data: {
-          behaviorId: c.behavior.id,
-          attemptId,
-          phase: 'initial',
-        },
+    const content: Notifications.NotificationContentInput = {
+      title: c.behavior.title,
+      body,
+      sound: true,
+      vibrate: [0, 250, 250, 250],
+      categoryIdentifier: CHECKIN_CATEGORY,
+      data: {
+        behaviorId: c.behavior.id,
+        attemptId,
+        phase: 'initial',
       },
-      trigger: {
-        type: 'date',
-        date: new Date(c.timestamp),
-      } as any,
+    };
+    if (Platform.OS === 'android') {
+      (content as any).channelId = ANDROID_CHANNEL_ID;
+    }
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content,
+      trigger: { type: 'date', date: new Date(c.timestamp) } as any,
     });
 
     const attempt: ReminderAttempt = {
@@ -204,13 +180,7 @@ async function scheduleCandidate(c: Candidate): Promise<void> {
 }
 
 export async function scheduleForBehavior(behavior: Behavior): Promise<void> {
-  await cancelForBehavior(behavior.id);
-  if (behavior.hidden) return;
-  const now = Date.now();
-  const candidates = buildCandidatesForBehavior(behavior, now);
-  for (const c of candidates) {
-    await scheduleCandidate(c);
-  }
+  await rescheduleAll({ force: true });
 }
 
 export async function rescheduleAll(options?: { force?: boolean }): Promise<void> {
@@ -219,20 +189,14 @@ export async function rescheduleAll(options?: { force?: boolean }): Promise<void
   lastRescheduleAt = now;
 
   const store = useStore.getState();
-
-  for (const b of store.behaviors) {
-    await cancelForBehavior(b.id);
-  }
+  await cancelAllScheduled();
 
   const active = store.behaviors.filter((b) => !b.hidden);
-  const daysHorizon = Math.max(
-    1,
-    Math.min(7, Math.ceil(MAX_SCHEDULED / Math.max(1, active.length * 20)))
-  );
+  if (active.length === 0) return;
 
   const all: Candidate[] = [];
   for (const b of active) {
-    all.push(...buildCandidatesForBehavior(b, now, daysHorizon));
+    all.push(...buildCandidatesForBehavior(b, now, DAYS_HORIZON));
   }
   all.sort((a, b) => a.timestamp - b.timestamp);
   const toSchedule = all.slice(0, MAX_SCHEDULED);
@@ -241,17 +205,36 @@ export async function rescheduleAll(options?: { force?: boolean }): Promise<void
   }
 }
 
-export async function cancelForBehavior(behaviorId: string): Promise<void> {
+async function cancelAllScheduled(): Promise<void> {
   const store = useStore.getState();
-  const attempts = store.getReminderAttempts(behaviorId);
-
-  for (const attempt of attempts) {
-    if (attempt.status !== 'scheduled') continue;
+  const open = store.reminderAttempts.filter((a) => a.status === 'scheduled');
+  for (const attempt of open) {
     if (attempt.notificationId) {
       try {
         await Notifications.cancelScheduledNotificationAsync(attempt.notificationId);
       } catch {
-        // notification may have already fired or expired
+        // already fired or invalid; safe to ignore
+      }
+    }
+    await store.updateReminderAttempt({
+      ...attempt,
+      status: 'disabled',
+      updatedAt: Date.now(),
+    });
+  }
+}
+
+export async function cancelForBehavior(behaviorId: string): Promise<void> {
+  const store = useStore.getState();
+  const attempts = store.reminderAttempts.filter(
+    (a) => a.behaviorId === behaviorId && a.status === 'scheduled'
+  );
+  for (const attempt of attempts) {
+    if (attempt.notificationId) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(attempt.notificationId);
+      } catch {
+        // already fired
       }
     }
     await store.updateReminderAttempt({
@@ -266,24 +249,21 @@ export async function sendTestNotification(behavior: Behavior): Promise<void> {
   const store = useStore.getState();
   const attemptId = generateUUID();
 
+  const content: Notifications.NotificationContentInput = {
+    title: behavior.title,
+    body: behavior.pingMessage,
+    sound: true,
+    vibrate: [0, 250, 250, 250],
+    categoryIdentifier: CHECKIN_CATEGORY,
+    data: { behaviorId: behavior.id, attemptId, phase: 'initial' },
+  };
+  if (Platform.OS === 'android') {
+    (content as any).channelId = ANDROID_CHANNEL_ID;
+  }
+
   const notificationId = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: behavior.title,
-      body: behavior.pingMessage,
-      sound: true,
-      vibrate: [0, 250, 250, 250],
-      categoryIdentifier: CHECKIN_CATEGORY,
-      data: {
-        behaviorId: behavior.id,
-        attemptId,
-        phase: 'initial',
-      },
-    },
-    trigger: {
-      type: 'timeInterval',
-      seconds: 1,
-      repeats: false,
-    } as any,
+    content,
+    trigger: { type: 'timeInterval', seconds: 1, repeats: false } as any,
   });
 
   const attempt: ReminderAttempt = {
@@ -337,56 +317,78 @@ export async function handleCheckInResponse(
   result: 'yes' | 'no'
 ): Promise<void> {
   const store = useStore.getState();
-
   const attempt = store.reminderAttempts.find((a) => a.id === attemptId);
-  if (!attempt) return;
-
   const behavior = store.behaviors.find((b) => b.id === behaviorId);
   if (!behavior) return;
 
-  if (result === 'yes') {
-    await store.updateReminderAttempt({
-      ...attempt,
-      status: 'resolved',
-      updatedAt: Date.now(),
-    });
-    await store.updateBehavior(onYes(behavior));
+  if (attempt && (attempt.status === 'resolved' || attempt.status === 'disabled')) {
+    // idempotency: don't double-process a fired-then-cancelled attempt
     return;
   }
 
-  const nextPhase: 'snooze15' | 'snooze30' = attempt.noCount >= 1 ? 'snooze30' : 'snooze15';
-  const snoozeMinutes = nextPhase === 'snooze15' ? 15 : 30;
-  const snoozeTime = addMinutes(Date.now(), snoozeMinutes);
+  if (result === 'yes') {
+    if (attempt) {
+      await store.updateReminderAttempt({
+        ...attempt,
+        status: 'resolved',
+        updatedAt: Date.now(),
+      });
+    }
+    const streak = calculateStreak(behaviorId, store.checkIns);
+    if (shouldLevelUp(streak, behavior.lastLevelUpStreak)) {
+      await store.updateBehavior(applyLevelUp(behavior, streak));
+      await rescheduleAll({ force: true });
+    }
+    return;
+  }
+
+  // result === 'no'
+  if (!attempt) return;
+  const noCount = attempt.noCount + 1;
 
   await store.updateReminderAttempt({
     ...attempt,
     status: 'skipped',
+    noCount,
     updatedAt: Date.now(),
-    noCount: attempt.noCount + 1,
   });
 
-  const updatedBehavior = onNo(behavior);
+  const consecutiveNos = consecutiveNoCount(behaviorId, store.checkIns);
+  if (consecutiveNos >= LAPSE_NO_THRESHOLD) {
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+    await store.updateBehavior({
+      ...applyLapse(behavior),
+      pausedUntil: endOfDay.getTime(),
+    });
+    await cancelForBehavior(behaviorId);
+    return;
+  }
 
-  if (attempt.noCount < 2) {
-    await store.updateBehavior(updatedBehavior);
+  if (noCount < 2) {
+    const nextPhase: 'snooze15' | 'snooze30' = noCount === 1 ? 'snooze15' : 'snooze30';
+    const snoozeMinutes = nextPhase === 'snooze15' ? 15 : 30;
+    const snoozeTime = addMinutes(Date.now(), snoozeMinutes);
     const newAttemptId = generateUUID();
+
+    const content: Notifications.NotificationContentInput = {
+      title: behavior.title,
+      body:
+        behavior.kind === 'eliminate'
+          ? `CATCH IT — ${behavior.pingMessage}`
+          : behavior.pingMessage,
+      sound: true,
+      vibrate: [0, 250, 250, 250],
+      categoryIdentifier: CHECKIN_CATEGORY,
+      data: { behaviorId, attemptId: newAttemptId, phase: nextPhase },
+    };
+    if (Platform.OS === 'android') {
+      (content as any).channelId = ANDROID_CHANNEL_ID;
+    }
+
     const newNotificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: behavior.title,
-        body: behavior.pingMessage,
-        sound: true,
-        vibrate: [0, 250, 250, 250],
-        categoryIdentifier: CHECKIN_CATEGORY,
-        data: {
-          behaviorId,
-          attemptId: newAttemptId,
-          phase: nextPhase,
-        },
-      },
-      trigger: {
-        type: 'date',
-        date: snoozeTime,
-      } as any,
+      content,
+      trigger: { type: 'date', date: snoozeTime } as any,
     });
 
     const newAttempt: ReminderAttempt = {
@@ -395,19 +397,11 @@ export async function handleCheckInResponse(
       scheduledFor: snoozeTime.getTime(),
       phase: nextPhase,
       status: 'scheduled',
-      noCount: attempt.noCount + 1,
+      noCount,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       notificationId: newNotificationId,
     };
     await store.addReminderAttempt(newAttempt);
-  } else {
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-    await store.updateBehavior({
-      ...updatedBehavior,
-      pausedUntil: endOfDay.getTime(),
-    });
-    await cancelForBehavior(behaviorId);
   }
 }

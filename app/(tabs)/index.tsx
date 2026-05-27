@@ -6,6 +6,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import { useCallback, useState } from 'react';
 import type { Behavior } from '@/types';
+import { deriveStage, stageLabel } from '@/services/levels';
+import { domainLabel } from '@/services/library-content';
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -136,6 +138,10 @@ function StateTile({ behavior, today, streak, colors, onPress }: TileProps) {
   const isPaused = behavior.pausedUntil != null && behavior.pausedUntil > Date.now();
   const isActiveToday = behavior.activeDays.includes(today);
   const isEnabled = !isPaused && isActiveToday;
+  const stage = deriveStage(behavior.level, streak);
+  const textColor = isEnabled ? colors.stateEnabledText : colors.stateDisabledText;
+  const kindBadgeBg = behavior.kind === 'eliminate' ? colors.warning + '33' : colors.tint + '33';
+  const kindBadgeText = behavior.kind === 'eliminate' ? colors.warning : colors.tint;
 
   return (
     <Pressable
@@ -154,10 +160,7 @@ function StateTile({ behavior, today, streak, colors, onPress }: TileProps) {
         <View style={styles.tileTopRow}>
           <Text
             numberOfLines={2}
-            style={[
-              styles.tileTitle,
-              { color: isEnabled ? colors.stateEnabledText : colors.stateDisabledText },
-            ]}
+            style={[styles.tileTitle, { color: textColor }]}
           >
             {behavior.title}
           </Text>
@@ -169,12 +172,22 @@ function StateTile({ behavior, today, streak, colors, onPress }: TileProps) {
           )}
         </View>
 
-        <Text
-          style={[
-            styles.tileWindow,
-            { color: isEnabled ? colors.stateEnabledText : colors.stateDisabledText },
-          ]}
-        >
+        <View style={styles.kindRow}>
+          <View style={[styles.kindBadge, { backgroundColor: kindBadgeBg }]}>
+            <Text style={[styles.kindBadgeText, { color: kindBadgeText }]}>
+              {behavior.kind === 'eliminate' ? 'ELIMINATE' : 'ADOPT'}
+            </Text>
+          </View>
+          <Text style={[styles.stageText, { color: textColor }]}>{stageLabel(stage)}</Text>
+        </View>
+
+        {behavior.domain && (
+          <Text style={[styles.domainText, { color: textColor, opacity: 0.7 }]}>
+            {domainLabel(behavior.domain)}
+          </Text>
+        )}
+
+        <Text style={[styles.tileWindow, { color: textColor }]}>
           {behavior.window.from} – {behavior.window.to}
         </Text>
 
@@ -315,6 +328,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.85,
     marginTop: 4,
+  },
+  kindRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  kindBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  kindBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  stageText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  domainText: {
+    fontSize: 11,
+    marginTop: 2,
   },
   daysRow: {
     flexDirection: 'row',

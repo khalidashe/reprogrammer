@@ -21,12 +21,12 @@ export default function CheckInScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { behaviorId, attemptId } = useLocalSearchParams();
-  const { behaviors, addCheckIn, getStreak } = useStore();
+  const { behaviors, addCheckIn } = useStore();
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const behavior = useMemo(
-    () => behaviors.find(b => b.id === behaviorId as string),
+    () => behaviors.find((b) => b.id === (behaviorId as string)),
     [behaviors, behaviorId]
   );
 
@@ -58,12 +58,15 @@ export default function CheckInScreen() {
   if (!behavior) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorText, { color: colors.text }]}>
-          State not found
-        </Text>
+        <Text style={[styles.errorText, { color: colors.text }]}>State not found</Text>
       </View>
     );
   }
+
+  const isEliminate = behavior.kind === 'eliminate';
+  const yesLabel = isEliminate ? 'Caught It' : 'Check-in';
+  const noLabel = isEliminate ? "Didn't Notice" : 'Snooze';
+  const messageBody = isEliminate ? `CATCH IT — ${behavior.pingMessage}` : behavior.pingMessage;
 
   return (
     <KeyboardAvoidingView
@@ -71,12 +74,23 @@ export default function CheckInScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.content}>
-        <Text style={[styles.behaviorTitle, { color: colors.text }]}>
-          {behavior.title}
-        </Text>
-        <Text style={[styles.message, { color: colors.text }]}>
-          {behavior.pingMessage}
-        </Text>
+        <View
+          style={[
+            styles.kindPill,
+            { backgroundColor: isEliminate ? colors.warning + '33' : colors.tint + '33' },
+          ]}
+        >
+          <Text
+            style={[
+              styles.kindPillText,
+              { color: isEliminate ? colors.warning : colors.tint },
+            ]}
+          >
+            {isEliminate ? 'ELIMINATE' : 'ADOPT'}
+          </Text>
+        </View>
+        <Text style={[styles.behaviorTitle, { color: colors.text }]}>{behavior.title}</Text>
+        <Text style={[styles.message, { color: colors.text }]}>{messageBody}</Text>
 
         <View style={styles.buttonContainer}>
           <Pressable
@@ -84,11 +98,10 @@ export default function CheckInScreen() {
             disabled={isSubmitting}
             style={[
               styles.button,
-              styles.yesButton,
               { backgroundColor: colors.tint, opacity: isSubmitting ? 0.5 : 1 },
             ]}
           >
-            <Text style={styles.buttonText}>✓ Yes</Text>
+            <Text style={styles.buttonText}>{yesLabel}</Text>
           </Pressable>
           <Pressable
             onPress={() => handleResponse('no')}
@@ -96,13 +109,10 @@ export default function CheckInScreen() {
             style={[
               styles.button,
               styles.noButton,
-              {
-                borderColor: colors.tint,
-                opacity: isSubmitting ? 0.5 : 1,
-              },
+              { borderColor: colors.tint, opacity: isSubmitting ? 0.5 : 1 },
             ]}
           >
-            <Text style={[styles.buttonText, { color: colors.tint }]}>✗ No</Text>
+            <Text style={[styles.buttonText, { color: colors.tint }]}>{noLabel}</Text>
           </Pressable>
         </View>
 
@@ -130,6 +140,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
   },
+  kindPill: {
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  kindPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   behaviorTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -152,7 +174,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  yesButton: {},
   noButton: {
     borderWidth: 2,
     backgroundColor: 'transparent',

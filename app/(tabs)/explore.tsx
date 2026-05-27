@@ -5,6 +5,7 @@ import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import { useCallback, useState } from 'react';
+import { deriveStage } from '@/services/levels';
 
 /**
  * Profile screen. Reached from the small profile icon on the Dashboard.
@@ -33,13 +34,16 @@ export default function ProfileScreen() {
   const daysActive = new Set(
     checkIns.map((c) => new Date(c.at).toDateString())
   ).size;
+  const habitualCount = behaviors.filter(
+    (b) => deriveStage(b.level, getStreak(b.id)) === 'habitual'
+  ).length;
 
   const stats: { value: string | number; label: string }[] = [
     { value: activeStates.length, label: 'Active states' },
+    { value: habitualCount, label: 'Habitual states' },
     { value: totalCheckIns, label: 'Total check-ins' },
     { value: `${successRate}%`, label: 'Success rate' },
     { value: longestStreak, label: 'Longest streak' },
-    { value: totalStates, label: 'Total states' },
     { value: daysActive, label: 'Days active' },
   ];
 
