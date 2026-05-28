@@ -15,6 +15,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { cancelForBehavior, sendTestNotification } from '@/services/notifications';
 import { deriveStage, stageLabel } from '@/services/levels';
+import { ADOPT_TEMPLATES } from '@/services/library/adopt';
+import { ELIMINATE_TEMPLATES } from '@/services/library/eliminate';
+import { LIBRARY_GUIDES } from '@/services/library/guides';
 
 export default function BehaviorDetailScreen() {
   const router = useRouter();
@@ -47,6 +50,22 @@ export default function BehaviorDetailScreen() {
   }
 
   const streak = getStreak(behavior.id);
+
+  const adoptTemplate =
+    behavior.kind === 'adopt'
+      ? ADOPT_TEMPLATES.find(
+          (t) => t.libraryGuideId === behavior.libraryGuideId || t.title === behavior.title
+        )
+      : undefined;
+  const eliminateTemplate =
+    behavior.kind === 'eliminate'
+      ? ELIMINATE_TEMPLATES.find((t) => t.title === behavior.title)
+      : undefined;
+  const linkedGuideId =
+    behavior.libraryGuideId ?? adoptTemplate?.libraryGuideId ?? eliminateTemplate?.relatedGuideIds?.[0];
+  const linkedGuide = linkedGuideId
+    ? LIBRARY_GUIDES.find((g) => g.id === linkedGuideId)
+    : undefined;
 
   const handleEdit = () => {
     router.push({ pathname: '/create', params: { id: behavior.id } });
@@ -145,6 +164,57 @@ export default function BehaviorDetailScreen() {
           </Text>
         </View>
       </View>
+
+      {(adoptTemplate?.tactics?.length || eliminateTemplate?.triggers?.length) ? (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {adoptTemplate ? 'Tactics' : 'Triggers'}
+          </Text>
+          {(adoptTemplate?.tactics ?? eliminateTemplate?.triggers ?? []).map((item, idx) => (
+            <View key={idx} style={styles.contextRow}>
+              <Text style={[styles.contextBullet, { color: colors.tint }]}>•</Text>
+              <Text style={[styles.contextText, { color: colors.text }]}>{item}</Text>
+            </View>
+          ))}
+          {eliminateTemplate?.whyItsCostly && (
+            <Text style={[styles.contextWhy, { color: colors.textMuted }]}>
+              {eliminateTemplate.whyItsCostly}
+            </Text>
+          )}
+          {adoptTemplate?.whyItWorks && (
+            <Text style={[styles.contextWhy, { color: colors.textMuted }]}>
+              {adoptTemplate.whyItWorks}
+            </Text>
+          )}
+        </View>
+      ) : null}
+
+      {linkedGuide && (
+        <View style={styles.section}>
+          <Pressable
+            onPress={() =>
+              router.push({ pathname: '/library/guide/[id]', params: { id: linkedGuide.id } })
+            }
+            style={[
+              styles.guideLink,
+              { borderColor: colors.tintMuted, backgroundColor: colors.tintSoft },
+            ]}
+          >
+            <Text style={[styles.guideLinkLabel, { color: colors.textMuted }]}>
+              READ THE PROGRAM
+            </Text>
+            <Text style={[styles.guideLinkTitle, { color: colors.text }]}>
+              {linkedGuide.title}
+            </Text>
+            <Text
+              style={[styles.guideLinkSummary, { color: colors.textMuted }]}
+              numberOfLines={2}
+            >
+              {linkedGuide.summary}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -364,5 +434,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     marginTop: 20,
+  },
+  contextRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  contextBullet: {
+    fontSize: 16,
+    fontWeight: '700',
+    minWidth: 14,
+  },
+  contextText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  contextWhy: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  guideLink: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    gap: 4,
+  },
+  guideLinkLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+  },
+  guideLinkTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  guideLinkSummary: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
   },
 });
