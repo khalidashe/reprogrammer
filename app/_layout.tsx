@@ -107,6 +107,9 @@ export default function RootLayout() {
         <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
         <Stack.Screen name="create" options={{ presentation: 'modal', title: 'Create State' }} />
         <Stack.Screen name="behavior/[id]" options={{ title: 'State' }} />
+        <Stack.Screen name="library/guide/[id]" options={{ title: 'Guide' }} />
+        <Stack.Screen name="library/state/[id]" options={{ title: 'State' }} />
+        <Stack.Screen name="library/core/[id]" options={{ title: 'Core Guide' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

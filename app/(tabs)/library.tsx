@@ -1,104 +1,54 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
-import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, type ThemeColors } from '@/constants/theme';
 import useStore from '@/store/useStore';
-import { generateUUID } from '@/utils/uuid';
-import { scheduleForBehavior } from '@/services/notifications';
-import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from '@/services/levels';
 import {
   LIBRARY_GUIDES,
   LIBRARY_PACKAGES,
   ADOPT_TEMPLATES,
   ELIMINATE_TEMPLATES,
+  CORE_STORIES,
+  SCIENCE_SECTION,
   domainLabel,
   type LibraryGuide,
   type LibraryPackage,
   type AdoptTemplate,
   type EliminateTemplate,
+  type CoreStory,
 } from '@/services/library-content';
-import type { Behavior } from '@/types';
+import { GROUND_RULES, type GroundRule } from '@/services/ground-rules';
 
-type Tab = 'programs' | 'states' | 'packages';
+type Tab = 'core' | 'programs' | 'states' | 'packages';
 
 export default function LibraryScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const [tab, setTab] = useState<Tab>('programs');
-  const { behaviors, addBehavior } = useStore();
+  const [tab, setTab] = useState<Tab>('core');
+  const { behaviors } = useStore();
 
-  const addedTemplateIds = useMemo(
-    () => new Set(behaviors.map((b) => b.title)),
-    [behaviors]
-  );
+  const addedTitles = new Set(behaviors.map((b) => b.title));
 
-  const handleAddAdopt = async (template: AdoptTemplate) => {
-    const behavior: Behavior = {
-      id: generateUUID(),
-      kind: 'adopt',
-      title: template.title,
-      pingMessage: template.pingMessage,
-      practiceType: template.practiceType,
-      domain: template.domain,
-      libraryGuideId: template.libraryGuideId,
-      window: template.window,
-      activeDays: [0, 1, 2, 3, 4, 5, 6],
-      intervalMinutes: template.intervalMinutes,
-      level: INITIAL_LEVEL,
-      lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
-      createdAt: Date.now(),
-      hidden: false,
-      bookmarked: false,
-    };
-    await addBehavior(behavior);
-    await scheduleForBehavior(behavior);
-    Alert.alert('Added', `"${template.title}" is now in your active states.`);
-  };
-
-  const handleAddEliminate = async (template: EliminateTemplate) => {
-    const replacement = behaviors.find(
-      (b) => b.kind === 'adopt' && (b.id === template.replacementAdoptId || b.title === ADOPT_TEMPLATES.find((a) => a.id === template.replacementAdoptId)?.title)
-    );
-    if (!replacement) {
-      const adoptTemplate = ADOPT_TEMPLATES.find((a) => a.id === template.replacementAdoptId);
-      Alert.alert(
-        'Add replacement first',
-        `"${template.title}" needs an active "${adoptTemplate?.title ?? 'replacement'}" Adopt state. Add that one first, then come back.`
-      );
-      return;
-    }
-    const behavior: Behavior = {
-      id: generateUUID(),
-      kind: 'eliminate',
-      title: template.title,
-      pingMessage: template.pingMessage,
-      domain: template.domain,
-      replacementStateId: replacement.id,
-      window: { from: '09:00', to: '21:00' },
-      activeDays: [0, 1, 2, 3, 4, 5, 6],
-      intervalMinutes: 30,
-      level: INITIAL_LEVEL,
-      lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
-      createdAt: Date.now(),
-      hidden: false,
-      bookmarked: false,
-    };
-    await addBehavior(behavior);
-    await scheduleForBehavior(behavior);
-    Alert.alert('Added', `"${template.title}" is now in your active states.`);
-  };
+  const goToGuide = (id: string) =>
+    router.push({ pathname: '/library/guide/[id]', params: { id } });
+  const goToState = (id: string, kind: 'adopt' | 'eliminate') =>
+    router.push({ pathname: '/library/state/[id]', params: { id, kind } });
+  const goToCore = (id: string) =>
+    router.push({ pathname: '/library/core/[id]', params: { id } });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Library</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          16 guides, 17 adopt templates, 12 eliminate templates.
+          {LIBRARY_GUIDES.length} guides · {ADOPT_TEMPLATES.length} adopt · {ELIMINATE_TEMPLATES.length} eliminate
         </Text>
       </View>
 
       <View style={styles.tabRow}>
-        {(['programs', 'states', 'packages'] as const).map((t) => (
+        {(['core', 'programs', 'states', 'packages'] as const).map((t) => (
           <Pressable
             key={t}
             onPress={() => setTab(t)}
@@ -116,17 +66,69 @@ export default function LibraryScreen() {
                 { color: tab === t ? colors.textOnBrand : colors.text },
               ]}
             >
-              {t === 'programs' ? 'Programs' : t === 'states' ? 'States' : 'Packages'}
+              {t === 'core'
+                ? 'Core'
+                : t === 'programs'
+                  ? 'Programs'
+                  : t === 'states'
+                    ? 'States'
+                    : 'Packages'}
             </Text>
           </Pressable>
         ))}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {tab === 'core' && (
+          <View style={styles.section}>
+            <Text style={[styles.subSectionTitle, { color: colors.text }]}>Ground Rules</Text>
+            {GROUND_RULES.map((rule, idx) => (
+              <GroundRuleCard key={rule.id} rule={rule} index={idx + 1} colors={colors} />
+            ))}
+            <Text
+              style={[styles.subSectionTitle, { color: colors.text, marginTop: 20 }]}
+            >
+              Stories
+            </Text>
+            {CORE_STORIES.map((story) => (
+              <CoreStoryCard
+                key={story.id}
+                story={story}
+                colors={colors}
+                onPress={() => goToCore(story.id)}
+              />
+            ))}
+            <Text
+              style={[styles.subSectionTitle, { color: colors.text, marginTop: 20 }]}
+            >
+              The Science
+            </Text>
+            <Pressable
+              onPress={() => goToCore('science')}
+              style={[
+                styles.card,
+                { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+              ]}
+            >
+              <Text style={[styles.cardTitle, { color: colors.text }]}>
+                {SCIENCE_SECTION.title}
+              </Text>
+              <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={3}>
+                {SCIENCE_SECTION.intro}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {tab === 'programs' && (
           <View style={styles.section}>
             {LIBRARY_GUIDES.map((guide) => (
-              <GuideCard key={guide.id} guide={guide} colors={colors} />
+              <GuideCard
+                key={guide.id}
+                guide={guide}
+                colors={colors}
+                onPress={() => goToGuide(guide.id)}
+              />
             ))}
           </View>
         )}
@@ -140,9 +142,9 @@ export default function LibraryScreen() {
                 title={t.title}
                 domain={domainLabel(t.domain)}
                 message={t.pingMessage}
-                added={addedTemplateIds.has(t.title)}
+                added={addedTitles.has(t.title)}
                 colors={colors}
-                onAdd={() => handleAddAdopt(t)}
+                onPress={() => goToState(t.id, 'adopt')}
               />
             ))}
             <Text
@@ -156,9 +158,9 @@ export default function LibraryScreen() {
                 title={t.title}
                 domain={domainLabel(t.domain)}
                 message={t.pingMessage}
-                added={addedTemplateIds.has(t.title)}
+                added={addedTitles.has(t.title)}
                 colors={colors}
-                onAdd={() => handleAddEliminate(t)}
+                onPress={() => goToState(t.id, 'eliminate')}
               />
             ))}
           </View>
@@ -176,9 +178,72 @@ export default function LibraryScreen() {
   );
 }
 
-function GuideCard({ guide, colors }: { guide: LibraryGuide; colors: ThemeColors }) {
+function GroundRuleCard({
+  rule,
+  index,
+  colors,
+}: {
+  rule: GroundRule;
+  index: number;
+  colors: ThemeColors;
+}) {
   return (
     <View
+      style={[
+        styles.ruleCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
+      <View style={styles.ruleHeader}>
+        <View style={[styles.ruleNumber, { backgroundColor: colors.tint }]}>
+          <Text style={[styles.ruleNumberText, { color: colors.textOnBrand }]}>{index}</Text>
+        </View>
+        <Text style={[styles.ruleTitle, { color: colors.text }]}>{rule.title}</Text>
+      </View>
+      <Text style={[styles.ruleBody, { color: colors.text }]}>{rule.body}</Text>
+      <Text style={[styles.ruleCitation, { color: colors.textMuted }]}>{rule.citation}</Text>
+    </View>
+  );
+}
+
+function CoreStoryCard({
+  story,
+  colors,
+  onPress,
+}: {
+  story: CoreStory;
+  colors: ThemeColors;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.card,
+        { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+      ]}
+    >
+      <Text style={[styles.cardMeta, { color: colors.textMuted }]}>Story {story.index}</Text>
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{story.title}</Text>
+      <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={2}>
+        {story.principle}
+      </Text>
+    </Pressable>
+  );
+}
+
+function GuideCard({
+  guide,
+  colors,
+  onPress,
+}: {
+  guide: LibraryGuide;
+  colors: ThemeColors;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
       style={[
         styles.card,
         { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
@@ -191,7 +256,7 @@ function GuideCard({ guide, colors }: { guide: LibraryGuide; colors: ThemeColors
       <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={3}>
         {guide.summary}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -201,17 +266,18 @@ function TemplateCard({
   message,
   added,
   colors,
-  onAdd,
+  onPress,
 }: {
   title: string;
   domain: string;
   message: string;
   added: boolean;
   colors: ThemeColors;
-  onAdd: () => void;
+  onPress: () => void;
 }) {
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       style={[
         styles.card,
         { backgroundColor: colors.surface, borderColor: colors.border },
@@ -222,30 +288,16 @@ function TemplateCard({
           <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.cardMeta, { color: colors.textMuted }]}>{domain}</Text>
         </View>
-        <Pressable
-          onPress={onAdd}
-          disabled={added}
-          style={[
-            styles.addButton,
-            {
-              backgroundColor: added ? colors.surfaceMuted : colors.tint,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.addButtonText,
-              { color: added ? colors.textMuted : colors.textOnBrand },
-            ]}
-          >
-            {added ? 'Added' : 'Add'}
-          </Text>
-        </Pressable>
+        {added && (
+          <View style={[styles.addedPill, { backgroundColor: colors.surfaceMuted }]}>
+            <Text style={[styles.addedPillText, { color: colors.textMuted }]}>Added</Text>
+          </View>
+        )}
       </View>
       <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={2}>
         {message}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -302,10 +354,46 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '600' },
   cardMeta: { fontSize: 11, marginTop: 2 },
   cardBody: { fontSize: 13, lineHeight: 18, marginTop: 4 },
-  addButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+  addedPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  addButtonText: { fontSize: 12, fontWeight: '700' },
+  addedPillText: { fontSize: 11, fontWeight: '700' },
+  ruleCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    gap: 8,
+  },
+  ruleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ruleNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ruleNumberText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ruleTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+  },
+  ruleBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  ruleCitation: {
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
 });
