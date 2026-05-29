@@ -17,6 +17,7 @@ const MAPPING = {
   'house.fill': 'home',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
+  'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
   // Tab bar icons (Dashboard / States / Library)
   'square.grid.2x2.fill': 'dashboard',

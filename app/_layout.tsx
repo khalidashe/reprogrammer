@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
@@ -14,23 +14,31 @@ import {
   rescheduleAll,
   setupNotificationCategory,
 } from '@/services/notifications';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { ContentModalsProvider } from '@/components/library/content-modals-provider';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const pathname = usePathname();
   const isHydrated = useStore((state) => state.isHydrated);
   const appProfile = useStore((state) => state.appProfile);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
 
   useEffect(() => {
+    if (!isHydrated) return;
+    if (!appProfile.hasOnboarded && pathname !== '/onboarding') {
+      router.replace('/onboarding');
+    } else if (appProfile.hasOnboarded && pathname === '/onboarding') {
+      router.replace('/(tabs)');
+    }
+  }, [isHydrated, appProfile.hasOnboarded, pathname, router]);
+
+  useEffect(() => {
     const setup = async () => {
       await useStore.getState().hydrate();
-      await requestNotificationPermission();
+      const granted = await requestNotificationPermission();
+      await useStore.getState().updateAppProfile({ notificationsDenied: !granted });
       await setupNotificationCategory();
 
       notificationListener.current = Notifications.addNotificationReceivedListener(
@@ -89,28 +97,17 @@ export default function RootLayout() {
     return null;
   }
 
-  if (!appProfile.hasOnboarded) {
-    return (
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
-        <Stack.Screen name="create" options={{ presentation: 'modal', title: 'Create State' }} />
-        <Stack.Screen name="behavior/[id]" options={{ title: 'State' }} />
-        <Stack.Screen name="library/guide/[id]" options={{ title: 'Guide' }} />
-        <Stack.Screen name="library/state/[id]" options={{ title: 'State' }} />
-        <Stack.Screen name="library/core/[id]" options={{ title: 'Core Guide' }} />
-      </Stack>
+      <ContentModalsProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
+          <Stack.Screen name="create" options={{ presentation: 'modal', title: 'Create State' }} />
+          <Stack.Screen name="behavior/[id]" options={{ title: 'State' }} />
+        </Stack>
+      </ContentModalsProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
   );

@@ -1,11 +1,17 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, Type, Space, Radius } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { useCallback, useState } from 'react';
 import { deriveStage } from '@/services/levels';
+import { rescheduleAll } from '@/services/notifications';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import {
+  hhmmToDate,
+  dateToHHmm,
+  formatTimeForDisplayString,
+} from '@/utils/time';
 
 /**
  * Profile screen. Reached from the small profile icon on the Dashboard.
@@ -15,8 +21,9 @@ export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { behaviors, checkIns, getStreak } = useStore();
+  const { behaviors, checkIns, appProfile, updateAppProfile, getStreak } = useStore();
   const [, setRefresh] = useState({});
+  const [pickerOpen, setPickerOpen] = useState<'from' | 'to' | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -25,7 +32,6 @@ export default function ProfileScreen() {
   );
 
   const activeStates = behaviors.filter((b) => !b.hidden);
-  const totalStates = behaviors.length;
   const totalCheckIns = checkIns.length;
   const successCount = checkIns.filter((c) => c.result === 'yes').length;
   const successRate =
@@ -46,6 +52,62 @@ export default function ProfileScreen() {
     { value: longestStreak, label: 'Longest streak' },
     { value: daysActive, label: 'Days active' },
   ];
+
+  const quietHours = appProfile.quietHours;
+  const quietHoursEnabled = quietHours != null;
+
+  const handleToggleQuietHours = async () => {
+    if (quietHoursEnabled) {
+      await updateAppProfile({ quietHours: undefined });
+    } else {
+      await updateAppProfile({ quietHours: { from: '22:00', to: '07:00' } });
+    }
+    await rescheduleAll({ force: true });
+  };
+
+  const handleQuietTimeChange = (which: 'from' | 'to') => async (
+    event: DateTimePickerEvent,
+    selected?: Date
+  ) => {
+    if (Platform.OS === 'android') {
+      setPickerOpen(null);
+    }
+    if (event.type === 'dismissed' || !selected || !quietHours) return;
+    const value = dateToHHmm(selected);
+    await updateAppProfile({
+      quietHours: {
+        from: which === 'from' ? value : quietHours.from,
+        to: which === 'to' ? value : quietHours.to,
+      },
+    });
+    await rescheduleAll({ force: true });
+  };
+
+  const renderTimeChip = (which: 'from' | 'to', value: string) => {
+    const isOpen = pickerOpen === which;
+    return (
+      <Pressable
+        onPress={() => setPickerOpen(isOpen ? null : which)}
+        style={[
+          styles.timeChip,
+          {
+            backgroundColor: isOpen ? colors.tint : colors.background,
+            borderColor: colors.tint,
+          },
+        ]}
+        accessibilityLabel={`Quiet hours ${which} time, currently ${formatTimeForDisplayString(value)}`}
+      >
+        <Text
+          style={[
+            styles.timeChipText,
+            { color: isOpen ? colors.textOnBrand : colors.text },
+          ]}
+        >
+          {formatTimeForDisplayString(value)}
+        </Text>
+      </Pressable>
+    );
+  };
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -75,6 +137,73 @@ export default function ProfileScreen() {
             </Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Notifications
+        </Text>
+        <Text
+          style={[styles.notificationStatus, { color: appProfile.notificationsDenied ? colors.danger : colors.textMuted }]}
+        >
+          {appProfile.notificationsDenied
+            ? 'Disabled in system settings'
+            : 'Enabled'}
+        </Text>
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Quiet hours
+            </Text>
+            <Text style={[styles.sectionSub, { color: colors.textMuted }]}>
+              Reminders pause inside this window across every state.
+            </Text>
+          </View>
+          <Pressable
+            onPress={handleToggleQuietHours}
+            style={[
+              styles.toggle,
+              {
+                backgroundColor: quietHoursEnabled ? colors.tint : colors.surfaceMuted,
+              },
+            ]}
+            accessibilityLabel={
+              quietHoursEnabled ? 'Disable quiet hours' : 'Enable quiet hours'
+            }
+          >
+            <Text
+              style={[
+                styles.toggleText,
+                {
+                  color: quietHoursEnabled ? colors.textOnBrand : colors.text,
+                },
+              ]}
+            >
+              {quietHoursEnabled ? 'On' : 'Off'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {quietHoursEnabled ? (
+          <View style={styles.timeRow}>
+            <Text style={[styles.timeRowLabel, { color: colors.textMuted }]}>From</Text>
+            {renderTimeChip('from', quietHours.from)}
+            <Text style={[styles.timeRowLabel, { color: colors.textMuted }]}>to</Text>
+            {renderTimeChip('to', quietHours.to)}
+          </View>
+        ) : null}
+
+        {quietHoursEnabled && pickerOpen ? (
+          <DateTimePicker
+            value={hhmmToDate(pickerOpen === 'from' ? quietHours.from : quietHours.to)}
+            mode="time"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleQuietTimeChange(pickerOpen)}
+          />
+        ) : null}
       </View>
 
       <View style={styles.section}>
@@ -143,10 +272,36 @@ const styles = StyleSheet.create({
     marginTop: 24,
     gap: 12,
   },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
   },
+  sectionSub: { ...Type.caption, marginTop: Space.xs },
+  notificationStatus: { ...Type.body },
+  toggle: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.xs + 2,
+    borderRadius: Radius.sm,
+  },
+  toggleText: { ...Type.bodyBold },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  timeRowLabel: { ...Type.body },
+  timeChip: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+  },
+  timeChipText: { ...Type.bodyBold },
   descriptionText: {
     fontSize: 14,
     lineHeight: 20,

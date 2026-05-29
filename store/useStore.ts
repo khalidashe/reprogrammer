@@ -106,6 +106,7 @@ interface StoreState {
   addCheckIn: (checkIn: CheckIn) => Promise<void>;
   getStreak: (behaviorId: string) => number;
   setOnboarded: (value: boolean) => Promise<void>;
+  updateAppProfile: (partial: Partial<AppProfile>) => Promise<void>;
   addReminderAttempt: (attempt: ReminderAttempt) => Promise<void>;
   updateReminderAttempt: (attempt: ReminderAttempt) => Promise<void>;
   getReminderAttempts: (behaviorId: string) => ReminderAttempt[];
@@ -172,9 +173,15 @@ const useStore = create<StoreState>((set, get) => ({
     const state = get();
     const updated = state.behaviors.filter((b) => b.id !== id);
     const checkInsUpdated = state.checkIns.filter((c) => c.behaviorId !== id);
-    set({ behaviors: updated, checkIns: checkInsUpdated });
+    const attemptsUpdated = state.reminderAttempts.filter((a) => a.behaviorId !== id);
+    set({
+      behaviors: updated,
+      checkIns: checkInsUpdated,
+      reminderAttempts: attemptsUpdated,
+    });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(checkInsUpdated));
+    await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(attemptsUpdated));
   },
 
   addCheckIn: async (checkIn: CheckIn) => {
@@ -192,6 +199,13 @@ const useStore = create<StoreState>((set, get) => ({
   setOnboarded: async (value: boolean) => {
     const state = get();
     const updated = { ...state.appProfile, hasOnboarded: value };
+    set({ appProfile: updated });
+    await AsyncStorage.setItem('rpg.app.v1', JSON.stringify(updated));
+  },
+
+  updateAppProfile: async (partial: Partial<AppProfile>) => {
+    const state = get();
+    const updated = { ...state.appProfile, ...partial };
     set({ appProfile: updated });
     await AsyncStorage.setItem('rpg.app.v1', JSON.stringify(updated));
   },

@@ -185,6 +185,45 @@ export const Colors: { light: ThemeVariant; dark: ThemeVariant } = {
 export type ThemeName = keyof typeof Colors;
 export type ThemeColors = ThemeVariant;
 
+/**
+ * Typography scale — 5 steps + a reserved display token.
+ * Use these as `{ ...Type.body }` spread into style objects, with `color`
+ * applied separately at the call site.
+ */
+export const Type = {
+  h1: { fontSize: 24, lineHeight: 30, fontWeight: '700' as const },
+  h2: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' as const },
+  bodyBold: { fontSize: 15, lineHeight: 22, fontWeight: '600' as const },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const },
+  micro: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600' as const,
+    letterSpacing: 0.5,
+  },
+  /** Streak / milestone moment — reserved. */
+  display: { fontSize: 48, lineHeight: 54, fontWeight: '700' as const },
+} as const;
+
+/** Spacing tokens — 4pt grid. Prefer these over raw numbers in styles. */
+export const Space = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+} as const;
+
+/** Border radius scale — 3 steps. */
+export const Radius = {
+  sm: 6, // badges, pills, chips
+  md: 12, // buttons, cards, inputs
+  lg: 20, // tiles, modals
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */
