@@ -41,8 +41,15 @@ export function resolveWikiLabel(label: string): ContentTarget {
 
 export function transformWikiLinks(md: string): string {
   return md
-    .replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, '[$2](wiki://$1)')
-    .replace(/\[\[([^\]]+)\]\]/g, '[$1](wiki://$1)');
+    .replace(
+      /\[\[([^|\]]+)\|([^\]]+)\]\]/g,
+      (_, target, display) =>
+        `[${display}](wiki://${encodeURIComponent(target.trim())})`
+    )
+    .replace(
+      /\[\[([^\]]+)\]\]/g,
+      (_, target) => `[${target}](wiki://${encodeURIComponent(target.trim())})`
+    );
 }
 
 export function decodeWikiHref(href: string): string | null {

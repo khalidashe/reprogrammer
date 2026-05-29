@@ -11,7 +11,7 @@ import {
 } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ComponentProps } from 'react';
 import { Alert } from 'react-native';
 import type { Behavior } from '@/types';
 import { deriveStage, stageLabel } from '@/services/levels';
@@ -33,7 +33,9 @@ function startOfTodayMs(): number {
 }
 
 function formatToday(): string {
-  return new Date().toLocaleDateString(undefined, {
+  // Pin to en-US Gregorian so the dashboard date doesn't drift with system locale
+  // (Hijri-configured sims previously showed "Friday, 12 Dhu'l-H.").
+  return new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
@@ -488,7 +490,7 @@ export default function DashboardScreen() {
 
 interface BulkActionButtonProps {
   label: string;
-  icon: string;
+  icon: ComponentProps<typeof IconSymbol>['name'];
   color: string;
   disabled: boolean;
   onPress: () => void;

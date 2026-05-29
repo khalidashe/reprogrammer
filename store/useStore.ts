@@ -173,9 +173,15 @@ const useStore = create<StoreState>((set, get) => ({
     const state = get();
     const updated = state.behaviors.filter((b) => b.id !== id);
     const checkInsUpdated = state.checkIns.filter((c) => c.behaviorId !== id);
-    set({ behaviors: updated, checkIns: checkInsUpdated });
+    const attemptsUpdated = state.reminderAttempts.filter((a) => a.behaviorId !== id);
+    set({
+      behaviors: updated,
+      checkIns: checkInsUpdated,
+      reminderAttempts: attemptsUpdated,
+    });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(checkInsUpdated));
+    await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(attemptsUpdated));
   },
 
   addCheckIn: async (checkIn: CheckIn) => {
