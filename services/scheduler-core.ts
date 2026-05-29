@@ -87,6 +87,7 @@ export function generateTimesForDay(args: {
   rng: () => number;
   maxPings: number;
   quietHours?: { from: string; to: string };
+  pausedUntil?: number;
 }): number[] {
   const {
     date,
@@ -98,6 +99,7 @@ export function generateTimesForDay(args: {
     rng,
     maxPings,
     quietHours,
+    pausedUntil,
   } = args;
   const windowStart = setLocalTimeOnDate(date, windowFrom);
   const windowEnd = setLocalTimeOnDate(date, windowTo);
@@ -120,6 +122,7 @@ export function generateTimesForDay(args: {
 
     if (candidate >= windowEnd) break;
     if (candidate < earliest) continue;
+    if (pausedUntil && candidate < pausedUntil) continue;
     if (candidate - lastScheduled < minGapMs) continue;
     if (isInQuietHours(candidate, date, quietHours)) continue;
 

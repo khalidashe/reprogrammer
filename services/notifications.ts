@@ -112,7 +112,6 @@ function buildCandidatesForBehavior(
   for (let dayOffset = 0; dayOffset < daysHorizon; dayOffset++) {
     const date = addDays(startOfDay(now), dayOffset);
     if (!behavior.activeDays.includes(date.getDay())) continue;
-    if (behavior.pausedUntil && date.getTime() < behavior.pausedUntil) continue;
 
     const rng = mulberry32(hashSeed(behavior.id, dateKey(date)));
     const times = generateTimesForDay({
@@ -125,6 +124,7 @@ function buildCandidatesForBehavior(
       rng,
       maxPings: dailyCap,
       quietHours,
+      pausedUntil: behavior.pausedUntil,
     });
     for (const ts of times) {
       results.push({ behavior, timestamp: ts });

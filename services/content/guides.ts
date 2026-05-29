@@ -1036,6 +1036,6 @@ You can have a streak of zero and still be in the practice. You cannot have a st
 
 ## Connection to the System
 
-This guide is paired with [[Rumination Interrupt]] for the shame-loop, [[Compassionate Curiosity]] for the stance toward your own behavior, and [[Confidence is a Repetition]] for the restart — confidence comes from re-engaging at a smaller rep, not from waiting until you "feel ready" to restart at the old level.`,
+This guide is paired with [[Rumination Interrupt]] for the shame-loop, [[Compassionate Curiosity]] for the stance toward your own behavior, and [[Confidence|Confidence as Repetition]] for the restart — confidence comes from re-engaging at a smaller rep, not from waiting until you "feel ready" to restart at the old level.`,
   },
 ];
