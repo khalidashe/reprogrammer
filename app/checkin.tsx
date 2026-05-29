@@ -8,13 +8,18 @@ import {
   Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { Colors, Type, Space, Radius } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { CheckIn } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { handleCheckInResponse } from '@/services/notifications';
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+
+function draftKey(attemptId: string): string {
+  return `checkin-draft:${attemptId}`;
+}
 
 export default function CheckInScreen() {
   const router = useRouter();
@@ -24,13 +29,46 @@ export default function CheckInScreen() {
   const { behaviors, addCheckIn } = useStore();
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const draftWriteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const behavior = useMemo(
     () => behaviors.find((b) => b.id === (behaviorId as string)),
     [behaviors, behaviorId]
   );
 
-  const handleResponse = async (result: 'yes' | 'no') => {
+  // Load any saved draft for this attempt on mount.
+  useEffect(() => {
+    if (typeof attemptId !== 'string') return;
+    let cancelled = false;
+    AsyncStorage.getItem(draftKey(attemptId))
+      .then((stored) => {
+        if (!cancelled && stored) setNote(stored);
+      })
+      .catch(() => {
+        // Draft load is best-effort.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attemptId]);
+
+  // Debounce-write the draft as the user types.
+  useEffect(() => {
+    if (typeof attemptId !== 'string') return;
+    if (draftWriteTimeout.current) clearTimeout(draftWriteTimeout.current);
+    draftWriteTimeout.current = setTimeout(() => {
+      if (note) {
+        void AsyncStorage.setItem(draftKey(attemptId), note);
+      } else {
+        void AsyncStorage.removeItem(draftKey(attemptId));
+      }
+    }, 200);
+    return () => {
+      if (draftWriteTimeout.current) clearTimeout(draftWriteTimeout.current);
+    };
+  }, [note, attemptId]);
+
+  const handleResponse = async (result: 'yes' | 'tried' | 'no') => {
     if (!behavior || !behaviorId || !attemptId) return;
 
     setIsSubmitting(true);
@@ -46,6 +84,10 @@ export default function CheckInScreen() {
 
       await addCheckIn(checkIn);
       await handleCheckInResponse(behavior.id, attemptId as string, result);
+
+      if (typeof attemptId === 'string') {
+        await AsyncStorage.removeItem(draftKey(attemptId));
+      }
 
       router.back();
     } catch (error) {
@@ -65,6 +107,7 @@ export default function CheckInScreen() {
 
   const isEliminate = behavior.kind === 'eliminate';
   const yesLabel = isEliminate ? 'Caught It' : 'Check-in';
+  const triedLabel = isEliminate ? 'Struggled' : 'Tried';
   const noLabel = isEliminate ? "Didn't Notice" : 'Snooze';
   const messageBody = isEliminate ? `CATCH IT — ${behavior.pingMessage}` : behavior.pingMessage;
 
@@ -77,7 +120,7 @@ export default function CheckInScreen() {
         <View
           style={[
             styles.kindPill,
-            { backgroundColor: isEliminate ? colors.warning + '33' : colors.tint + '33' },
+            { backgroundColor: isEliminate ? colors.warningSoft : colors.tintSoft },
           ]}
         >
           <Text
@@ -100,8 +143,26 @@ export default function CheckInScreen() {
               styles.button,
               { backgroundColor: colors.tint, opacity: isSubmitting ? 0.5 : 1 },
             ]}
+            accessibilityLabel={yesLabel}
           >
             <Text style={styles.buttonText}>{yesLabel}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => handleResponse('tried')}
+            disabled={isSubmitting}
+            style={[
+              styles.button,
+              styles.triedButton,
+              {
+                borderColor: colors.warning,
+                backgroundColor: colors.warningSoft,
+                opacity: isSubmitting ? 0.5 : 1,
+              },
+            ]}
+            accessibilityLabel={triedLabel}
+            accessibilityHint="Showing up counts — use when you engaged but didn't fully complete."
+          >
+            <Text style={[styles.buttonText, { color: colors.warning }]}>{triedLabel}</Text>
           </Pressable>
           <Pressable
             onPress={() => handleResponse('no')}
@@ -111,6 +172,7 @@ export default function CheckInScreen() {
               styles.noButton,
               { borderColor: colors.tint, opacity: isSubmitting ? 0.5 : 1 },
             ]}
+            accessibilityLabel={noLabel}
           >
             <Text style={[styles.buttonText, { color: colors.tint }]}>{noLabel}</Text>
           </Pressable>
@@ -118,13 +180,14 @@ export default function CheckInScreen() {
 
         <Text style={[styles.label, { color: colors.text }]}>Add a note (optional)</Text>
         <TextInput
-          style={[styles.noteInput, { color: colors.text, borderColor: colors.text }]}
+          style={[styles.noteInput, { color: colors.text, borderColor: colors.border }]}
           placeholder="How did it go?"
-          placeholderTextColor={colors.text + '80'}
+          placeholderTextColor={colors.textMuted}
           value={note}
           onChangeText={setNote}
           multiline
           editable={!isSubmitting}
+          accessibilityLabel="Optional note about this check-in"
         />
       </View>
     </KeyboardAvoidingView>
@@ -137,66 +200,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    paddingHorizontal: 20,
-    paddingVertical: 40,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.xxxl + Space.sm,
   },
   kindPill: {
     alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 12,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+    borderRadius: Radius.sm,
+    marginBottom: Space.md,
   },
-  kindPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
+  kindPillText: { ...Type.micro },
   behaviorTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    ...Type.h1,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: Space.md,
   },
   message: {
-    fontSize: 16,
+    ...Type.body,
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: Space.xxxl + Space.sm,
   },
   buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 40,
+    flexDirection: 'column',
+    gap: Space.sm,
+    marginBottom: Space.xxxl + Space.sm,
   },
   button: {
-    flex: 1,
-    paddingVertical: 20,
-    borderRadius: 12,
+    paddingVertical: Space.lg,
+    borderRadius: Radius.md,
     alignItems: 'center',
+  },
+  triedButton: {
+    borderWidth: 2,
   },
   noButton: {
     borderWidth: 2,
     backgroundColor: 'transparent',
   },
   buttonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...Type.h2,
     color: 'white',
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
+    ...Type.bodyBold,
+    marginBottom: Space.sm,
   },
   noteInput: {
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: Radius.md,
+    padding: Space.md,
     minHeight: 80,
-    fontSize: 14,
+    ...Type.body,
   },
   errorText: {
     textAlign: 'center',
-    fontSize: 16,
+    ...Type.body,
   },
 });

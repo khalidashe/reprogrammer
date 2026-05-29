@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { Colors, Type, Space, Radius } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { Behavior, BehaviorKind } from '@/types';
 import { generateUUID } from '@/utils/uuid';
@@ -25,8 +25,15 @@ import { useState, useMemo } from 'react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const ACCENT = '#FF9500';
-
+const DAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 function hhmmToDate(hhmm: string): Date {
   const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
   const d = new Date();
@@ -68,6 +75,7 @@ export default function CreateScreen() {
   );
 
   const [title, setTitle] = useState(editingBehavior?.title || '');
+  const [pingMessage, setPingMessage] = useState(editingBehavior?.pingMessage || '');
   const [startTime, setStartTime] = useState(editingBehavior?.window.from || '09:00');
   const [endTime, setEndTime] = useState(editingBehavior?.window.to || '21:00');
   const [pickerOpen, setPickerOpen] = useState<'start' | 'end' | null>(null);
@@ -153,12 +161,14 @@ export default function CreateScreen() {
       return;
     }
 
+    const effectivePing = pingMessage.trim() || title;
+
     if (editingBehavior) {
       const updated: Behavior = {
         ...editingBehavior,
         kind,
         title,
-        pingMessage: title,
+        pingMessage: effectivePing,
         window: { from: startTime, to: endTime },
         intervalMinutes,
         activeDays,
@@ -172,7 +182,7 @@ export default function CreateScreen() {
         id: generateUUID(),
         kind,
         title,
-        pingMessage: title,
+        pingMessage: effectivePing,
         window: { from: startTime, to: endTime },
         intervalMinutes,
         activeDays,
@@ -203,15 +213,15 @@ export default function CreateScreen() {
         style={[
           styles.timeChip,
           {
-            backgroundColor: isOpen ? ACCENT : colors.background,
-            borderColor: ACCENT,
+            backgroundColor: isOpen ? colors.tint : colors.background,
+            borderColor: colors.tint,
           },
         ]}
       >
-        <Text style={[styles.timeChipText, { color: isOpen ? 'white' : colors.text }]}>
+        <Text style={[styles.timeChipText, { color: isOpen ? colors.textOnBrand : colors.text }]}>
           {display.time}
         </Text>
-        <Text style={[styles.timeChipPeriod, { color: isOpen ? 'white' : colors.text + 'AA' }]}>
+        <Text style={[styles.timeChipPeriod, { color: isOpen ? colors.textOnBrand : colors.textMuted }]}>
           {display.period}
         </Text>
       </Pressable>
@@ -227,14 +237,15 @@ export default function CreateScreen() {
             style={[
               styles.kindButton,
               {
-                backgroundColor: kind === 'adopt' ? ACCENT : colors.text + '15',
+                backgroundColor: kind === 'adopt' ? colors.tint : colors.surfaceMuted,
               },
             ]}
+            accessibilityLabel={`Adopt${kind === 'adopt' ? ', selected' : ''}`}
           >
             <Text
               style={[
                 styles.kindButtonText,
-                { color: kind === 'adopt' ? 'white' : colors.text },
+                { color: kind === 'adopt' ? colors.textOnBrand : colors.text },
               ]}
             >
               Adopt
@@ -245,14 +256,15 @@ export default function CreateScreen() {
             style={[
               styles.kindButton,
               {
-                backgroundColor: kind === 'eliminate' ? ACCENT : colors.text + '15',
+                backgroundColor: kind === 'eliminate' ? colors.tint : colors.surfaceMuted,
               },
             ]}
+            accessibilityLabel={`Eliminate${kind === 'eliminate' ? ', selected' : ''}`}
           >
             <Text
               style={[
                 styles.kindButtonText,
-                { color: kind === 'eliminate' ? 'white' : colors.text },
+                { color: kind === 'eliminate' ? colors.textOnBrand : colors.text },
               ]}
             >
               Eliminate
@@ -265,7 +277,7 @@ export default function CreateScreen() {
             <Text style={[styles.rowLabel, { color: colors.text }]}>Replace with:</Text>
             <View style={styles.replacementChips}>
               {adoptStateOptions.length === 0 ? (
-                <Text style={{ color: colors.text + '99', fontSize: 12, flex: 1 }}>
+                <Text style={{ color: colors.textMuted, fontSize: 12, flex: 1 }}>
                   No Adopt states yet — create one first.
                 </Text>
               ) : (
@@ -277,13 +289,16 @@ export default function CreateScreen() {
                       onPress={() => setReplacementStateId(b.id)}
                       style={[
                         styles.replacementChip,
-                        { backgroundColor: active ? ACCENT : colors.text + '15' },
+                        { backgroundColor: active ? colors.tint : colors.surfaceMuted },
                       ]}
+                      accessibilityLabel={`Replace with ${b.title}${
+                        active ? ', selected' : ''
+                      }`}
                     >
                       <Text
                         style={[
                           styles.replacementChipText,
-                          { color: active ? 'white' : colors.text },
+                          { color: active ? colors.textOnBrand : colors.text },
                         ]}
                       >
                         {b.title}
@@ -298,12 +313,12 @@ export default function CreateScreen() {
 
         <View style={styles.timeBlock}>
           <View style={styles.timeColumn}>
-            <Text style={[styles.timeColumnLabel, { color: colors.text + 'AA' }]}>From</Text>
+            <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>From</Text>
             {renderTimeChip('start', startDisplay)}
           </View>
-          <Text style={[styles.timeArrow, { color: colors.text + '66' }]}>→</Text>
+          <Text style={[styles.timeArrow, { color: colors.textMuted }]}>→</Text>
           <View style={styles.timeColumn}>
-            <Text style={[styles.timeColumnLabel, { color: colors.text + 'AA' }]}>To</Text>
+            <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>To</Text>
             {renderTimeChip('end', endDisplay)}
           </View>
         </View>
@@ -338,17 +353,21 @@ export default function CreateScreen() {
                 <Pressable
                   key={index}
                   onPress={() => toggleDay(index)}
+                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
                   style={[
                     styles.dayPill,
                     {
-                      backgroundColor: active ? ACCENT : colors.text + '22',
+                      backgroundColor: active ? colors.tint : colors.surfaceMuted,
                     },
                   ]}
+                  accessibilityLabel={`${DAY_NAMES[index]} ${
+                    active ? 'active' : 'inactive'
+                  }`}
                 >
                   <Text
                     style={[
                       styles.dayPillLetter,
-                      { color: active ? 'white' : colors.text },
+                      { color: active ? colors.textOnBrand : colors.text },
                     ]}
                   >
                     {letter}
@@ -362,11 +381,28 @@ export default function CreateScreen() {
         <View style={styles.row}>
           <Text style={[styles.rowLabel, { color: colors.text }]}>Label:</Text>
           <TextInput
-            style={[styles.fieldInput, { color: colors.text, backgroundColor: colors.text + '15' }]}
+            style={[styles.fieldInput, { color: colors.text, backgroundColor: colors.surfaceMuted }]}
             placeholder="State"
-            placeholderTextColor={colors.text + '66'}
+            placeholderTextColor={colors.textMuted}
             value={title}
             onChangeText={setTitle}
+          />
+        </View>
+
+        <View style={styles.pingRow}>
+          <Text style={[styles.rowLabel, { color: colors.text }]}>Reminder:</Text>
+          <TextInput
+            style={[
+              styles.pingInput,
+              { color: colors.text, backgroundColor: colors.surfaceMuted },
+            ]}
+            placeholder={title ? `Default: "${title}"` : 'What should the reminder say?'}
+            placeholderTextColor={colors.textMuted}
+            value={pingMessage}
+            onChangeText={setPingMessage}
+            multiline
+            accessibilityLabel="Reminder message shown in the notification"
+            accessibilityHint="Optional. If left blank, the label is used."
           />
         </View>
 
@@ -379,17 +415,21 @@ export default function CreateScreen() {
                 <Pressable
                   key={mins}
                   onPress={() => setIntervalMinutes(mins)}
+                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
                   style={[
                     styles.intervalChip,
                     {
-                      backgroundColor: active ? ACCENT : colors.text + '22',
+                      backgroundColor: active ? colors.tint : colors.surfaceMuted,
                     },
                   ]}
+                  accessibilityLabel={`Every ${mins} minutes${
+                    active ? ', selected' : ''
+                  }`}
                 >
                   <Text
                     style={[
                       styles.intervalChipText,
-                      { color: active ? 'white' : colors.text },
+                      { color: active ? colors.textOnBrand : colors.text },
                     ]}
                   >
                     {mins}m
@@ -400,20 +440,22 @@ export default function CreateScreen() {
           </View>
         </View>
 
-        <Text style={[styles.previewText, { color: colors.text + 'AA' }]}>{previewText}</Text>
+        <Text style={[styles.previewText, { color: colors.textMuted }]}>{previewText}</Text>
 
         <View style={styles.buttonRow}>
           <Pressable
             onPress={handleCancel}
-            style={[styles.actionButton, { backgroundColor: colors.text + '22' }]}
+            style={[styles.actionButton, { backgroundColor: colors.surfaceMuted }]}
+            accessibilityLabel="Cancel"
           >
             <Text style={[styles.actionButtonText, { color: colors.text }]}>Cancel</Text>
           </Pressable>
           <Pressable
             onPress={handleSave}
-            style={[styles.actionButton, { backgroundColor: ACCENT }]}
+            style={[styles.actionButton, { backgroundColor: colors.tint }]}
+            accessibilityLabel="Save state"
           >
-            <Text style={[styles.actionButtonText, { color: 'white' }]}>Save</Text>
+            <Text style={[styles.actionButtonText, { color: colors.textOnBrand }]}>Save</Text>
           </Pressable>
         </View>
       </View>
@@ -426,31 +468,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 24,
-    gap: 20,
+    padding: Space.xxl,
+    gap: Space.xl,
   },
   timeBlock: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-end',
-    gap: 16,
-    marginTop: 8,
+    gap: Space.lg,
+    marginTop: Space.sm,
   },
   timeColumn: {
     alignItems: 'center',
-    gap: 6,
+    gap: Space.xs,
   },
   timeColumnLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 0.5,
+    ...Type.micro,
     textTransform: 'uppercase',
   },
   timeChip: {
     minWidth: 120,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    borderRadius: Radius.md,
     borderWidth: 2,
     alignItems: 'center',
   },
@@ -460,15 +500,13 @@ const styles = StyleSheet.create({
     lineHeight: 36,
   },
   timeChipPeriod: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...Type.micro,
     marginTop: 2,
     letterSpacing: 1,
   },
   timeArrow: {
-    fontSize: 24,
-    fontWeight: '600',
-    paddingBottom: 18,
+    ...Type.h1,
+    paddingBottom: Space.lg,
   },
   pickerWrapper: {
     alignItems: 'center',
@@ -476,54 +514,65 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Space.md,
   },
   rowLabel: {
     width: 76,
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.bodyBold,
     textAlign: 'right',
   },
   dayPills: {
     flex: 1,
     flexDirection: 'row',
-    gap: 6,
+    gap: Space.xs,
   },
   dayPill: {
     width: 34,
     height: 34,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
   dayPillLetter: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...Type.bodyBold,
   },
   fieldInput: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    fontSize: 14,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.sm,
+    ...Type.body,
+  },
+  pingRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Space.md,
+  },
+  pingInput: {
+    flex: 1,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.sm,
+    minHeight: 60,
+    ...Type.body,
   },
   intervalChips: {
     flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: Space.xs,
   },
   intervalChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs + 2,
+    borderRadius: Radius.sm,
   },
   intervalChipText: {
-    fontSize: 13,
+    ...Type.caption,
     fontWeight: '600',
   },
   previewText: {
-    fontSize: 13,
+    ...Type.caption,
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: -4,
@@ -531,53 +580,51 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 8,
+    gap: Space.md,
+    marginTop: Space.sm,
   },
   actionButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: Space.xxl,
+    paddingVertical: Space.md,
+    borderRadius: Radius.sm,
     minWidth: 100,
     alignItems: 'center',
   },
   actionButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.bodyBold,
   },
   kindToggle: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Space.sm,
   },
   kindButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: Space.md,
+    borderRadius: Radius.sm,
     alignItems: 'center',
   },
   kindButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...Type.bodyBold,
     letterSpacing: 0.5,
   },
   replacementRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: Space.md,
   },
   replacementChips: {
     flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: Space.xs,
   },
   replacementChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs + 2,
+    borderRadius: Radius.sm,
   },
   replacementChipText: {
-    fontSize: 12,
+    ...Type.caption,
     fontWeight: '600',
   },
 });

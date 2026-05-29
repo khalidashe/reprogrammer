@@ -1,15 +1,22 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Linking } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, type ThemeColors } from '@/constants/theme';
+import {
+  Colors,
+  Type,
+  Space,
+  Radius,
+  type ThemeColors,
+} from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import { useCallback, useState } from 'react';
 import type { Behavior } from '@/types';
 import { deriveStage, stageLabel } from '@/services/levels';
-import { domainLabel } from '@/services/library-content';
+import { useContentModals } from '@/components/library/content-modals-provider';
 
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const RELAPSE_BANNER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function todayWeekday(): number {
   return new Date().getDay(); // 0 = Sunday
@@ -32,8 +39,17 @@ function formatToday(): string {
 export default function DashboardScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { behaviors, checkIns, reminderAttempts, getStreak } = useStore();
+  const insets = useSafeAreaInsets();
+  const {
+    behaviors,
+    checkIns,
+    reminderAttempts,
+    appProfile,
+    updateAppProfile,
+    getStreak,
+  } = useStore();
   const router = useRouter();
+  const { openGuide } = useContentModals();
   const [, setRefresh] = useState({});
 
   useFocusEffect(
@@ -48,8 +64,12 @@ export default function DashboardScreen() {
   const today = todayWeekday();
 
   // Today's progress across all active states (for the header).
+  // 'tried' counts as engagement — showing up is the practice.
   const todaysCheckInsCount = checkIns.filter(
-    (c) => c.at >= todayStart && c.at < todayEnd && c.result === 'yes'
+    (c) =>
+      c.at >= todayStart &&
+      c.at < todayEnd &&
+      (c.result === 'yes' || c.result === 'tried')
   ).length;
   const todaysAttemptsCount = reminderAttempts.filter(
     (a) => a.scheduledFor >= todayStart && a.scheduledFor < todayEnd && a.phase === 'initial'
@@ -59,10 +79,24 @@ export default function DashboardScreen() {
   const handleOpenState = (id: string) => router.push(`/behavior/${id}`);
   const handleOpenProfile = () => router.push('/explore');
 
+  const showRelapseBanner =
+    appProfile.lastLapseAt != null &&
+    appProfile.lastLapseAcknowledged !== true &&
+    Date.now() - appProfile.lastLapseAt < RELAPSE_BANNER_TTL_MS;
+
+  const handleOpenRelapseGuide = () => {
+    openGuide('guide-relapse-and-restart');
+    void updateAppProfile({ lastLapseAcknowledged: true });
+  };
+
+  const handleDismissRelapseBanner = () => {
+    void updateAppProfile({ lastLapseAcknowledged: true });
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top bar: profile · today · add */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: insets.top + Space.md }]}>
         <Pressable
           onPress={handleOpenProfile}
           style={[styles.profileButton, { backgroundColor: colors.surfaceMuted }]}
@@ -95,32 +129,153 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.gridScroll}>
-        <View style={styles.grid}>
-          {activeBehaviors.map((b) => (
-            <StateTile
-              key={b.id}
-              behavior={b}
-              today={today}
-              streak={getStreak(b.id)}
-              colors={colors}
-              onPress={() => handleOpenState(b.id)}
-            />
-          ))}
-
-          {/* Empty "+" tile to add a state directly from the grid */}
-          <Pressable
-            onPress={handleCreate}
+        {appProfile.notificationsDenied ? (
+          <View
             style={[
-              styles.tile,
-              styles.emptyTile,
-              { borderColor: colors.border, backgroundColor: colors.surface },
+              styles.permissionBanner,
+              {
+                backgroundColor: colors.dangerSoft,
+                borderColor: colors.danger,
+              },
             ]}
-            accessibilityLabel="Add a new state"
           >
-            <IconSymbol name="plus" size={32} color={colors.textMuted} />
-            <Text style={[styles.emptyLabel, { color: colors.textMuted }]}>Add state</Text>
-          </Pressable>
-        </View>
+            <View style={styles.permissionBannerBody}>
+              <Text style={[styles.relapseBannerTitle, { color: colors.text }]}>
+                Notifications are off.
+              </Text>
+              <Text
+                style={[styles.relapseBannerSub, { color: colors.textMuted }]}
+              >
+                Reprogrammer can&apos;t remind you without them. Enable in system settings.
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => void Linking.openSettings()}
+              style={[
+                styles.permissionBannerCta,
+                { backgroundColor: colors.danger },
+              ]}
+              accessibilityLabel="Open notification settings"
+            >
+              <Text
+                style={[styles.permissionBannerCtaText, { color: colors.textOnBrand }]}
+              >
+                Open Settings
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {showRelapseBanner ? (
+          <View
+            style={[
+              styles.relapseBanner,
+              {
+                backgroundColor: colors.warningSoft,
+                borderColor: colors.warning,
+              },
+            ]}
+          >
+            <Pressable
+              onPress={handleOpenRelapseGuide}
+              style={styles.relapseBannerBody}
+              accessibilityLabel="Open the When You Slip guide"
+              accessibilityHint="Compassionate restart practice after a missed day"
+            >
+              <Text style={[styles.relapseBannerTitle, { color: colors.text }]}>
+                Yesterday was hard.
+              </Text>
+              <Text
+                style={[styles.relapseBannerSub, { color: colors.textMuted }]}
+              >
+                A short read on how to come back without making it bigger than it is.
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleDismissRelapseBanner}
+              style={styles.relapseBannerDismiss}
+              hitSlop={8}
+              accessibilityLabel="Dismiss restart prompt"
+            >
+              <IconSymbol name="xmark" size={16} color={colors.textMuted} />
+            </Pressable>
+          </View>
+        ) : null}
+        {activeBehaviors.length === 0 ? (
+          <View
+            style={[
+              styles.emptyDashboard,
+              { borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.emptyHeadline, { color: colors.text }]}>
+              No states yet
+            </Text>
+            <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
+              States are the behaviors you choose to practice. Browse the catalog or
+              create one from scratch.
+            </Text>
+            <View style={styles.emptyCtaRow}>
+              <Pressable
+                onPress={() => router.push('/(tabs)/states')}
+                style={[
+                  styles.emptyCta,
+                  styles.emptyCtaSecondary,
+                  { borderColor: colors.tint },
+                ]}
+                accessibilityLabel="Browse states catalog"
+              >
+                <Text
+                  style={[styles.emptyCtaText, { color: colors.tint }]}
+                >
+                  Browse states
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleCreate}
+                style={[
+                  styles.emptyCta,
+                  { backgroundColor: colors.tint },
+                ]}
+                accessibilityLabel="Create state from scratch"
+              >
+                <Text
+                  style={[styles.emptyCtaText, { color: colors.textOnBrand }]}
+                >
+                  Create from scratch
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {activeBehaviors.map((b) => (
+              <StateTile
+                key={b.id}
+                behavior={b}
+                today={today}
+                streak={getStreak(b.id)}
+                colors={colors}
+                onPress={() => handleOpenState(b.id)}
+              />
+            ))}
+
+            {/* Empty "+" tile to add a state directly from the grid */}
+            <Pressable
+              onPress={handleCreate}
+              style={[
+                styles.tile,
+                styles.emptyTile,
+                { borderColor: colors.border, backgroundColor: colors.surface },
+              ]}
+              accessibilityLabel="Add a new state"
+            >
+              <IconSymbol name="plus" size={32} color={colors.textMuted} />
+              <Text style={[styles.emptyLabel, { color: colors.textMuted }]}>
+                Add state
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -140,8 +295,8 @@ function StateTile({ behavior, today, streak, colors, onPress }: TileProps) {
   const isEnabled = !isPaused && isActiveToday;
   const stage = deriveStage(behavior.level, streak);
   const textColor = isEnabled ? colors.stateEnabledText : colors.stateDisabledText;
-  const kindBadgeBg = behavior.kind === 'eliminate' ? colors.warning + '33' : colors.tint + '33';
-  const kindBadgeText = behavior.kind === 'eliminate' ? colors.warning : colors.tint;
+  const accentColor =
+    behavior.kind === 'eliminate' ? colors.warning : colors.tint;
 
   return (
     <Pressable
@@ -153,8 +308,20 @@ function StateTile({ behavior, today, streak, colors, onPress }: TileProps) {
           overflow: 'hidden',
         },
       ]}
+      accessibilityLabel={`${behavior.title}, ${
+        behavior.kind === 'eliminate' ? 'Eliminate' : 'Adopt'
+      }, ${stageLabel(stage)}, ${
+        streak > 0 ? `${streak} day streak` : 'no current streak'
+      }`}
+      accessibilityHint="Opens state details"
     >
       {!isEnabled && <DiagonalStripes color={colors.stateDisabledStripe} />}
+
+      {/* 3pt kind accent bar (left edge) */}
+      <View
+        pointerEvents="none"
+        style={[styles.kindAccent, { backgroundColor: accentColor }]}
+      />
 
       <View style={styles.tileContent}>
         <View style={styles.tileTopRow}>
@@ -167,53 +334,22 @@ function StateTile({ behavior, today, streak, colors, onPress }: TileProps) {
           {streak > 0 && (
             <View style={styles.streakBadge}>
               <IconSymbol name="flame.fill" size={12} color={colors.warning} />
-              <Text style={[styles.streakNumber, { color: colors.warning }]}>{streak}</Text>
+              <Text style={[styles.streakNumber, { color: colors.warning }]}>
+                {streak}
+              </Text>
             </View>
           )}
         </View>
 
-        <View style={styles.kindRow}>
-          <View style={[styles.kindBadge, { backgroundColor: kindBadgeBg }]}>
-            <Text style={[styles.kindBadgeText, { color: kindBadgeText }]}>
-              {behavior.kind === 'eliminate' ? 'ELIMINATE' : 'ADOPT'}
-            </Text>
-          </View>
-          <Text style={[styles.stageText, { color: textColor }]}>{stageLabel(stage)}</Text>
-        </View>
-
-        {behavior.domain && (
-          <Text style={[styles.domainText, { color: textColor, opacity: 0.7 }]}>
-            {domainLabel(behavior.domain)}
+        <View style={styles.tileFooter}>
+          <Text style={[styles.stageText, { color: textColor }]}>
+            {isPaused ? 'Paused' : stageLabel(stage)}
           </Text>
-        )}
-
-        <Text style={[styles.tileWindow, { color: textColor }]}>
-          {behavior.window.from} – {behavior.window.to}
-        </Text>
-
-        <View style={styles.daysRow}>
-          {DAY_LABELS.map((label, idx) => {
-            const isActive = behavior.activeDays.includes(idx);
-            return (
-              <Text
-                key={idx}
-                style={[
-                  styles.dayLabel,
-                  {
-                    color: isActive
-                      ? isEnabled
-                        ? colors.stateEnabledText
-                        : colors.stateDisabledText
-                      : colors.textMuted,
-                    opacity: isActive ? 1 : 0.4,
-                    fontWeight: isActive ? '700' : '400',
-                  },
-                ]}
-              >
-                {label}
-              </Text>
-            );
-          })}
+          <Text style={[styles.tileWindow, { color: textColor }]}>
+            {behavior.window.from === '00:00' && behavior.window.to === '23:59'
+              ? 'All day'
+              : `${behavior.window.from}–${behavior.window.to}`}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -244,8 +380,6 @@ function DiagonalStripes({ color }: { color: string }) {
   );
 }
 
-const TILE_GAP = 12;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -253,15 +387,14 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 12,
+    paddingHorizontal: Space.lg,
+    paddingBottom: Space.md,
+    gap: Space.md,
   },
   profileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -269,35 +402,78 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateText: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...Type.bodyBold,
   },
   progressText: {
-    fontSize: 12,
+    ...Type.caption,
     marginTop: 2,
   },
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   gridScroll: {
-    padding: 16,
-    paddingTop: 8,
+    padding: Space.lg,
+    paddingTop: Space.sm,
+  },
+  relapseBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    padding: Space.md,
+    marginBottom: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  permissionBanner: {
+    gap: Space.sm,
+    padding: Space.md,
+    marginBottom: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  permissionBannerBody: {
+    gap: Space.xs,
+  },
+  permissionBannerCta: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.sm,
+  },
+  permissionBannerCtaText: { ...Type.bodyBold },
+  relapseBannerBody: {
+    flex: 1,
+    gap: Space.xs,
+  },
+  relapseBannerTitle: { ...Type.bodyBold },
+  relapseBannerSub: { ...Type.caption },
+  relapseBannerDismiss: {
+    padding: Space.xs,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: TILE_GAP,
+    gap: Space.md,
   },
   tile: {
     width: `${(100 - 4) / 2}%`, // two columns with gap
     aspectRatio: 1,
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: Radius.lg,
+    padding: Space.md,
+    paddingLeft: Space.md + 6, // room for kind accent bar
     justifyContent: 'space-between',
+  },
+  kindAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    zIndex: 1,
   },
   tileContent: {
     flex: 1,
@@ -308,11 +484,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: 6,
+    gap: Space.sm,
   },
   tileTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    ...Type.bodyBold,
     flex: 1,
   },
   streakBadge: {
@@ -321,58 +496,68 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   streakNumber: {
-    fontSize: 12,
+    ...Type.caption,
     fontWeight: '700',
   },
-  tileWindow: {
-    fontSize: 12,
-    opacity: 0.85,
-    marginTop: 4,
-  },
-  kindRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-  },
-  kindBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  kindBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  tileFooter: {
+    gap: Space.xs,
   },
   stageText: {
-    fontSize: 11,
+    ...Type.caption,
     fontWeight: '600',
   },
-  domainText: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  daysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  dayLabel: {
-    fontSize: 11,
-    width: 14,
-    textAlign: 'center',
+  tileWindow: {
+    ...Type.micro,
+    opacity: 0.85,
   },
   emptyTile: {
     borderWidth: 2,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: Space.xs,
+    paddingLeft: Space.md, // override tile's paddingLeft hack
   },
   emptyLabel: {
-    fontSize: 12,
+    ...Type.caption,
     fontWeight: '500',
+  },
+  emptyDashboard: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: Radius.lg,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.xxl,
+    marginTop: Space.xxl,
+    gap: Space.sm,
+    alignItems: 'center',
+  },
+  emptyHeadline: {
+    ...Type.h2,
+  },
+  emptyBody: {
+    ...Type.body,
+    textAlign: 'center',
+  },
+  emptyCtaRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    marginTop: Space.sm,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  emptyCta: {
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    borderRadius: Radius.md,
+    minWidth: 130,
+    alignItems: 'center',
+  },
+  emptyCtaSecondary: {
+    borderWidth: 1,
+  },
+  emptyCtaText: {
+    ...Type.bodyBold,
   },
   stripesContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -383,7 +568,7 @@ const styles = StyleSheet.create({
     left: -60,
     width: 300,
     height: 6,
-    opacity: 0.45,
+    opacity: 0.25,
     transform: [{ rotate: '-45deg' }],
   },
 });

@@ -106,6 +106,7 @@ interface StoreState {
   addCheckIn: (checkIn: CheckIn) => Promise<void>;
   getStreak: (behaviorId: string) => number;
   setOnboarded: (value: boolean) => Promise<void>;
+  updateAppProfile: (partial: Partial<AppProfile>) => Promise<void>;
   addReminderAttempt: (attempt: ReminderAttempt) => Promise<void>;
   updateReminderAttempt: (attempt: ReminderAttempt) => Promise<void>;
   getReminderAttempts: (behaviorId: string) => ReminderAttempt[];
@@ -192,6 +193,13 @@ const useStore = create<StoreState>((set, get) => ({
   setOnboarded: async (value: boolean) => {
     const state = get();
     const updated = { ...state.appProfile, hasOnboarded: value };
+    set({ appProfile: updated });
+    await AsyncStorage.setItem('rpg.app.v1', JSON.stringify(updated));
+  },
+
+  updateAppProfile: async (partial: Partial<AppProfile>) => {
+    const state = get();
+    const updated = { ...state.appProfile, ...partial };
     set({ appProfile: updated });
     await AsyncStorage.setItem('rpg.app.v1', JSON.stringify(updated));
   },

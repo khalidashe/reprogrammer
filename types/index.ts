@@ -47,7 +47,7 @@ export interface CheckIn {
   id: string;
   behaviorId: string;
   at: number;
-  result: 'yes' | 'no';
+  result: 'yes' | 'tried' | 'no';
   note?: string;
 }
 
@@ -67,4 +67,12 @@ export interface AppProfile {
   hasOnboarded: boolean;
   userName?: string;
   userBio?: string;
+  /** Timestamp of the most recent lapse (3-no auto-pause). */
+  lastLapseAt?: number;
+  /** Whether the user has dismissed the compassionate restart banner for the last lapse. */
+  lastLapseAcknowledged?: boolean;
+  /** Global do-not-ping window (e.g., overnight). Times in "HH:MM" 24-hour form. */
+  quietHours?: { from: string; to: string };
+  /** Set if the user declined system notification permissions. */
+  notificationsDenied?: boolean;
 }

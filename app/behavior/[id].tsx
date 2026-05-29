@@ -9,12 +9,27 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { Colors, Type, Space, Radius } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { cancelForBehavior, sendTestNotification } from '@/services/notifications';
+import { cancelForBehavior, rescheduleAll, sendTestNotification } from '@/services/notifications';
 import { deriveStage, stageLabel } from '@/services/levels';
+import { useContentModals } from '@/components/library/content-modals-provider';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+
+function formatPausedUntil(ms: number): string {
+  const d = new Date(ms);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 export default function BehaviorDetailScreen() {
   const router = useRouter();
@@ -22,6 +37,7 @@ export default function BehaviorDetailScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { id } = useLocalSearchParams();
   const { behaviors, checkIns, getStreak, deleteBehavior, updateBehavior } = useStore();
+  const { openGuide } = useContentModals();
   const [, setRefresh] = useState({});
 
   useFocusEffect(
@@ -91,6 +107,52 @@ export default function BehaviorDetailScreen() {
     }
   };
 
+  const isPaused = behavior.pausedUntil != null && behavior.pausedUntil > Date.now();
+
+  const pauseUntil = async (resumeAt: number) => {
+    await updateBehavior({ ...behavior, pausedUntil: resumeAt });
+    await cancelForBehavior(behavior.id);
+  };
+
+  const handlePausePress = () => {
+    if (isPaused) {
+      Alert.alert(
+        'Resume now?',
+        `${behavior.title} is paused until ${formatPausedUntil(behavior.pausedUntil!)}.`,
+        [
+          { text: 'Stay paused', style: 'cancel' },
+          {
+            text: 'Resume now',
+            onPress: async () => {
+              await updateBehavior({ ...behavior, pausedUntil: undefined });
+              await rescheduleAll({ force: true });
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Pause this state',
+      'Reminders stop; your streak and history stay. Pick a length — you can resume any time.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Until tonight',
+          onPress: () => {
+            const end = new Date();
+            end.setHours(23, 59, 59, 999);
+            void pauseUntil(end.getTime());
+          },
+        },
+        { text: '1 day', onPress: () => pauseUntil(Date.now() + 24 * 60 * 60 * 1000) },
+        { text: '3 days', onPress: () => pauseUntil(Date.now() + 3 * 24 * 60 * 60 * 1000) },
+        { text: '1 week', onPress: () => pauseUntil(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+      ]
+    );
+  };
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
@@ -100,16 +162,48 @@ export default function BehaviorDetailScreen() {
               {behavior.title}
             </Text>
           </View>
-          <Pressable
-            onPress={handleTestNotification}
-            style={[styles.testButton, { backgroundColor: colors.tint }]}
-          >
-            <Text style={styles.testButtonText}>Test</Text>
-          </Pressable>
+          {__DEV__ && (
+            <Pressable
+              onPress={handleTestNotification}
+              style={[styles.testButton, { borderColor: colors.border }]}
+              accessibilityLabel="Send test notification"
+            >
+              <Text
+                style={[styles.testButtonText, { color: colors.textMuted }]}
+              >
+                Test
+              </Text>
+            </Pressable>
+          )}
         </View>
         <Text style={[styles.message, { color: colors.text }]}>
           {behavior.pingMessage}
         </Text>
+        {isPaused ? (
+          <View
+            style={[
+              styles.pausedChip,
+              { backgroundColor: colors.warningSoft, borderColor: colors.warning },
+            ]}
+          >
+            <IconSymbol name="pause.fill" size={12} color={colors.warning} />
+            <Text style={[styles.pausedChipText, { color: colors.warning }]}>
+              Paused until {formatPausedUntil(behavior.pausedUntil!)}
+            </Text>
+          </View>
+        ) : null}
+        {behavior.libraryGuideId ? (
+          <Pressable
+            onPress={() => openGuide(behavior.libraryGuideId!)}
+            style={styles.guideLink}
+            accessibilityLabel="Read the guide"
+          >
+            <IconSymbol name="book.fill" size={14} color={colors.tint} />
+            <Text style={[styles.guideLinkText, { color: colors.tint }]}>
+              Read the guide
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={[styles.streakCard, { backgroundColor: colors.tint }]}>
@@ -124,7 +218,7 @@ export default function BehaviorDetailScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           Details
         </Text>
-        <View style={[styles.detailItem, { borderBottomColor: colors.text + '20' }]}>
+        <View style={[styles.detailItem, { borderBottomColor: colors.border }]}>
           <Text style={[styles.detailLabel, { color: colors.text }]}>Time Window</Text>
           <Text style={[styles.detailValue, { color: colors.text }]}>
             {behavior.window.from === '00:00' && behavior.window.to === '23:59'
@@ -132,13 +226,13 @@ export default function BehaviorDetailScreen() {
               : `${behavior.window.from} – ${behavior.window.to}`}
           </Text>
         </View>
-        <View style={[styles.detailItem, { borderBottomColor: colors.text + '20' }]}>
+        <View style={[styles.detailItem, { borderBottomColor: colors.border }]}>
           <Text style={[styles.detailLabel, { color: colors.text }]}>Interval</Text>
           <Text style={[styles.detailValue, { color: colors.text }]}>
             every {behavior.intervalMinutes} min
           </Text>
         </View>
-        <View style={[styles.detailItem, { borderBottomColor: colors.text + '20' }]}>
+        <View style={[styles.detailItem, { borderBottomColor: colors.border }]}>
           <Text style={[styles.detailLabel, { color: colors.text }]}>Level</Text>
           <Text style={[styles.detailValue, { color: colors.text }]}>
             L{behavior.level} · {stageLabel(deriveStage(behavior.level, streak))}
@@ -167,17 +261,43 @@ export default function BehaviorDetailScreen() {
               });
               const dateStr = date.toLocaleDateString();
 
+              const yesGlyph =
+                behavior.kind === 'eliminate' ? '✓ Caught it' : '✓ Practiced';
+              const triedGlyph =
+                behavior.kind === 'eliminate' ? '◐ Struggled' : '◐ Showed up';
+              const noGlyph = '× Skipped';
+
+              const bg =
+                item.result === 'yes'
+                  ? colors.successSoft
+                  : item.result === 'tried'
+                    ? colors.warningSoft
+                    : colors.surfaceMuted;
+              const stripe =
+                item.result === 'yes'
+                  ? colors.success
+                  : item.result === 'tried'
+                    ? colors.warning
+                    : colors.textMuted;
+              const labelColor =
+                item.result === 'yes'
+                  ? colors.success
+                  : item.result === 'tried'
+                    ? colors.warning
+                    : colors.text;
+              const glyph =
+                item.result === 'yes'
+                  ? yesGlyph
+                  : item.result === 'tried'
+                    ? triedGlyph
+                    : noGlyph;
               return (
                 <View
                   style={[
                     styles.checkInItem,
                     {
-                      backgroundColor:
-                        item.result === 'yes'
-                          ? colors.tint + '20'
-                          : colors.text + '20',
-                      borderLeftColor:
-                        item.result === 'yes' ? colors.tint : colors.text,
+                      backgroundColor: bg,
+                      borderLeftColor: stripe,
                     },
                   ]}
                 >
@@ -185,12 +305,10 @@ export default function BehaviorDetailScreen() {
                     <Text
                       style={[
                         styles.checkInResult,
-                        {
-                          color: item.result === 'yes' ? colors.tint : colors.text,
-                        },
+                        { color: labelColor },
                       ]}
                     >
-                      {item.result === 'yes' ? '✓ Yes' : '✗ No'}
+                      {glyph}
                     </Text>
                     <Text style={[styles.checkInTime, { color: colors.text }]}>
                       {dateStr} {timeStr}
@@ -209,26 +327,66 @@ export default function BehaviorDetailScreen() {
       </View>
 
       <View style={styles.actionButtons}>
+        {/* Primary actions — frequently used, non-destructive */}
         <Pressable
           onPress={handleEdit}
           style={[styles.actionButton, { backgroundColor: colors.tint }]}
+          accessibilityLabel="Edit state"
         >
-          <Text style={styles.actionButtonText}>Edit</Text>
+          <Text
+            style={[styles.actionButtonText, { color: colors.textOnBrand }]}
+          >
+            Edit
+          </Text>
         </Pressable>
         <Pressable
           onPress={handleToggleBookmark}
           style={[
             styles.actionButton,
-            { borderColor: colors.tint, borderWidth: 1, backgroundColor: 'transparent' },
+            {
+              borderColor: colors.tint,
+              borderWidth: 1,
+              backgroundColor: 'transparent',
+            },
           ]}
+          accessibilityLabel={
+            behavior.bookmarked ? 'Remove bookmark' : 'Bookmark state'
+          }
         >
           <Text style={[styles.actionButtonText, { color: colors.tint }]}>
             {behavior.bookmarked ? '★ Bookmarked' : '☆ Bookmark'}
           </Text>
         </Pressable>
         <Pressable
+          onPress={handlePausePress}
+          style={[
+            styles.actionButton,
+            {
+              borderColor: colors.warning,
+              borderWidth: 1,
+              backgroundColor: isPaused ? colors.warningSoft : 'transparent',
+            },
+          ]}
+          accessibilityLabel={isPaused ? 'Resume state' : 'Pause state'}
+          accessibilityHint={
+            isPaused
+              ? 'Resume reminders for this state'
+              : 'Stop reminders temporarily without losing your streak'
+          }
+        >
+          <Text style={[styles.actionButtonText, { color: colors.warning }]}>
+            {isPaused ? '▶ Resume' : '⏸ Pause'}
+          </Text>
+        </Pressable>
+
+        {/* Visual separator before destructive group */}
+        <View style={styles.actionDivider} />
+
+        {/* Destructive / archival actions — separated by spacing */}
+        <Pressable
           onPress={handleArchive}
-          style={[styles.actionButton, { backgroundColor: colors.text + '20' }]}
+          style={[styles.actionButton, { backgroundColor: colors.surfaceMuted }]}
+          accessibilityLabel="Archive state"
         >
           <Text style={[styles.actionButtonText, { color: colors.text }]}>
             Archive
@@ -236,9 +394,13 @@ export default function BehaviorDetailScreen() {
         </Pressable>
         <Pressable
           onPress={handleDelete}
-          style={[styles.actionButton, { backgroundColor: '#ff0000' }]}
+          style={[styles.actionButton, { backgroundColor: colors.danger }]}
+          accessibilityLabel="Delete state"
+          accessibilityHint="Permanently removes this state and all its history"
         >
-          <Text style={styles.actionButtonText}>Delete</Text>
+          <Text style={[styles.actionButtonText, { color: colors.textOnBrand }]}>
+            Delete
+          </Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -250,119 +412,118 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 20,
+    padding: Space.xl,
     paddingBottom: 0,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 8,
+    gap: Space.md,
+    marginBottom: Space.sm,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
+  title: { ...Type.h1 },
   testButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.xs + 2,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
   },
-  testButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+  testButtonText: { ...Type.caption, fontWeight: '600' },
+  message: { ...Type.body, marginBottom: Space.sm },
+  guideLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    marginTop: Space.sm,
   },
-  message: {
-    fontSize: 14,
-    marginBottom: 8,
+  guideLinkText: {
+    ...Type.bodyBold,
   },
+  pausedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Space.xs,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+    marginTop: Space.sm,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+  },
+  pausedChipText: { ...Type.caption, fontWeight: '600' },
   streakCard: {
-    margin: 20,
-    padding: 24,
-    borderRadius: 12,
+    margin: Space.xl,
+    padding: Space.xxl,
+    borderRadius: Radius.md,
     alignItems: 'center',
   },
   streakLabel: {
     color: 'white',
-    fontSize: 14,
-    marginBottom: 4,
+    ...Type.body,
+    marginBottom: Space.xs,
   },
   streakValue: {
     color: 'white',
-    fontSize: 48,
-    fontWeight: 'bold',
+    ...Type.display,
   },
   streakDays: {
     color: 'white',
-    fontSize: 14,
+    ...Type.body,
   },
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: Space.xl,
+    marginBottom: Space.xl,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
+    ...Type.h2,
+    marginBottom: Space.md,
   },
   detailItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: Space.md,
     borderBottomWidth: 1,
   },
-  detailLabel: {
-    fontSize: 14,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  detailLabel: { ...Type.body },
+  detailValue: { ...Type.bodyBold },
   emptyText: {
     textAlign: 'center',
-    paddingVertical: 20,
-    fontSize: 14,
+    paddingVertical: Space.xl,
+    ...Type.body,
   },
   checkInItem: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: Space.md,
+    borderRadius: Radius.sm,
+    marginBottom: Space.sm,
     borderLeftWidth: 4,
   },
   checkInHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: Space.xs,
   },
-  checkInResult: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  checkInTime: {
-    fontSize: 12,
-  },
-  checkInNote: {
-    fontSize: 12,
-    marginTop: 4,
-  },
+  checkInResult: { ...Type.bodyBold },
+  checkInTime: { ...Type.caption },
+  checkInNote: { ...Type.caption, marginTop: Space.xs },
   actionButtons: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 8,
+    paddingHorizontal: Space.xl,
+    paddingBottom: Space.xl,
+    gap: Space.sm,
+  },
+  actionDivider: {
+    height: Space.xl,
   },
   actionButton: {
-    padding: 12,
-    borderRadius: 8,
+    padding: Space.md,
+    borderRadius: Radius.md,
     alignItems: 'center',
   },
   actionButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    ...Type.bodyBold,
   },
   errorText: {
     textAlign: 'center',
-    fontSize: 16,
-    marginTop: 20,
+    ...Type.body,
+    marginTop: Space.xl,
   },
 });

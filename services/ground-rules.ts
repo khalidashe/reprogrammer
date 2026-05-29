@@ -8,15 +8,15 @@ export interface GroundRule {
 export const GROUND_RULES: GroundRule[] = [
   {
     id: 'rule-time',
-    title: 'Time, or delete it.',
-    body: "If you won't set aside daily practice time — not reading, actual doing — delete the app now. The app cannot do the work for you.",
-    citation: 'Sheeran, 2002 — 72% of behavioral intentions are never acted on',
+    title: 'Show up — more days than not.',
+    body: 'Habits form from repetition, not perfection. Aim for daily practice — actual doing, not just reading — but a missed day is data, not failure. Come back tomorrow.',
+    citation: 'Lally et al., 2010 — habit automaticity emerges from frequency; one missed opportunity does not break formation',
   },
   {
     id: 'rule-silence',
-    title: 'Improve in silence.',
-    body: "Announcing you're changing triggers social resistance and gives your brain a premature reward that kills drive. Tell nobody.",
-    citation: 'Gollwitzer et al., 2009',
+    title: 'Tell one person — not everyone.',
+    body: "Premature broadcasting can release the dopamine that should fuel the doing. But silence isn't the goal — one trusted person who knows what you're working on is protective when you slip. Pick carefully; share intentionally.",
+    citation: 'Gollwitzer et al., 2009; Marlatt & Gordon, 1985 — social support reduces relapse',
   },
   {
     id: 'rule-exercise',

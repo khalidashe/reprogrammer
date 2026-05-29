@@ -50,6 +50,26 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * Returns true if `candidateMs` falls inside the given quiet window for the day
+ * `dayDate`. Handles windows that span midnight (e.g., 22:00–07:00). An empty
+ * window (from === to) disables filtering.
+ */
+export function isInQuietHours(
+  candidateMs: number,
+  dayDate: Date,
+  quietHours?: { from: string; to: string }
+): boolean {
+  if (!quietHours) return false;
+  if (quietHours.from === quietHours.to) return false;
+  const fromMs = setLocalTimeOnDate(dayDate, quietHours.from);
+  const toMs = setLocalTimeOnDate(dayDate, quietHours.to);
+  if (toMs > fromMs) {
+    return candidateMs >= fromMs && candidateMs < toMs;
+  }
+  return candidateMs >= fromMs || candidateMs < toMs;
+}
+
 export function generateTimesForDay(args: {
   date: Date;
   windowFrom: string;
@@ -59,8 +79,19 @@ export function generateTimesForDay(args: {
   now: number;
   rng: () => number;
   maxPings: number;
+  quietHours?: { from: string; to: string };
 }): number[] {
-  const { date, windowFrom, windowTo, intervalMinutes, level, now, rng, maxPings } = args;
+  const {
+    date,
+    windowFrom,
+    windowTo,
+    intervalMinutes,
+    level,
+    now,
+    rng,
+    maxPings,
+    quietHours,
+  } = args;
   const windowStart = setLocalTimeOnDate(date, windowFrom);
   const windowEnd = setLocalTimeOnDate(date, windowTo);
   const fullWindowMs = windowEnd - windowStart;
@@ -83,6 +114,7 @@ export function generateTimesForDay(args: {
     if (candidate >= windowEnd) break;
     if (candidate < earliest) continue;
     if (candidate - lastScheduled < minGapMs) continue;
+    if (isInQuietHours(candidate, date, quietHours)) continue;
 
     times.push(Math.floor(candidate));
     lastScheduled = candidate;

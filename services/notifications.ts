@@ -95,7 +95,8 @@ interface Candidate {
 function buildCandidatesForBehavior(
   behavior: Behavior,
   now: number,
-  daysHorizon: number
+  daysHorizon: number,
+  quietHours?: { from: string; to: string }
 ): Candidate[] {
   const results: Candidate[] = [];
   const baseDate = new Date(now);
@@ -122,6 +123,7 @@ function buildCandidatesForBehavior(
       now,
       rng,
       maxPings: dailyCap,
+      quietHours,
     });
     for (const ts of times) {
       results.push({ behavior, timestamp: ts });
@@ -194,9 +196,10 @@ export async function rescheduleAll(options?: { force?: boolean }): Promise<void
   const active = store.behaviors.filter((b) => !b.hidden);
   if (active.length === 0) return;
 
+  const quietHours = store.appProfile.quietHours;
   const all: Candidate[] = [];
   for (const b of active) {
-    all.push(...buildCandidatesForBehavior(b, now, DAYS_HORIZON));
+    all.push(...buildCandidatesForBehavior(b, now, DAYS_HORIZON, quietHours));
   }
   all.sort((a, b) => a.timestamp - b.timestamp);
   const toSchedule = all.slice(0, MAX_SCHEDULED);
@@ -314,7 +317,7 @@ export async function handleNotificationAction(
 export async function handleCheckInResponse(
   behaviorId: string,
   attemptId: string,
-  result: 'yes' | 'no'
+  result: 'yes' | 'tried' | 'no'
 ): Promise<void> {
   const store = useStore.getState();
   const attempt = store.reminderAttempts.find((a) => a.id === attemptId);
@@ -326,7 +329,7 @@ export async function handleCheckInResponse(
     return;
   }
 
-  if (result === 'yes') {
+  if (result === 'yes' || result === 'tried') {
     if (attempt) {
       await store.updateReminderAttempt({
         ...attempt,
@@ -334,10 +337,13 @@ export async function handleCheckInResponse(
         updatedAt: Date.now(),
       });
     }
-    const streak = calculateStreak(behaviorId, store.checkIns);
-    if (shouldLevelUp(streak, behavior.lastLevelUpStreak)) {
-      await store.updateBehavior(applyLevelUp(behavior, streak));
-      await rescheduleAll({ force: true });
+    // Only a clean 'yes' day can trigger level-up.
+    if (result === 'yes') {
+      const streak = calculateStreak(behaviorId, store.checkIns);
+      if (shouldLevelUp(streak, behavior.lastLevelUpStreak)) {
+        await store.updateBehavior(applyLevelUp(behavior, streak));
+        await rescheduleAll({ force: true });
+      }
     }
     return;
   }
@@ -362,6 +368,11 @@ export async function handleCheckInResponse(
       pausedUntil: endOfDay.getTime(),
     });
     await cancelForBehavior(behaviorId);
+    // Surface the compassionate restart banner on next dashboard render.
+    await store.updateAppProfile({
+      lastLapseAt: Date.now(),
+      lastLapseAcknowledged: false,
+    });
     return;
   }
 
