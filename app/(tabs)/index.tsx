@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   profileButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: Radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -856,7 +856,7 @@ const styles = StyleSheet.create({
     right: Space.sm,
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: Radius.pill,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',

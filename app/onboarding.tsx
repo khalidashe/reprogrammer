@@ -1,7 +1,8 @@
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { Colors, Type, Space, Radius } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { Behavior } from '@/types';
 import { generateUUID } from '@/utils/uuid';
@@ -17,8 +18,13 @@ const templates = featuredTemplates();
 export default function OnboardingScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   const { addBehavior, setOnboarded } = useStore();
   const [step, setStep] = useState<Step>('splash');
+
+  // The rules / templates screens need to clear the status bar; the splash
+  // is centered so it doesn't.
+  const contentPaddingTop = insets.top + Space.xxl;
 
   const addTemplate = async (template: (typeof templates)[0]) => {
     const behavior: Behavior = {
@@ -72,7 +78,7 @@ export default function OnboardingScreen() {
   if (step === 'rules') {
     return (
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingTop: contentPaddingTop }]}>
           <Text style={[styles.title, { color: colors.text }]}>Before you start</Text>
           <Text style={[styles.description, { color: colors.textMuted }]}>
             Five rules that decide whether this works for you.
@@ -103,7 +109,7 @@ export default function OnboardingScreen() {
 
           <Pressable
             onPress={() => setStep('templates')}
-            style={[styles.cta, { backgroundColor: colors.tint, marginTop: 12 }]}
+            style={[styles.cta, { backgroundColor: colors.tint, marginTop: Space.md }]}
           >
             <Text style={[styles.ctaText, { color: colors.textOnBrand }]}>I understand</Text>
           </Pressable>
@@ -114,7 +120,7 @@ export default function OnboardingScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
+      <View style={[styles.content, { paddingTop: contentPaddingTop }]}>
         <Text style={[styles.title, { color: colors.text }]}>Pick a state to start</Text>
         <Text style={[styles.description, { color: colors.textMuted }]}>
           One state. Get it to automatic before adding another.
@@ -155,108 +161,111 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    gap: 16,
+    padding: Space.xl,
+    gap: Space.lg,
   },
+  // Splash hero — the only place we use the editorial display-2 token.
   splashTitle: {
-    fontSize: 40,
+    ...Type.display2,
+    fontSize: 40, // splash hero stays larger than guide titles
     fontWeight: '800',
   },
   splashTagline: {
-    fontSize: 13,
+    ...Type.caption,
     fontWeight: '700',
-    letterSpacing: 2,
-    marginBottom: 24,
+    letterSpacing: 2, // the tagline's spaced-out branding effect
+    marginBottom: Space.xxl,
   },
   container: {
     flex: 1,
   },
+  // paddingTop is applied dynamically (safe-area + Space.xxl) at the JSX site
   content: {
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 40,
+    padding: Space.xl,
+    paddingBottom: Space.xxxl + Space.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 6,
+    ...Type.display2,
+    marginBottom: Space.xs + Space.xxs, // = 6, the small bump under the title
   },
   description: {
-    fontSize: 14,
-    marginBottom: 20,
-    lineHeight: 20,
+    ...Type.body,
+    marginBottom: Space.xl,
   },
   ruleCard: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    gap: 8,
+    borderRadius: Radius.md,
+    padding: Space.md + Space.xxs, // = 14; sits between md (12) and lg (16)
+    marginBottom: Space.sm + Space.xxs, // = 10
+    gap: Space.sm,
   },
   ruleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Space.sm + Space.xxs, // = 10
   },
   ruleNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: Space.xxl,
+    height: Space.xxl,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Lives inside a 24pt circle badge; the caption-1px override keeps the
+  // numeral centered without overflowing the chip.
   ruleNumberText: {
+    ...Type.caption,
     fontSize: 12,
     fontWeight: '700',
   },
   ruleTitle: {
-    fontSize: 16,
+    ...Type.bodyBold,
     fontWeight: '700',
     flex: 1,
   },
   ruleBody: {
-    fontSize: 14,
-    lineHeight: 20,
+    ...Type.body,
   },
   ruleCitation: {
-    fontSize: 11,
+    ...Type.micro,
+    fontWeight: '400',
     fontStyle: 'italic',
   },
   templates: {
-    gap: 12,
-    marginBottom: 24,
+    gap: Space.md,
+    marginBottom: Space.xxl,
   },
   templateCard: {
     borderWidth: 2,
-    borderRadius: 12,
-    padding: 14,
-    gap: 4,
+    borderRadius: Radius.md,
+    padding: Space.md + Space.xxs, // = 14
+    gap: Space.xs,
   },
   templateTitle: {
-    fontSize: 15,
+    ...Type.bodyBold,
     fontWeight: '700',
   },
   templateMessage: {
-    fontSize: 13,
+    ...Type.caption,
   },
   cta: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 10,
+    paddingVertical: Space.md + Space.xxs, // = 14
+    paddingHorizontal: Space.xxl,
+    borderRadius: Radius.md,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: Space.sm,
   },
   ctaText: {
-    fontSize: 16,
+    ...Type.bodyBold,
     fontWeight: '700',
   },
   skipButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: Space.md,
+    borderRadius: Radius.xs,
     alignItems: 'center',
   },
   skipButtonText: {
-    fontSize: 14,
+    ...Type.body,
     fontWeight: '500',
   },
 });
