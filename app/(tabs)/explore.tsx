@@ -7,26 +7,11 @@ import { useCallback, useState } from 'react';
 import { deriveStage } from '@/services/levels';
 import { rescheduleAll } from '@/services/notifications';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-
-function hhmmToDate(hhmm: string): Date {
-  const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
-  const d = new Date();
-  d.setHours(h ?? 0, m ?? 0, 0, 0);
-  return d;
-}
-
-function dateToHHmm(d: Date): string {
-  const h = d.getHours().toString().padStart(2, '0');
-  const m = d.getMinutes().toString().padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-function formatTimeForDisplay(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
-  const period = h >= 12 ? 'PM' : 'AM';
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${(m ?? 0).toString().padStart(2, '0')} ${period}`;
-}
+import {
+  hhmmToDate,
+  dateToHHmm,
+  formatTimeForDisplayString,
+} from '@/utils/time';
 
 /**
  * Profile screen. Reached from the small profile icon on the Dashboard.
@@ -110,7 +95,7 @@ export default function ProfileScreen() {
             borderColor: colors.tint,
           },
         ]}
-        accessibilityLabel={`Quiet hours ${which} time, currently ${formatTimeForDisplay(value)}`}
+        accessibilityLabel={`Quiet hours ${which} time, currently ${formatTimeForDisplayString(value)}`}
       >
         <Text
           style={[
@@ -118,7 +103,7 @@ export default function ProfileScreen() {
             { color: isOpen ? colors.textOnBrand : colors.text },
           ]}
         >
-          {formatTimeForDisplay(value)}
+          {formatTimeForDisplayString(value)}
         </Text>
       </Pressable>
     );

@@ -91,28 +91,21 @@ export default function RootLayout() {
     return null;
   }
 
-  if (!appProfile.hasOnboarded) {
-    return (
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <ContentModalsProvider>
-          <Stack>
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          </Stack>
-        </ContentModalsProvider>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <ContentModalsProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
-          <Stack.Screen name="create" options={{ presentation: 'modal', title: 'Create State' }} />
-          <Stack.Screen name="behavior/[id]" options={{ title: 'State' }} />
-        </Stack>
+        {appProfile.hasOnboarded ? (
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
+            <Stack.Screen name="create" options={{ presentation: 'modal', title: 'Create State' }} />
+            <Stack.Screen name="behavior/[id]" options={{ title: 'State' }} />
+          </Stack>
+        ) : (
+          <Stack>
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          </Stack>
+        )}
       </ContentModalsProvider>
       <StatusBar style="auto" />
     </ThemeProvider>

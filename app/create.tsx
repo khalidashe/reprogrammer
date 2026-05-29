@@ -23,6 +23,12 @@ import {
 } from '@/services/levels';
 import { useState, useMemo } from 'react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import {
+  hhmmToDate,
+  dateToHHmm,
+  hhmmToMinutes,
+  formatTimeForDisplay,
+} from '@/utils/time';
 
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_NAMES = [
@@ -34,33 +40,6 @@ const DAY_NAMES = [
   'Friday',
   'Saturday',
 ];
-function hhmmToDate(hhmm: string): Date {
-  const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
-  const d = new Date();
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
-function dateToHHmm(d: Date): string {
-  const h = d.getHours().toString().padStart(2, '0');
-  const m = d.getMinutes().toString().padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-function hhmmToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
-  return h * 60 + m;
-}
-
-function formatTimeForDisplay(hhmm: string): { time: string; period: string } {
-  const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
-  const period = h >= 12 ? 'PM' : 'AM';
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return {
-    time: `${hour12}:${m.toString().padStart(2, '0')}`,
-    period,
-  };
-}
 
 export default function CreateScreen() {
   const router = useRouter();

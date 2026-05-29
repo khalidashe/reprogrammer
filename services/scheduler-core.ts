@@ -22,6 +22,13 @@ export function setLocalTimeOnDate(date: Date, hhmm: string): number {
   return d.getTime();
 }
 
+/** Local end-of-day timestamp (23:59:59.999) for the given moment (default: now). */
+export function endOfLocalDay(at: number = Date.now()): number {
+  const d = new Date(at);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
 export function dateKey(d: Date): string {
   const y = d.getFullYear();
   const m = (d.getMonth() + 1).toString().padStart(2, '0');

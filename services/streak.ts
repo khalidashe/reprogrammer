@@ -1,20 +1,6 @@
 import { CheckIn } from '../types';
 import { startOfDay, subDays, addDays } from 'date-fns';
 
-type DayResult = 'yes' | 'tried' | 'no';
-
-function bestResultForDay(
-  behaviorCheckIns: CheckIn[],
-  dayStart: number,
-  dayEnd: number
-): DayResult | null {
-  const todays = behaviorCheckIns.filter((ci) => ci.at >= dayStart && ci.at < dayEnd);
-  if (todays.length === 0) return null;
-  if (todays.some((ci) => ci.result === 'yes')) return 'yes';
-  if (todays.some((ci) => ci.result === 'tried')) return 'tried';
-  return 'no';
-}
-
 export function calculateStreak(behaviorId: string, checkIns: CheckIn[]): number {
   const behaviorCheckIns = checkIns.filter((ci) => ci.behaviorId === behaviorId);
   if (behaviorCheckIns.length === 0) return 0;
@@ -25,29 +11,31 @@ export function calculateStreak(behaviorId: string, checkIns: CheckIn[]): number
   // Bounded walk-back: at most 365 days to prevent pathological loops.
   for (let i = 0; i < 365; i++) {
     const dayEnd = startOfDay(addDays(currentDate, 1)).getTime();
-    const result = bestResultForDay(behaviorCheckIns, currentDate, dayEnd);
+    const todays = behaviorCheckIns.filter(
+      (ci) => ci.at >= currentDate && ci.at < dayEnd
+    );
 
-    if (result === 'yes') {
-      streak++;
-      currentDate = startOfDay(subDays(currentDate, 1)).getTime();
-    } else if (result === 'tried') {
-      // Streak-preserving but not advancing — continue walking back.
-      currentDate = startOfDay(subDays(currentDate, 1)).getTime();
-    } else if (result === 'no') {
-      break;
-    } else {
-      // No check-in for this day. Allow a 1-day grace: if yesterday has a
-      // check-in, jump back to it; otherwise the streak ends.
+    if (todays.length === 0) {
+      // No check-in this day. Allow a 1-day grace: if there's a check-in
+      // yesterday, jump back to it; otherwise the streak ends.
       const yesterdayStart = startOfDay(subDays(currentDate, 1)).getTime();
       const hasYesterdayCheckIn = behaviorCheckIns.some(
         (ci) => ci.at >= yesterdayStart && ci.at < currentDate
       );
-      if (hasYesterdayCheckIn) {
-        currentDate = yesterdayStart;
-      } else {
-        break;
-      }
+      if (!hasYesterdayCheckIn) break;
+      currentDate = yesterdayStart;
+      continue;
     }
+
+    // Best-of-day wins: yes > tried > no.
+    if (todays.some((ci) => ci.result === 'yes')) {
+      streak++;
+    } else if (!todays.some((ci) => ci.result === 'tried')) {
+      // All 'no' on this day — streak ends.
+      break;
+    }
+    // 'yes' advances and walks back; 'tried' preserves and walks back.
+    currentDate = startOfDay(subDays(currentDate, 1)).getTime();
   }
 
   return streak;

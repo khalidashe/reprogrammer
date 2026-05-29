@@ -14,6 +14,7 @@ import useStore from '@/store/useStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { cancelForBehavior, rescheduleAll, sendTestNotification } from '@/services/notifications';
+import { endOfLocalDay } from '@/services/scheduler-core';
 import { deriveStage, stageLabel } from '@/services/levels';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -109,10 +110,13 @@ export default function BehaviorDetailScreen() {
 
   const isPaused = behavior.pausedUntil != null && behavior.pausedUntil > Date.now();
 
-  const pauseUntil = async (resumeAt: number) => {
-    await updateBehavior({ ...behavior, pausedUntil: resumeAt });
-    await cancelForBehavior(behavior.id);
-  };
+  const pauseUntil = (resumeAt: number) =>
+    Promise.all([
+      updateBehavior({ ...behavior, pausedUntil: resumeAt }),
+      cancelForBehavior(behavior.id),
+    ]);
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
   const handlePausePress = () => {
     if (isPaused) {
@@ -123,10 +127,11 @@ export default function BehaviorDetailScreen() {
           { text: 'Stay paused', style: 'cancel' },
           {
             text: 'Resume now',
-            onPress: async () => {
-              await updateBehavior({ ...behavior, pausedUntil: undefined });
-              await rescheduleAll({ force: true });
-            },
+            onPress: () =>
+              Promise.all([
+                updateBehavior({ ...behavior, pausedUntil: undefined }),
+                rescheduleAll({ force: true }),
+              ]),
           },
         ]
       );
@@ -138,17 +143,10 @@ export default function BehaviorDetailScreen() {
       'Reminders stop; your streak and history stay. Pick a length — you can resume any time.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Until tonight',
-          onPress: () => {
-            const end = new Date();
-            end.setHours(23, 59, 59, 999);
-            void pauseUntil(end.getTime());
-          },
-        },
-        { text: '1 day', onPress: () => pauseUntil(Date.now() + 24 * 60 * 60 * 1000) },
-        { text: '3 days', onPress: () => pauseUntil(Date.now() + 3 * 24 * 60 * 60 * 1000) },
-        { text: '1 week', onPress: () => pauseUntil(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+        { text: 'Until tonight', onPress: () => pauseUntil(endOfLocalDay()) },
+        { text: '1 day', onPress: () => pauseUntil(Date.now() + DAY_MS) },
+        { text: '3 days', onPress: () => pauseUntil(Date.now() + 3 * DAY_MS) },
+        { text: '1 week', onPress: () => pauseUntil(Date.now() + 7 * DAY_MS) },
       ]
     );
   };
@@ -261,43 +259,35 @@ export default function BehaviorDetailScreen() {
               });
               const dateStr = date.toLocaleDateString();
 
-              const yesGlyph =
-                behavior.kind === 'eliminate' ? '✓ Caught it' : '✓ Practiced';
-              const triedGlyph =
-                behavior.kind === 'eliminate' ? '◐ Struggled' : '◐ Showed up';
-              const noGlyph = '× Skipped';
+              const isEliminate = behavior.kind === 'eliminate';
+              const resultStyle = {
+                yes: {
+                  bg: colors.successSoft,
+                  stripe: colors.success,
+                  labelColor: colors.success,
+                  glyph: isEliminate ? '✓ Caught it' : '✓ Practiced',
+                },
+                tried: {
+                  bg: colors.warningSoft,
+                  stripe: colors.warning,
+                  labelColor: colors.warning,
+                  glyph: isEliminate ? '◐ Struggled' : '◐ Showed up',
+                },
+                no: {
+                  bg: colors.surfaceMuted,
+                  stripe: colors.textMuted,
+                  labelColor: colors.text,
+                  glyph: '× Skipped',
+                },
+              }[item.result];
 
-              const bg =
-                item.result === 'yes'
-                  ? colors.successSoft
-                  : item.result === 'tried'
-                    ? colors.warningSoft
-                    : colors.surfaceMuted;
-              const stripe =
-                item.result === 'yes'
-                  ? colors.success
-                  : item.result === 'tried'
-                    ? colors.warning
-                    : colors.textMuted;
-              const labelColor =
-                item.result === 'yes'
-                  ? colors.success
-                  : item.result === 'tried'
-                    ? colors.warning
-                    : colors.text;
-              const glyph =
-                item.result === 'yes'
-                  ? yesGlyph
-                  : item.result === 'tried'
-                    ? triedGlyph
-                    : noGlyph;
               return (
                 <View
                   style={[
                     styles.checkInItem,
                     {
-                      backgroundColor: bg,
-                      borderLeftColor: stripe,
+                      backgroundColor: resultStyle.bg,
+                      borderLeftColor: resultStyle.stripe,
                     },
                   ]}
                 >
@@ -305,10 +295,10 @@ export default function BehaviorDetailScreen() {
                     <Text
                       style={[
                         styles.checkInResult,
-                        { color: labelColor },
+                        { color: resultStyle.labelColor },
                       ]}
                     >
-                      {glyph}
+                      {resultStyle.glyph}
                     </Text>
                     <Text style={[styles.checkInTime, { color: colors.text }]}>
                       {dateStr} {timeStr}

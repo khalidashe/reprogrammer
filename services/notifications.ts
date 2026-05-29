@@ -15,6 +15,7 @@ import {
 import {
   generateTimesForDay,
   setLocalTimeOnDate,
+  endOfLocalDay,
   dateKey,
   hashSeed,
   mulberry32,
@@ -293,9 +294,7 @@ export async function handleNotificationAction(
   if (!behavior) return;
 
   if (actionId === ACTION_OFF) {
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-    await store.updateBehavior({ ...behavior, pausedUntil: endOfDay.getTime() });
+    await store.updateBehavior({ ...behavior, pausedUntil: endOfLocalDay() });
     await cancelForBehavior(behaviorId);
     return;
   }
@@ -361,11 +360,9 @@ export async function handleCheckInResponse(
 
   const consecutiveNos = consecutiveNoCount(behaviorId, store.checkIns);
   if (consecutiveNos >= LAPSE_NO_THRESHOLD) {
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
     await store.updateBehavior({
       ...applyLapse(behavior),
-      pausedUntil: endOfDay.getTime(),
+      pausedUntil: endOfLocalDay(),
     });
     await cancelForBehavior(behaviorId);
     // Surface the compassionate restart banner on next dashboard render.
