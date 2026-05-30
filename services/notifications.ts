@@ -1,17 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { Behavior, ReminderAttempt } from '../types';
-import { addDays, addMinutes, startOfDay } from 'date-fns';
+import { addDays, startOfDay } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import useStore from '../store/useStore';
-import { calculateStreak, consecutiveNoCount } from './streak';
-import {
-  perBehaviorDailyCap,
-  shouldLevelUp,
-  applyLevelUp,
-  applyLapse,
-  LAPSE_NO_THRESHOLD,
-} from './levels';
+import { perBehaviorDailyCap } from './levels';
 import {
   generateTimesForDay,
   setLocalTimeOnDate,
@@ -21,19 +14,23 @@ import {
   mulberry32,
   SCHEDULE_LEAD_MS,
 } from './scheduler-core';
+import {
+  decideCheckInResponse,
+  CHECKIN_CATEGORY,
+  ANDROID_CHANNEL_ID,
+} from './checkin-policy';
 
 export { generateTimesForDay } from './scheduler-core';
+export { CHECKIN_CATEGORY } from './checkin-policy';
 
 const MAX_SCHEDULED = 60;
 const RESCHEDULE_THROTTLE_MS = 60 * 1000;
 const DAYS_HORIZON = 7;
-const ANDROID_CHANNEL_ID = 'reprogrammer-checkin';
 
 let lastRescheduleAt = 0;
 let categoryRegistered = false;
 let channelRegistered = false;
 
-export const CHECKIN_CATEGORY = 'behavior_checkin';
 export const ACTION_YES = 'CHECKIN_YES';
 export const ACTION_NO = 'CHECKIN_NO';
 export const ACTION_OFF = 'CHECKIN_OFF';
@@ -321,95 +318,52 @@ export async function handleCheckInResponse(
   const store = useStore.getState();
   const attempt = store.reminderAttempts.find((a) => a.id === attemptId);
   const behavior = store.behaviors.find((b) => b.id === behaviorId);
-  if (!behavior) return;
+  const platform: 'ios' | 'android' = Platform.OS === 'android' ? 'android' : 'ios';
 
-  if (attempt && (attempt.status === 'resolved' || attempt.status === 'disabled')) {
-    // idempotency: don't double-process a fired-then-cancelled attempt
-    return;
-  }
+  const decision = decideCheckInResponse(
+    result,
+    behavior,
+    attempt,
+    store.checkIns,
+    platform
+  );
 
-  if (result === 'yes' || result === 'tried') {
-    if (attempt) {
-      await store.updateReminderAttempt({
-        ...attempt,
-        status: 'resolved',
-        updatedAt: Date.now(),
-      });
-    }
-    // Only a clean 'yes' day can trigger level-up.
-    if (result === 'yes') {
-      const streak = calculateStreak(behaviorId, store.checkIns);
-      if (shouldLevelUp(streak, behavior.lastLevelUpStreak)) {
-        await store.updateBehavior(applyLevelUp(behavior, streak));
+  switch (decision.kind) {
+    case 'noop':
+      return;
+
+    case 'success':
+      if (decision.resolveAttempt) {
+        await store.updateReminderAttempt(decision.resolveAttempt);
+      }
+      if (decision.levelUp) {
+        await store.updateBehavior(decision.levelUp.updatedBehavior);
         await rescheduleAll({ force: true });
       }
-    }
-    return;
-  }
+      return;
 
-  // result === 'no'
-  if (!attempt) return;
-  const noCount = attempt.noCount + 1;
+    case 'lapse':
+      await store.updateReminderAttempt(decision.updateAttempt);
+      await store.updateBehavior(decision.updatedBehavior);
+      await cancelForBehavior(behaviorId);
+      await store.updateAppProfile(decision.appProfilePatch);
+      return;
 
-  await store.updateReminderAttempt({
-    ...attempt,
-    status: 'skipped',
-    noCount,
-    updatedAt: Date.now(),
-  });
-
-  const consecutiveNos = consecutiveNoCount(behaviorId, store.checkIns);
-  if (consecutiveNos >= LAPSE_NO_THRESHOLD) {
-    await store.updateBehavior({
-      ...applyLapse(behavior),
-      pausedUntil: endOfLocalDay(),
-    });
-    await cancelForBehavior(behaviorId);
-    // Surface the compassionate restart banner on next dashboard render.
-    await store.updateAppProfile({
-      lastLapseAt: Date.now(),
-      lastLapseAcknowledged: false,
-    });
-    return;
-  }
-
-  if (noCount < 2) {
-    const nextPhase: 'snooze15' | 'snooze30' = noCount === 1 ? 'snooze15' : 'snooze30';
-    const snoozeMinutes = nextPhase === 'snooze15' ? 15 : 30;
-    const snoozeTime = addMinutes(Date.now(), snoozeMinutes);
-    const newAttemptId = generateUUID();
-
-    const content: Notifications.NotificationContentInput = {
-      title: behavior.title,
-      body:
-        behavior.kind === 'eliminate'
-          ? `CATCH IT — ${behavior.pingMessage}`
-          : behavior.pingMessage,
-      sound: true,
-      vibrate: [0, 250, 250, 250],
-      categoryIdentifier: CHECKIN_CATEGORY,
-      data: { behaviorId, attemptId: newAttemptId, phase: nextPhase },
-    };
-    if (Platform.OS === 'android') {
-      (content as any).channelId = ANDROID_CHANNEL_ID;
+    case 'snooze': {
+      await store.updateReminderAttempt(decision.updateAttempt);
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: decision.content as Notifications.NotificationContentInput,
+        trigger: {
+          type: 'date',
+          date: new Date(decision.newAttempt.scheduledFor),
+        } as any,
+      });
+      await store.addReminderAttempt({ ...decision.newAttempt, notificationId });
+      return;
     }
 
-    const newNotificationId = await Notifications.scheduleNotificationAsync({
-      content,
-      trigger: { type: 'date', date: snoozeTime } as any,
-    });
-
-    const newAttempt: ReminderAttempt = {
-      id: newAttemptId,
-      behaviorId,
-      scheduledFor: snoozeTime.getTime(),
-      phase: nextPhase,
-      status: 'scheduled',
-      noCount,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      notificationId: newNotificationId,
-    };
-    await store.addReminderAttempt(newAttempt);
+    case 'skip':
+      await store.updateReminderAttempt(decision.updateAttempt);
+      return;
   }
 }
