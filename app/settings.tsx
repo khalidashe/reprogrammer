@@ -62,13 +62,17 @@ export default function SettingsScreen() {
     (b) => deriveStage(b.level, getStreak(b.id)) === 'habitual'
   ).length;
 
-  const stats: { value: string | number; label: string }[] = [
-    { value: activeStates.length, label: 'Active states' },
-    { value: habitualCount, label: 'Habitual states' },
-    { value: totalCheckIns, label: 'Total check-ins' },
-    { value: `${successRate}%`, label: 'Success rate' },
-    { value: longestStreak, label: 'Longest streak' },
-    { value: daysActive, label: 'Days active' },
+  const stats: { value: string | number; isZero: boolean; label: string }[] = [
+    { value: activeStates.length, isZero: activeStates.length === 0, label: 'Active states' },
+    { value: habitualCount, isZero: habitualCount === 0, label: 'Habitual states' },
+    { value: totalCheckIns, isZero: totalCheckIns === 0, label: 'Total check-ins' },
+    {
+      value: totalCheckIns > 0 ? `${successRate}%` : '—',
+      isZero: totalCheckIns === 0,
+      label: 'Success rate',
+    },
+    { value: longestStreak, isZero: longestStreak === 0, label: 'Longest streak' },
+    { value: daysActive, isZero: daysActive === 0, label: 'Days active' },
   ];
 
   const quietHours = appProfile.quietHours;
@@ -157,10 +161,20 @@ export default function SettingsScreen() {
             key={stat.label}
             style={[
               styles.statCard,
-              { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+              {
+                backgroundColor: stat.isZero ? colors.surfaceMuted : colors.tintSoft,
+                borderColor: stat.isZero ? colors.border : colors.tintMuted,
+              },
             ]}
           >
-            <Text style={[styles.statValue, { color: colors.tint }]}>{stat.value}</Text>
+            <Text
+              style={[
+                styles.statValue,
+                { color: stat.isZero ? colors.textMuted : colors.tint },
+              ]}
+            >
+              {stat.value}
+            </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {stat.label}
             </Text>

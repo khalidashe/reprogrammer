@@ -109,7 +109,10 @@ export default function CheckInScreen() {
   const yesLabel = isEliminate ? 'Caught It' : 'Check-in';
   const triedLabel = isEliminate ? 'Struggled' : 'Tried';
   const noLabel = isEliminate ? "Didn't Notice" : 'Snooze';
-  const messageBody = isEliminate ? `CATCH IT — ${behavior.pingMessage}` : behavior.pingMessage;
+  const messageBody = behavior.pingMessage;
+  const noHint = isEliminate
+    ? "Marks this prompt as missed. Doesn't reset your streak."
+    : 'Reschedules this reminder for later. Use when you can\'t practice right now.';
 
   return (
     <KeyboardAvoidingView
@@ -170,11 +173,12 @@ export default function CheckInScreen() {
             style={[
               styles.button,
               styles.noButton,
-              { borderColor: colors.tint, opacity: isSubmitting ? 0.5 : 1 },
+              { borderColor: colors.border, opacity: isSubmitting ? 0.5 : 1 },
             ]}
             accessibilityLabel={noLabel}
+            accessibilityHint={noHint}
           >
-            <Text style={[styles.buttonText, { color: colors.tint }]}>{noLabel}</Text>
+            <Text style={[styles.buttonText, { color: colors.textMuted }]}>{noLabel}</Text>
           </Pressable>
         </View>
 
