@@ -104,6 +104,8 @@ interface StoreState {
   updateBehavior: (behavior: Behavior) => Promise<void>;
   deleteBehavior: (id: string) => Promise<void>;
   addCheckIn: (checkIn: CheckIn) => Promise<void>;
+  updateCheckIn: (checkIn: CheckIn) => Promise<void>;
+  deleteCheckIn: (id: string) => Promise<void>;
   getStreak: (behaviorId: string) => number;
   setOnboarded: (value: boolean) => Promise<void>;
   updateAppProfile: (partial: Partial<AppProfile>) => Promise<void>;
@@ -187,6 +189,20 @@ const useStore = create<StoreState>((set, get) => ({
   addCheckIn: async (checkIn: CheckIn) => {
     const state = get();
     const updated = [...state.checkIns, checkIn];
+    set({ checkIns: updated });
+    await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(updated));
+  },
+
+  updateCheckIn: async (checkIn: CheckIn) => {
+    const state = get();
+    const updated = state.checkIns.map((c) => (c.id === checkIn.id ? checkIn : c));
+    set({ checkIns: updated });
+    await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(updated));
+  },
+
+  deleteCheckIn: async (id: string) => {
+    const state = get();
+    const updated = state.checkIns.filter((c) => c.id !== id);
     set({ checkIns: updated });
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(updated));
   },
