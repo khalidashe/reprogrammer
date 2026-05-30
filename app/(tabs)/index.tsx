@@ -88,7 +88,7 @@ export default function DashboardScreen() {
   ).length;
 
   const handleCreate = () => router.push('/create');
-  const handleOpenProfile = () => router.push('/explore');
+  const handleOpenProfile = () => router.push('/settings');
 
   // --- Select-mode handlers ---
 

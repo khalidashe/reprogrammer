@@ -1,28 +1,44 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius } from '@/constants/theme';
-import useStore from '@/store/useStore';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Alert,
+  Linking,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { useQuery } from 'convex/react';
+import { useAuthActions } from '@convex-dev/auth/react';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { api } from '@/convex/_generated/api';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import { useIsPro } from '@/hooks/useIsPro';
+import {
+  restorePurchases,
+  logoutRevenueCat,
+} from '@/services/revenuecat';
+import useStore from '@/store/useStore';
 import { deriveStage } from '@/services/levels';
 import { rescheduleAll } from '@/services/notifications';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import {
-  hhmmToDate,
-  dateToHHmm,
-  formatTimeForDisplayString,
-} from '@/utils/time';
+import { hhmmToDate, dateToHHmm, formatTimeForDisplayString } from '@/utils/time';
 
-/**
- * Profile screen. Reached from the small profile icon on the Dashboard.
- * Hidden from the tab bar — surfaced via `href: null` in (tabs)/_layout.tsx.
- */
-export default function ProfileScreen() {
+const MANAGE_URL = Platform.select({
+  ios: 'https://apps.apple.com/account/subscriptions',
+  android: 'https://play.google.com/store/account/subscriptions',
+  default: 'https://apps.apple.com/account/subscriptions',
+});
+
+export default function SettingsScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const { isPro, isSignedIn } = useIsPro();
+  const user = useQuery(api.users.getCurrentUser);
+  const { signOut } = useAuthActions();
   const { behaviors, checkIns, appProfile, updateAppProfile, getStreak } = useStore();
   const [, setRefresh] = useState({});
   const [pickerOpen, setPickerOpen] = useState<'from' | 'to' | null>(null);
@@ -61,6 +77,28 @@ export default function ProfileScreen() {
 
   const quietHours = appProfile.quietHours;
   const quietHoursEnabled = quietHours != null;
+
+  const handleRestore = async () => {
+    try {
+      await restorePurchases();
+      Alert.alert('Purchases restored', 'Any active subscription is now applied.');
+    } catch (e: any) {
+      Alert.alert('Restore failed', e?.message ?? 'Unknown error');
+    }
+  };
+
+  const handleManage = () => {
+    if (MANAGE_URL) Linking.openURL(MANAGE_URL);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await logoutRevenueCat();
+    } catch {
+      // ignore — RC may not be configured
+    }
+    await signOut();
+  };
 
   const handleToggleQuietHours = async () => {
     if (quietHoursEnabled) {
@@ -117,17 +155,6 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Space.xxl }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Back"
-        >
-          <Text style={[styles.backText, { color: colors.tint }]}>← Back</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
-      </View>
-
       <View style={styles.statsGrid}>
         {stats.map((stat) => (
           <View
@@ -155,36 +182,96 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Notifications
-        </Text>
-        <Text
-          style={[styles.notificationStatus, { color: appProfile.notificationsDenied ? colors.danger : colors.textMuted }]}
-        >
-          {appProfile.notificationsDenied
-            ? 'Disabled in system settings'
-            : 'Enabled'}
-        </Text>
-      </View>
+      <Section title="Subscription" colors={colors}>
+        <Row
+          label={isPro ? 'Reprogrammer Pro' : 'Free plan'}
+          value={isPro ? 'Active' : 'Upgrade for unlimited states + sync + AI'}
+          colors={colors}
+        />
+        {!isPro && (
+          <ActionButton
+            label="Upgrade to Pro"
+            onPress={() => router.push('/paywall')}
+            primary
+            colors={colors}
+          />
+        )}
+        {isPro && (
+          <ActionButton
+            label="Manage subscription"
+            onPress={handleManage}
+            colors={colors}
+          />
+        )}
+        <ActionButton
+          label="Restore purchases"
+          onPress={handleRestore}
+          colors={colors}
+        />
+      </Section>
 
-      <View style={styles.section}>
+      <Section title="Account" colors={colors}>
+        {isSignedIn ? (
+          <>
+            <Row
+              label="Signed in"
+              value={user?.email ?? user?.name ?? 'Account'}
+              colors={colors}
+            />
+            <ActionButton
+              label="Sign out"
+              onPress={handleSignOut}
+              colors={colors}
+              destructive
+            />
+          </>
+        ) : (
+          <>
+            <Row
+              label="Not signed in"
+              value="Sign in to sync across devices and access Pro."
+              colors={colors}
+            />
+            <ActionButton
+              label="Sign in"
+              onPress={() => router.push('/auth')}
+              primary
+              colors={colors}
+            />
+          </>
+        )}
+      </Section>
+
+      <Section title="Notifications" colors={colors}>
+        <Row
+          label="System permission"
+          value={
+            appProfile.notificationsDenied
+              ? 'Disabled in system settings'
+              : 'Enabled'
+          }
+          valueColor={appProfile.notificationsDenied ? colors.danger : undefined}
+          colors={colors}
+        />
+        {appProfile.notificationsDenied && (
+          <ActionButton
+            label="Open system settings"
+            onPress={() => void Linking.openSettings()}
+            colors={colors}
+          />
+        )}
+      </Section>
+
+      <Section title="Quiet hours" colors={colors}>
         <View style={styles.sectionRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Quiet hours
-            </Text>
-            <Text style={[styles.sectionSub, { color: colors.textMuted }]}>
-              Reminders pause inside this window across every state.
-            </Text>
-          </View>
+          <Text style={[styles.sectionSub, { color: colors.textMuted, flex: 1 }]}>
+            Reminders pause inside this window across every state.
+          </Text>
           <Pressable
             onPress={handleToggleQuietHours}
             style={[
               styles.toggle,
-              {
-                backgroundColor: quietHoursEnabled ? colors.tint : colors.surfaceMuted,
-              },
+              { backgroundColor: quietHoursEnabled ? colors.tint : colors.surfaceMuted },
             ]}
             accessibilityLabel={
               quietHoursEnabled ? 'Disable quiet hours' : 'Enable quiet hours'
@@ -193,9 +280,7 @@ export default function ProfileScreen() {
             <Text
               style={[
                 styles.toggleText,
-                {
-                  color: quietHoursEnabled ? colors.textOnBrand : colors.text,
-                },
+                { color: quietHoursEnabled ? colors.textOnBrand : colors.text },
               ]}
             >
               {quietHoursEnabled ? 'On' : 'Off'}
@@ -203,7 +288,7 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        {quietHoursEnabled ? (
+        {quietHoursEnabled && quietHours ? (
           <View style={styles.timeRow}>
             <Text style={[styles.timeRowLabel, { color: colors.textMuted }]}>From</Text>
             {renderTimeChip('from', quietHours.from)}
@@ -212,7 +297,7 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        {quietHoursEnabled && pickerOpen ? (
+        {quietHoursEnabled && quietHours && pickerOpen ? (
           <DateTimePicker
             value={hhmmToDate(pickerOpen === 'from' ? quietHours.from : quietHours.to)}
             mode="time"
@@ -220,12 +305,9 @@ export default function ProfileScreen() {
             onChange={handleQuietTimeChange(pickerOpen)}
           />
         ) : null}
-      </View>
+      </Section>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          About Reprogrammer
-        </Text>
+      <Section title="About" colors={colors}>
         <Text style={[styles.descriptionText, { color: colors.textMuted }]}>
           Reprogrammer uses spaced repetition to help you become aware of automatic
           behaviors and practice changing them.
@@ -233,38 +315,92 @@ export default function ProfileScreen() {
         <Text style={[styles.tagline, { color: colors.tint }]}>
           Notice · Repeat · Reprogram
         </Text>
-      </View>
+      </Section>
 
       <View style={styles.spacing} />
     </ScrollView>
   );
 }
 
+function Section({
+  title,
+  colors,
+  children,
+}: {
+  title: string;
+  colors: ThemeColors;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+        {title.toUpperCase()}
+      </Text>
+      <View style={[styles.sectionBody, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+function Row({
+  label,
+  value,
+  valueColor,
+  colors,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+  colors: ThemeColors;
+}) {
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.rowLabel, { color: colors.text }]}>{label}</Text>
+      <Text style={[styles.rowValue, { color: valueColor ?? colors.textMuted }]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function ActionButton({
+  label,
+  onPress,
+  primary,
+  destructive,
+  colors,
+}: {
+  label: string;
+  onPress: () => void;
+  primary?: boolean;
+  destructive?: boolean;
+  colors: ThemeColors;
+}) {
+  const bg = primary ? colors.tint : colors.surfaceMuted;
+  const fg = primary
+    ? colors.textOnBrand
+    : destructive
+      ? colors.danger
+      : colors.text;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.button, { backgroundColor: bg }]}
+      accessibilityLabel={label}
+    >
+      <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  // paddingTop is applied dynamically (safe-area + Space.xxl) at the JSX site
-  header: {
-    paddingHorizontal: Space.xl,
-    paddingBottom: Space.lg,
-    gap: Space.md,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-  },
-  backText: {
-    ...Type.body,
-    fontWeight: '500',
-  },
-  title: {
-    ...Type.display2,
-    fontWeight: '700',
-  },
+  container: { flex: 1 },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: Space.lg,
+    paddingTop: Space.lg,
     gap: Space.md,
   },
   statCard: {
@@ -275,33 +411,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.xs,
   },
-  statValue: {
-    ...Type.display2,
-    fontWeight: '700',
-  },
-  statLabel: {
-    ...Type.caption,
-    textAlign: 'center',
-  },
-  section: {
-    paddingHorizontal: Space.xl,
-    marginTop: Space.xxl,
-    gap: Space.md,
+  statValue: { ...Type.display2, fontWeight: '700' },
+  statLabel: { ...Type.caption, textAlign: 'center' },
+  section: { padding: Space.lg, gap: Space.sm },
+  sectionTitle: { ...Type.micro, letterSpacing: 1, marginLeft: Space.sm },
+  sectionBody: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: Space.md,
+    gap: Space.sm,
   },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.md,
   },
-  sectionTitle: {
-    ...Type.h2,
-    fontWeight: '600',
+  sectionSub: { ...Type.caption },
+  row: { gap: 2 },
+  rowLabel: { ...Type.bodyBold },
+  rowValue: { ...Type.caption },
+  button: {
+    paddingVertical: Space.md,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    marginTop: Space.xs,
   },
-  sectionSub: { ...Type.caption, marginTop: Space.xs },
-  notificationStatus: { ...Type.body },
+  buttonText: { ...Type.bodyBold },
   toggle: {
     paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + Space.xxs, // = 6
+    paddingVertical: Space.xs + Space.xxs,
     borderRadius: Radius.sm,
   },
   toggleText: { ...Type.bodyBold },
@@ -318,15 +457,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   timeChipText: { ...Type.bodyBold },
-  descriptionText: {
-    ...Type.body,
-  },
+  descriptionText: { ...Type.body },
   tagline: {
     ...Type.body,
     fontWeight: '600',
     letterSpacing: 1,
+    marginTop: Space.xs,
   },
-  spacing: {
-    height: Space.massive,
-  },
+  spacing: { height: Space.massive },
 });

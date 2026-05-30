@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useMemo, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
 import {
@@ -10,12 +11,16 @@ import {
 } from '@/services/library-content';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { SearchBar } from '@/components/library/search-bar';
+import { useIsPro } from '@/hooks/useIsPro';
+import { FREE_GUIDE_IDS } from '@/constants/limits';
 
 export default function LibraryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const { openGuide } = useContentModals();
+  const router = useRouter();
+  const { isPro } = useIsPro();
   const [query, setQuery] = useState('');
 
   const q = query.trim().toLowerCase();
@@ -51,14 +56,20 @@ export default function LibraryScreen() {
             No matches — try a different term.
           </Text>
         ) : (
-          filteredGuides.map((guide) => (
-            <GuideCard
-              key={guide.id}
-              guide={guide}
-              colors={colors}
-              onPress={() => openGuide(guide.id)}
-            />
-          ))
+          filteredGuides.map((guide) => {
+            const locked = !isPro && !FREE_GUIDE_IDS.has(guide.id);
+            return (
+              <GuideCard
+                key={guide.id}
+                guide={guide}
+                colors={colors}
+                locked={locked}
+                onPress={() =>
+                  locked ? router.push('/paywall') : openGuide(guide.id)
+                }
+              />
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -68,10 +79,12 @@ export default function LibraryScreen() {
 function GuideCard({
   guide,
   colors,
+  locked,
   onPress,
 }: {
   guide: LibraryGuide;
   colors: ThemeColors;
+  locked: boolean;
   onPress: () => void;
 }) {
   return (
@@ -79,12 +92,26 @@ function GuideCard({
       onPress={onPress}
       style={[
         styles.card,
-        { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+        {
+          backgroundColor: locked ? colors.surfaceMuted : colors.tintSoft,
+          borderColor: locked ? colors.border : colors.tintMuted,
+        },
       ]}
-      accessibilityLabel={`${guide.title} guide, ${guide.estimatedMinutes} minute read`}
-      accessibilityHint="Opens the full guide"
+      accessibilityLabel={
+        locked
+          ? `${guide.title} guide, Pro only`
+          : `${guide.title} guide, ${guide.estimatedMinutes} minute read`
+      }
+      accessibilityHint={locked ? 'Opens the upgrade screen' : 'Opens the full guide'}
     >
-      <Text style={[styles.cardTitle, { color: colors.text }]}>{guide.title}</Text>
+      <View style={styles.cardTitleRow}>
+        <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]}>
+          {guide.title}
+        </Text>
+        {locked && (
+          <Text style={[styles.cardLockBadge, { color: colors.tint }]}>PRO</Text>
+        )}
+      </View>
       <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
         {domainLabel(guide.domain)} · {guide.estimatedMinutes} min read
       </Text>
@@ -119,7 +146,9 @@ const styles = StyleSheet.create({
     padding: Space.md,
     gap: Space.xs,
   },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: Space.sm },
   cardTitle: { ...Type.bodyBold },
+  cardLockBadge: { ...Type.micro, fontWeight: '700', letterSpacing: 1 },
   cardMeta: { ...Type.micro, marginTop: 2 },
   cardBody: { ...Type.caption, marginTop: Space.xs },
 });

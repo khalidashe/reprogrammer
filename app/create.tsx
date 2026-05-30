@@ -15,6 +15,8 @@ import useStore from '@/store/useStore';
 import { Behavior, BehaviorKind } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { cancelForBehavior, scheduleForBehavior } from '@/services/notifications';
+import { useIsPro } from '@/hooks/useIsPro';
+import { FREE_TIER_STATE_CAP } from '@/constants/limits';
 import {
   INITIAL_LEVEL,
   INITIAL_LAST_LEVELUP_STREAK,
@@ -47,11 +49,19 @@ export default function CreateScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { id } = useLocalSearchParams();
   const { behaviors, addBehavior, updateBehavior } = useStore();
+  const { isPro } = useIsPro();
 
   const editingBehavior = useMemo(
     () => (id ? behaviors.find(b => b.id === id as string) : null),
     [id, behaviors]
   );
+
+  const activeStateCount = useMemo(
+    () => behaviors.filter((b) => !b.hidden).length,
+    [behaviors]
+  );
+  const wouldExceedFreeCap =
+    !isPro && !editingBehavior && activeStateCount >= FREE_TIER_STATE_CAP;
 
   const [title, setTitle] = useState(editingBehavior?.title || '');
   const [pingMessage, setPingMessage] = useState(editingBehavior?.pingMessage || '');
@@ -117,6 +127,11 @@ export default function CreateScreen() {
   };
 
   const handleSave = async () => {
+    if (wouldExceedFreeCap) {
+      router.push('/paywall');
+      return;
+    }
+
     if (!title.trim()) {
       Alert.alert('Label required', 'Please enter a state label');
       return;
@@ -210,6 +225,21 @@ export default function CreateScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
+        {wouldExceedFreeCap && (
+          <Pressable
+            onPress={() => router.push('/paywall')}
+            style={[styles.capBanner, { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted }]}
+            accessibilityLabel="Free tier limit reached. Upgrade to Pro."
+          >
+            <Text style={[styles.capBannerTitle, { color: colors.text }]}>
+              Free plan: {FREE_TIER_STATE_CAP} of {FREE_TIER_STATE_CAP} states used
+            </Text>
+            <Text style={[styles.capBannerSubtitle, { color: colors.textMuted }]}>
+              Upgrade to Pro for unlimited states →
+            </Text>
+          </Pressable>
+        )}
+
         <View style={styles.kindToggle}>
           <Pressable
             onPress={() => setKind('adopt')}
@@ -611,4 +641,12 @@ const styles = StyleSheet.create({
     ...Type.caption,
     fontWeight: '600',
   },
+  capBanner: {
+    padding: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    gap: 2,
+  },
+  capBannerTitle: { ...Type.bodyBold },
+  capBannerSubtitle: { ...Type.caption },
 });
