@@ -58,7 +58,6 @@ export default function TabLayout() {
         name="explore"
         options={{
           href: null,
-          tabBarButton: () => null,
         }}
       />
     </Tabs>

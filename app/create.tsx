@@ -30,7 +30,7 @@ import {
   formatTimeForDisplay,
 } from '@/utils/time';
 
-const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DAY_LETTERS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const DAY_NAMES = [
   'Sunday',
   'Monday',
@@ -332,7 +332,7 @@ export default function CreateScreen() {
                 <Pressable
                   key={index}
                   onPress={() => toggleDay(index)}
-                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                   style={[
                     styles.dayPill,
                     {
@@ -394,7 +394,6 @@ export default function CreateScreen() {
                 <Pressable
                   key={mins}
                   onPress={() => setIntervalMinutes(mins)}
-                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
                   style={[
                     styles.intervalChip,
                     {
@@ -545,9 +544,12 @@ const styles = StyleSheet.create({
     gap: Space.xs,
   },
   intervalChip: {
+    minWidth: 44,
+    minHeight: 44,
     paddingHorizontal: Space.sm,
-    paddingVertical: Space.xs + 2,
     borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   intervalChipText: {
     ...Type.caption,
