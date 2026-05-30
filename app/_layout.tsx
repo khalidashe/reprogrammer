@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
+import { ConvexAuthProvider } from '@convex-dev/auth/react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import useStore from '@/store/useStore';
@@ -15,8 +16,19 @@ import {
   setupNotificationCategory,
 } from '@/services/notifications';
 import { ContentModalsProvider } from '@/components/library/content-modals-provider';
+import { convex } from '@/services/convex-client';
+import { authSecureStorage } from '@/services/secure-storage';
+import { useCloudSyncBootstrap } from '@/hooks/useCloudSyncBootstrap';
 
 export default function RootLayout() {
+  return (
+    <ConvexAuthProvider client={convex} storage={authSecureStorage}>
+      <AppShell />
+    </ConvexAuthProvider>
+  );
+}
+
+function AppShell() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const pathname = usePathname();
@@ -24,6 +36,8 @@ export default function RootLayout() {
   const appProfile = useStore((state) => state.appProfile);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
+
+  useCloudSyncBootstrap();
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -106,6 +120,9 @@ export default function RootLayout() {
           <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
           <Stack.Screen name="create" options={{ presentation: 'modal', title: 'Create State' }} />
           <Stack.Screen name="behavior/[id]" options={{ title: 'State' }} />
+          <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
+          <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         </Stack>
       </ContentModalsProvider>
       <StatusBar style="auto" />

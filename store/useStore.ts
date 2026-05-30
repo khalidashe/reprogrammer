@@ -8,6 +8,7 @@ import {
   LEVEL_MIN,
   LEVEL_MAX,
 } from '../services/levels';
+import { cloudSync } from '../services/cloud-sync';
 
 const BEHAVIORS_KEY = 'rpg.behaviors.v3';
 const BEHAVIORS_V2_KEY = 'rpg.behaviors.v2';
@@ -162,6 +163,7 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = [...state.behaviors, behavior];
     set({ behaviors: updated });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
+    cloudSync.pushBehavior(behavior);
   },
 
   updateBehavior: async (behavior: Behavior) => {
@@ -169,10 +171,12 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = state.behaviors.map((b) => (b.id === behavior.id ? behavior : b));
     set({ behaviors: updated });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
+    cloudSync.pushBehavior(behavior);
   },
 
   deleteBehavior: async (id: string) => {
     const state = get();
+    const removedCheckIns = state.checkIns.filter((c) => c.behaviorId === id);
     const updated = state.behaviors.filter((b) => b.id !== id);
     const checkInsUpdated = state.checkIns.filter((c) => c.behaviorId !== id);
     const attemptsUpdated = state.reminderAttempts.filter((a) => a.behaviorId !== id);
@@ -184,6 +188,8 @@ const useStore = create<StoreState>((set, get) => ({
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(checkInsUpdated));
     await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(attemptsUpdated));
+    cloudSync.deleteBehavior(id);
+    for (const c of removedCheckIns) cloudSync.deleteCheckIn(c.id);
   },
 
   addCheckIn: async (checkIn: CheckIn) => {
@@ -191,6 +197,7 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = [...state.checkIns, checkIn];
     set({ checkIns: updated });
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(updated));
+    cloudSync.pushCheckIn(checkIn);
   },
 
   updateCheckIn: async (checkIn: CheckIn) => {
@@ -198,6 +205,7 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = state.checkIns.map((c) => (c.id === checkIn.id ? checkIn : c));
     set({ checkIns: updated });
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(updated));
+    cloudSync.pushCheckIn(checkIn);
   },
 
   deleteCheckIn: async (id: string) => {
@@ -205,6 +213,7 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = state.checkIns.filter((c) => c.id !== id);
     set({ checkIns: updated });
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(updated));
+    cloudSync.deleteCheckIn(id);
   },
 
   getStreak: (behaviorId: string) => {
@@ -217,6 +226,7 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = { ...state.appProfile, hasOnboarded: value };
     set({ appProfile: updated });
     await AsyncStorage.setItem('rpg.app.v1', JSON.stringify(updated));
+    cloudSync.pushAppProfile(updated);
   },
 
   updateAppProfile: async (partial: Partial<AppProfile>) => {
@@ -224,6 +234,7 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = { ...state.appProfile, ...partial };
     set({ appProfile: updated });
     await AsyncStorage.setItem('rpg.app.v1', JSON.stringify(updated));
+    cloudSync.pushAppProfile(updated);
   },
 
   addReminderAttempt: async (attempt: ReminderAttempt) => {
@@ -231,6 +242,7 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = [...state.reminderAttempts, attempt];
     set({ reminderAttempts: updated });
     await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(updated));
+    cloudSync.pushReminderAttempt(attempt);
   },
 
   updateReminderAttempt: async (attempt: ReminderAttempt) => {
@@ -240,6 +252,7 @@ const useStore = create<StoreState>((set, get) => ({
     );
     set({ reminderAttempts: updated });
     await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(updated));
+    cloudSync.pushReminderAttempt(attempt);
   },
 
   getReminderAttempts: (behaviorId: string) => {
