@@ -175,6 +175,7 @@ function TemplatesBrowser({
                 key={t.id}
                 title={t.title}
                 domain={domainLabel(t.domain)}
+                kind="adopt"
                 colors={colors}
                 onPress={() => onSelectAdopt(t)}
               />
@@ -201,6 +202,7 @@ function TemplatesBrowser({
                 key={t.id}
                 title={t.title}
                 domain={domainLabel(t.domain)}
+                kind="eliminate"
                 colors={colors}
                 onPress={() => onSelectEliminate(t)}
               />
@@ -215,22 +217,27 @@ function TemplatesBrowser({
 function TemplateCard({
   title,
   domain,
+  kind,
   colors,
   onPress,
 }: {
   title: string;
   domain: string;
+  kind: 'adopt' | 'eliminate';
   colors: ThemeColors;
   onPress: () => void;
 }) {
+  const isEliminate = kind === 'eliminate';
+  const bg = isEliminate ? colors.warningSoft : colors.tintSoft;
+  const border = isEliminate ? colors.warning : colors.tintMuted;
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.gridCard,
-        { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+        { backgroundColor: bg, borderColor: border },
       ]}
-      accessibilityLabel={`${title}, ${domain}`}
+      accessibilityLabel={`${title}, ${kind === 'eliminate' ? 'Eliminate' : 'Adopt'}, ${domain}`}
       accessibilityHint="Opens template details"
     >
       <Text

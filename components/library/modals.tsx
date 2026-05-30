@@ -42,7 +42,7 @@ function ModalHeader({ canBack, colors, onBack, onClose }: ModalHeaderProps) {
           hitSlop={8}
           accessibilityLabel="Back to previous"
         >
-          <IconSymbol name="chevron.left" size={22} color={colors.tint} />
+          <IconSymbol name="chevron.left" size={22} color={colors.textMuted} />
         </Pressable>
       ) : (
         <View style={styles.headerButton} />
@@ -53,7 +53,7 @@ function ModalHeader({ canBack, colors, onBack, onClose }: ModalHeaderProps) {
         hitSlop={8}
         accessibilityLabel="Close"
       >
-        <IconSymbol name="xmark" size={20} color={colors.tint} />
+        <IconSymbol name="xmark" size={20} color={colors.textMuted} />
       </Pressable>
     </View>
   );

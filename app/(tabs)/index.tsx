@@ -377,27 +377,23 @@ export default function DashboardScreen() {
                 onPress={() => router.push('/(tabs)/states')}
                 style={[
                   styles.emptyCta,
-                  styles.emptyCtaSecondary,
-                  { borderColor: colors.tint },
+                  { backgroundColor: colors.tint },
                 ]}
                 accessibilityLabel="Browse states catalog"
               >
                 <Text
-                  style={[styles.emptyCtaText, { color: colors.tint }]}
+                  style={[styles.emptyCtaText, { color: colors.textOnBrand }]}
                 >
                   Browse states
                 </Text>
               </Pressable>
               <Pressable
                 onPress={handleCreate}
-                style={[
-                  styles.emptyCta,
-                  { backgroundColor: colors.tint },
-                ]}
+                style={styles.emptyCta}
                 accessibilityLabel="Create state from scratch"
               >
                 <Text
-                  style={[styles.emptyCtaText, { color: colors.textOnBrand }]}
+                  style={[styles.emptyCtaText, { color: colors.textMuted }]}
                 >
                   Create from scratch
                 </Text>
