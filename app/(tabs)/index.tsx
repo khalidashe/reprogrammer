@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ScrollView, Linking } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   Colors,
@@ -46,6 +47,7 @@ export default function DashboardScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const {
     behaviors,
     checkIns,
@@ -447,9 +449,7 @@ export default function DashboardScreen() {
             {
               backgroundColor: colors.surface,
               borderTopColor: colors.border,
-              // Sit above the floating tab bar; insets.bottom is already
-              // absorbed by the tab bar so we add a fixed clearance.
-              bottom: 60 + insets.bottom,
+              bottom: tabBarHeight,
               paddingBottom: Space.sm,
             },
           ]}
