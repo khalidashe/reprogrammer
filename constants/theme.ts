@@ -202,12 +202,27 @@ export const Type = {
     fontWeight: '600' as const,
     letterSpacing: 0.5,
   },
+  /**
+   * Magazine-y display for guide titles and onboarding splash. Tighter
+   * tracking than h1 to feel editorial; smaller than the celebration `display`.
+   */
+  display2: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800' as const,
+    letterSpacing: -0.5,
+  },
   /** Streak / milestone moment — reserved. */
   display: { fontSize: 48, lineHeight: 54, fontWeight: '700' as const },
 } as const;
 
-/** Spacing tokens — 4pt grid. Prefer these over raw numbers in styles. */
+/**
+ * Spacing tokens — 4pt grid. Prefer these over raw numbers in styles.
+ * `xxs` covers fine adjustments (chip gaps, accent bars); `massive` is the
+ * top-of-screen breathing room you'd otherwise reach for with `paddingTop:60`.
+ */
 export const Space = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
@@ -215,13 +230,29 @@ export const Space = {
   xl: 20,
   xxl: 24,
   xxxl: 32,
+  massive: 48,
 } as const;
 
-/** Border radius scale — 3 steps. */
+/**
+ * Border radius scale. `xs` for inputs/small chips, `pill` for fully-rounded
+ * affordances.
+ */
 export const Radius = {
+  xs: 8, // inputs, small chips
   sm: 6, // badges, pills, chips
   md: 12, // buttons, cards, inputs
   lg: 20, // tiles, modals
+  pill: 9999, // fully rounded
+} as const;
+
+/**
+ * Layout tokens — percentages and ratios shared across screens. Centralizing
+ * these keeps grid math out of individual StyleSheets.
+ */
+export const Layout = {
+  /** Tile grid: 2-column with a single gap between, both as % of container. */
+  gridGapPct: 4,
+  tileWidthPct: 48, // (100 - gridGapPct) / 2
 } as const;
 
 export const Fonts = Platform.select({

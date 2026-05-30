@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   headerButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderWidth: 1,
     paddingHorizontal: Space.sm,
-    paddingVertical: 2,
+    paddingVertical: Space.xxs,
     marginBottom: Space.sm,
   },
   kindBadgeText: { ...Type.micro },
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderWidth: 1,
     paddingHorizontal: Space.sm,
-    paddingVertical: 5,
+    paddingVertical: Space.xs + Space.xxs - 1, // = 5; tight vertical to keep chip slim
   },
   chipText: { ...Type.caption },
   includedGuide: {

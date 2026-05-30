@@ -256,7 +256,7 @@ export default function CreateScreen() {
             <Text style={[styles.rowLabel, { color: colors.text }]}>Replace with:</Text>
             <View style={styles.replacementChips}>
               {adoptStateOptions.length === 0 ? (
-                <Text style={{ color: colors.textMuted, fontSize: 12, flex: 1 }}>
+                <Text style={[Type.caption, { color: colors.textMuted, flex: 1 }]}>
                   No Adopt states yet — create one first.
                 </Text>
               ) : (
@@ -473,6 +473,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
   },
+  // The time chip is the visual centerpiece of the schedule section — a
+  // larger-than-display2 numeric (32pt vs 28pt) to feel tappable as a target
+  // without competing with screen headers.
   timeChipText: {
     fontSize: 32,
     fontWeight: '700',

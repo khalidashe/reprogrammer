@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius } from '@/constants/theme';
 import useStore from '@/store/useStore';
@@ -21,6 +22,7 @@ export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { behaviors, checkIns, appProfile, updateAppProfile, getStreak } = useStore();
   const [, setRefresh] = useState({});
   const [pickerOpen, setPickerOpen] = useState<'from' | 'to' | null>(null);
@@ -111,7 +113,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + Space.xxl }]}>
         <Pressable
           onPress={() => router.back()}
           style={styles.backButton}
@@ -228,49 +230,49 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // paddingTop is applied dynamically (safe-area + Space.xxl) at the JSX site
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 12,
+    paddingHorizontal: Space.xl,
+    paddingBottom: Space.lg,
+    gap: Space.md,
   },
   backButton: {
     alignSelf: 'flex-start',
   },
   backText: {
-    fontSize: 15,
+    ...Type.body,
     fontWeight: '500',
   },
   title: {
-    fontSize: 28,
+    ...Type.display2,
     fontWeight: '700',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: Space.lg,
+    gap: Space.md,
   },
   statCard: {
     width: '48%',
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: Radius.lg,
+    padding: Space.lg,
     alignItems: 'center',
-    gap: 4,
+    gap: Space.xs,
   },
   statValue: {
-    fontSize: 28,
+    ...Type.display2,
     fontWeight: '700',
   },
   statLabel: {
-    fontSize: 12,
+    ...Type.caption,
     textAlign: 'center',
   },
   section: {
-    paddingHorizontal: 20,
-    marginTop: 24,
-    gap: 12,
+    paddingHorizontal: Space.xl,
+    marginTop: Space.xxl,
+    gap: Space.md,
   },
   sectionRow: {
     flexDirection: 'row',
@@ -278,14 +280,14 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   sectionTitle: {
-    fontSize: 18,
+    ...Type.h2,
     fontWeight: '600',
   },
   sectionSub: { ...Type.caption, marginTop: Space.xs },
   notificationStatus: { ...Type.body },
   toggle: {
     paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + 2,
+    paddingVertical: Space.xs + Space.xxs, // = 6
     borderRadius: Radius.sm,
   },
   toggleText: { ...Type.bodyBold },
@@ -303,15 +305,14 @@ const styles = StyleSheet.create({
   },
   timeChipText: { ...Type.bodyBold },
   descriptionText: {
-    fontSize: 14,
-    lineHeight: 20,
+    ...Type.body,
   },
   tagline: {
-    fontSize: 14,
+    ...Type.body,
     fontWeight: '600',
     letterSpacing: 1,
   },
   spacing: {
-    height: 60,
+    height: Space.massive,
   },
 });

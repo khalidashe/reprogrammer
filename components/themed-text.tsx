@@ -1,5 +1,6 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { Text, type TextProps } from 'react-native';
 
+import { Type } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 export type ThemedTextProps = TextProps & {
@@ -8,6 +9,18 @@ export type ThemedTextProps = TextProps & {
   type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
 };
 
+/**
+ * Theme-aware wrapper around RN's Text. Variants resolve to the canonical
+ * `Type` tokens so this component shares one typography scale with the rest
+ * of the app instead of carrying its own.
+ *
+ * Variant → token map:
+ *   default          → Type.body
+ *   defaultSemiBold  → Type.bodyBold
+ *   subtitle         → Type.h2
+ *   title            → Type.display2  (magazine-y editorial size)
+ *   link             → Type.body, colored with the theme's `info`
+ */
 export function ThemedText({
   style,
   lightColor,
@@ -15,48 +28,28 @@ export function ThemedText({
   type = 'default',
   ...rest
 }: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const textColor = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const linkColor = useThemeColor({}, 'info');
+
+  const variant =
+    type === 'title'
+      ? Type.display2
+      : type === 'subtitle'
+        ? Type.h2
+        : type === 'defaultSemiBold'
+          ? Type.bodyBold
+          : type === 'link'
+            ? Type.body
+            : Type.body;
 
   return (
     <Text
       style={[
-        { color },
-        type === 'default' ? styles.default : undefined,
-        type === 'title' ? styles.title : undefined,
-        type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
-        type === 'subtitle' ? styles.subtitle : undefined,
-        type === 'link' ? styles.link : undefined,
+        variant,
+        { color: type === 'link' ? linkColor : textColor },
         style,
       ]}
       {...rest}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  defaultSemiBold: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    lineHeight: 32,
-  },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 16,
-    // Color is provided by useThemeColor; this is a fallback that matches
-    // the new info-blue semantic token in light mode.
-    color: '#3b82f6',
-  },
-});
