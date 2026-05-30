@@ -14,6 +14,7 @@ import useStore from '@/store/useStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { cancelForBehavior, rescheduleAll, sendTestNotification } from '@/services/notifications';
+import type { CheckIn } from '@/types';
 import { endOfLocalDay } from '@/services/scheduler-core';
 import { deriveStage, stageLabel } from '@/services/levels';
 import { useContentModals } from '@/components/library/content-modals-provider';
@@ -37,7 +38,15 @@ export default function BehaviorDetailScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { id } = useLocalSearchParams();
-  const { behaviors, checkIns, getStreak, deleteBehavior, updateBehavior } = useStore();
+  const {
+    behaviors,
+    checkIns,
+    getStreak,
+    deleteBehavior,
+    updateBehavior,
+    updateCheckIn,
+    deleteCheckIn,
+  } = useStore();
   const { openGuide } = useContentModals();
   const [, setRefresh] = useState({});
 
@@ -97,6 +106,28 @@ export default function BehaviorDetailScreen() {
       hidden: true,
     });
     router.back();
+  };
+
+  const handleCheckInLongPress = (item: CheckIn) => {
+    const isEliminate = behavior.kind === 'eliminate';
+    const yesLabel = isEliminate ? 'Caught it' : 'Practiced';
+    const triedLabel = isEliminate ? 'Struggled' : 'Showed up';
+    const noLabel = 'Skipped';
+    const change = (next: 'yes' | 'tried' | 'no') => {
+      if (next === item.result) return;
+      void updateCheckIn({ ...item, result: next });
+    };
+    Alert.alert('Change this check-in', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      ...(item.result !== 'yes' ? [{ text: yesLabel, onPress: () => change('yes') }] : []),
+      ...(item.result !== 'tried' ? [{ text: triedLabel, onPress: () => change('tried') }] : []),
+      ...(item.result !== 'no' ? [{ text: noLabel, onPress: () => change('no') }] : []),
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => void deleteCheckIn(item.id),
+      },
+    ]);
   };
 
   const handleTestNotification = async () => {
@@ -282,7 +313,11 @@ export default function BehaviorDetailScreen() {
               }[item.result];
 
               return (
-                <View
+                <Pressable
+                  onLongPress={() => handleCheckInLongPress(item)}
+                  delayLongPress={400}
+                  accessibilityLabel={`Check-in: ${resultStyle.glyph}, ${dateStr} ${timeStr}`}
+                  accessibilityHint="Long-press to change or delete"
                   style={[
                     styles.checkInItem,
                     {
@@ -309,7 +344,7 @@ export default function BehaviorDetailScreen() {
                       {item.note}
                     </Text>
                   )}
-                </View>
+                </Pressable>
               );
             }}
           />
