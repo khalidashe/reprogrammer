@@ -2,6 +2,184 @@ import type { LibraryGuide } from '../library-content';
 
 export const LIBRARY_GUIDES: LibraryGuide[] = [
   {
+    id: 'guide-context-design',
+    title: 'Context Beats Willpower',
+    domain: 'language_cognitive',
+    practiceType: 'learning',
+    estimatedMinutes: 6,
+    summary:
+      "Your behavior isn't fixed — it's a response to the room you're in. Design the room and you change the behavior.",
+    body: `## The Story
+
+*Newcastle University, 2006. A staff tea room — about 48 people, no cashier, no camera. A price list on the wall and a wooden box with a slot. Staff pay on the honor system. Nobody is watching.*
+
+*Melissa Bateson, Daniel Nettle, and Gilbert Roberts change one thing. For ten weeks they alternate the image taped above the price list — some weeks a photo of flowers, some weeks a close-cropped photograph of human eyes staring directly outward. Nobody is told.*
+
+*Flower weeks: ordinary contributions. Eye weeks: contributions **176% higher**. Same people. Same coffee. Same prices. One photograph of eyes that nobody consciously reacted to.*
+
+---
+
+## What It Reveals
+
+The staff weren't dishonest — most paid either way. But *how much* they paid shifted on a feeling of being watched. Humans evolved where reputation was survival, so the brain runs fast, unconscious circuitry that detects social observers and adjusts behavior before conscious thought. A photograph is enough to trip it.
+
+That's the uncomfortable, freeing truth: your behavior is far less a product of fixed character than of your surroundings. You are not a willpower battery fighting temptation — you are a system responding to its environment. So the highest-leverage move isn't more willpower. It's redesigning the room.
+
+---
+
+## The Principle
+
+> *Your behavior is not fixed — it is a response to context. Design the context, and you shape the behavior.*
+
+---
+
+## The Research
+
+| Fact | Source |
+|---|---|
+| A photo of watching eyes raised honesty-box contributions by 176% | [Bateson, Nettle & Roberts, 2006](https://royalsocietypublishing.org/doi/10.1098/rsbl.2006.0509) |
+| Across 15 experiments, eye cues reduced antisocial behavior ~35% | Dear, Dutton & Fox, 2019 (meta-analysis) |
+| Eye-image signs cut littering 4–5× in a real cafeteria | [Ernest-Jones, Nettle & Bateson, 2011](https://www.sciencedirect.com/science/article/abs/pii/S1090513810001364) |
+| Removing a tempting cue from view beats resisting it — environment outperforms willpower | [Wood & Neal, 2007](https://psycnet.apa.org/doi/10.1037/0033-295X.114.4.843) |
+
+---
+
+## How to Apply It
+
+1. **Make the good cue obvious.** Put the trigger in your path — shoes by the door, book on the pillow, the app on your home screen. You shouldn't have to remember; the room should remind you.
+
+2. **Delete the bad cue.** Most "self-control" wins are really design wins: hide the snack, log out, leave the phone in another room. Don't fight the pull — remove it.
+
+3. **Borrow the watching eyes.** A small sense of accountability changes behavior. Tell one trusted person, or leave a visible tracker where you'll pass it.
+
+4. **Design before you rely on discipline.** Set the environment up the night before, when motivation is cheap, so the morning needs none.
+
+---
+
+## Connection to the System
+
+Reprogrammer is a context-design system. Every reminder is a deliberate cue; every Eliminate behavior is a trigger you're removing. You're not at war with your defaults — you're redesigning the room they live in. See [[Digital Discipline]] for the screen-environment version, and [[The Company You Keep]] for the social one.`,
+  },
+  {
+    id: 'guide-action-over-consumption',
+    title: 'Doing Beats Knowing',
+    domain: 'professional',
+    practiceType: 'learning',
+    estimatedMinutes: 6,
+    summary:
+      'The brain is changed by what you do, not by what you consume. Reading about change is not changing.',
+    body: `## The Story
+
+*Right now, someone is reading about discipline while avoiding the thing that requires it. Someone else is on their third nootropic stack of the year. A third owns seventeen self-improvement books, highlighted through chapter three, and a habit tracker opened twice in January. None of them are lazy. They are doing exactly what the brain is built to do.*
+
+*In 1949, the linguist George Kingsley Zipf documented the **Principle of Least Effort**: across language, work, and decisions, humans reliably choose the path that minimizes total effort. The brain is 2% of body mass and burns 20% of your energy; evolution tuned it to conserve.*
+
+*The numbers show where that instinct goes to spend. The global nootropics market: **$6 billion**, heading for $11.7B. The wider self-improvement industry: **$45.7 billion**. Meanwhile the actual mechanism of improvement — challenge, practice, reflection — isn't something you can buy. It's something you do.*
+
+---
+
+## What It Reveals
+
+The supplement aisle sells the feeling of hard effort at the price of none. Swallow the pill, feel invested in your mind. Download the app, feel like you've started. The feeling is real. The change is not.
+
+Every mechanism that actually rewires you — long-term potentiation, synaptic growth, the basal-ganglia encoding that turns effort into habit — is triggered by *action*. The pathway doesn't form when you learn that practice builds pathways. It forms when you practice. Consuming information about change produces the sensation of progress and none of the substance.
+
+---
+
+## The Principle
+
+> *The brain is not changed by what you consume. It is changed by what you do.*
+
+---
+
+## The Research
+
+| Fact | Source |
+|---|---|
+| Active learning raises performance and retention over passive lectures (meta-analysis, 225 studies) | [Freeman et al., 2014](https://www.pnas.org/doi/10.1073/pnas.1319030111) |
+| The generation effect: information you produce is remembered better than information you receive (126 studies) | [Bertsch et al., 2007](https://link.springer.com/article/10.3758/BF03193441) |
+| ~70% of meaningful development comes from challenging real practice, not content (the 70-20-10 model) | Lombardo & Eichinger, 1996 |
+| Habits cut the brain's energy cost — but only form through repetition, never through reading | MIT / Graybiel; [Lally et al., 2010](https://onlinelibrary.wiley.com/doi/10.1002/ejsp.674) |
+
+---
+
+## How to Apply It
+
+1. **Read once, then do.** A guide is scaffolding, not the building. The moment you finish one, run the exercise — even a two-minute version — before opening the next.
+
+2. **Pick one behavior and practice it today.** Not a reading list, not a plan. One rep in a real situation beats a week of research.
+
+3. **Notice the consumption trap.** Bookmarking, buying, and "researching" feel like progress. If an hour produced no rep, it produced no change.
+
+4. **Measure dones, not knowns.** Track reps completed, not articles read. The rep is the unit that moves the needle.
+
+---
+
+## Connection to the System
+
+This is the whole bet of Reprogrammer: the app gives you structure, science, and a schedule — it cannot supply the repetition. That part is yours. Read the guide, then let the next ping be the rep. Pairs with [[Context Beats Willpower]] (make the doing easy) and [[When You Slip: How to Come Back]] (getting back to the reps after a miss).`,
+  },
+  {
+    id: 'guide-social-environment',
+    title: 'The Company You Keep',
+    domain: 'social',
+    practiceType: 'learning',
+    estimatedMinutes: 7,
+    summary:
+      'Behavior spreads through your relationships — out to three degrees. Choosing your circle is choosing your defaults.',
+    body: `## The Story
+
+*Harvard and UC San Diego, 2007. Nicholas Christakis and James Fowler get access to the Framingham Heart Study — 12,067 people tracked across 32 years, including who was friends with whom. They ask a question that sounds too simple: does obesity spread between people who know each other?*
+
+*It does. When someone becomes obese, their close friend becomes **57% more likely** to become obese too — even after controlling for shared diets and neighborhoods. The effect propagates outward: friend of a friend +20%, friend of a friend of a friend +10%, vanishing only at the fourth degree. The same pattern holds for happiness, and for quitting smoking (67% → 36% → 11% across three degrees).*
+
+*The mechanism isn't copying. Norms — what counts as a normal body, a normal mood, a normal level of effort — quietly update through repeated exposure to the people around you. You don't notice the shift. You just become a more accurate reflection of your environment.*
+
+---
+
+## What It Reveals
+
+Your social environment is not a backdrop to your behavior — it is an active input to it, operating below awareness and reaching three layers into your network. Milgram showed 65% of people would deliver a maximum shock because an authority asked; Asch showed 75% would deny the evidence of their own eyes to match a group. We are exquisitely tuned to the people around us.
+
+This isn't a reason to be cold about relationships. It's the same logic as removing the slot machine from the room — applied to the people, feeds, and voices you expose yourself to every day. Curating your inputs is curating your defaults.
+
+---
+
+## The Principle
+
+> *You don't just choose your friends. You choose your future behavior, your health, and your defaults.*
+
+---
+
+## The Research
+
+| Fact | Source |
+|---|---|
+| A friend becoming obese raises your own risk 57%; the effect propagates three degrees | [Christakis & Fowler, 2007](https://www.nejm.org/doi/full/10.1056/NEJMsa066082) |
+| Smoking cessation spreads across networks: 67% → 36% → 11% over three degrees | [Christakis & Fowler, 2008](https://www.nejm.org/doi/full/10.1056/NEJMsa0706154) |
+| 65% delivered the maximum shock under mild authority pressure | Milgram, 1963 |
+| 75% conformed at least once to an obviously wrong group answer (control error <1%) | Asch, 1951 |
+| A randomly assigned higher-GPA roommate causally raised students' own GPA | [Sacerdote, 2001](https://academic.oup.com/qje/article-abstract/116/2/681/1904199) |
+
+---
+
+## How to Apply It
+
+1. **Audit your inputs.** Name the five people — and five feeds — you spend the most time with. They are quietly setting your baseline. Decide which to move toward and which to dilute.
+
+2. **Add one person who's already there.** The fastest route to a behavior is regular contact with someone for whom it's already normal. Proximity does work that motivation can't.
+
+3. **Treat your feed as a social environment.** Who you follow online is company too. Unfollow the defaults you don't want; follow the ones you do. See [[Digital Discipline]].
+
+4. **Improve in silence.** Announcing a change invites resistance and hands your brain a premature reward. Change quietly; let the results speak.
+
+---
+
+## Connection to the System
+
+Designing your social environment is the same move as designing your physical one — see [[Context Beats Willpower]]. It isn't elitism; it's recognizing that the people and feeds around you are active variables in who you become. Pairs with [[Doing Beats Knowing]]: the reps are yours, but the right environment makes them far easier to keep.`,
+  },
+  {
     id: 'guide-attention-fragmentation',
     title: 'Attention Fragmentation',
     domain: 'professional',

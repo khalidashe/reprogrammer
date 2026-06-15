@@ -331,8 +331,9 @@ function ProgramsBrowser({ colors, programs, onSelect }: ProgramsBrowserProps) {
                 {program.title}
               </Text>
               <Text style={[styles.programMeta, { color: colors.textMuted }]}>
-                {program.guideIds.length} guides
-                {program.sequence ? ` · ${program.sequence.length}-step sequence` : ''}
+                {program.book
+                  ? `Book · ${program.book.author}`
+                  : `${program.guideIds.length} guides${program.sequence ? ` · ${program.sequence.length}-step sequence` : ''}`}
               </Text>
             </View>
             <IconSymbol name="chevron.right" size={18} color={colors.textMuted} />

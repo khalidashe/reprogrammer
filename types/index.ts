@@ -13,6 +13,23 @@ export type Domain =
   | 'emotional'
   | 'creative'
   | 'professional';
+/**
+ * Browsable library taxonomy (REP-11). `foundation` is the forefront gateway —
+ * the "how change works" prologue surfaced before everything else. The
+ * remaining categories are organized by life domain.
+ */
+export type LibraryCategory =
+  | 'foundation'
+  | 'mind_thinking'
+  | 'focus_attention'
+  | 'emotions_resilience'
+  | 'social_communication'
+  | 'performance_productivity'
+  | 'identity_purpose'
+  | 'body_health'
+  | 'relationships'
+  | 'wealth_money'
+  | 'philosophy_worldview';
 export type Stage = 'starting' | 'in_progress' | 'habitual';
 
 export interface Behavior {
