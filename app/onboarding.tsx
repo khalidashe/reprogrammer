@@ -53,6 +53,10 @@ export default function OnboardingScreen() {
     await setOnboarded(true);
   };
 
+  const startWithFoundation = async () => {
+    await setOnboarded(true);
+  };
+
   if (step === 'splash') {
     return (
       <View
@@ -121,6 +125,23 @@ export default function OnboardingScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.content, { paddingTop: contentPaddingTop }]}>
+        <Pressable
+          onPress={startWithFoundation}
+          style={[
+            styles.foundationCard,
+            { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+          ]}
+        >
+          <Text style={[styles.foundationLabel, { color: colors.accentText }]}>
+            START HERE
+          </Text>
+          <Text style={[styles.foundationTitle, { color: colors.text }]}>The Foundation</Text>
+          <Text style={[styles.foundationBody, { color: colors.textMuted }]}>
+            New to changing habits? Begin with a few short reads on how change actually
+            works — they&apos;re at the top of your Library.
+          </Text>
+        </Pressable>
+
         <Text style={[styles.title, { color: colors.text }]}>Pick a behavior to start</Text>
         <Text style={[styles.description, { color: colors.textMuted }]}>
           One behavior. Get it to automatic before adding another.
@@ -236,6 +257,23 @@ const styles = StyleSheet.create({
     ...Type.micro,
     fontWeight: '400',
     fontStyle: 'italic',
+  },
+  foundationCard: {
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    padding: Space.lg,
+    gap: Space.xs,
+    marginBottom: Space.xl,
+  },
+  foundationLabel: {
+    ...Type.micro,
+  },
+  foundationTitle: {
+    ...Type.bodyBold,
+    fontWeight: '700',
+  },
+  foundationBody: {
+    ...Type.caption,
   },
   templates: {
     gap: Space.md,
