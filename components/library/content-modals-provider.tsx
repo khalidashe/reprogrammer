@@ -15,7 +15,7 @@ import { scheduleForBehavior } from '@/services/notifications';
 import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from '@/services/levels';
 import {
   LIBRARY_GUIDES,
-  LIBRARY_PACKAGES,
+  LIBRARY_PROGRAMS,
   ADOPT_TEMPLATES,
   ELIMINATE_TEMPLATES,
   type AdoptTemplate,
@@ -29,7 +29,7 @@ interface ContentModalsApi {
   openGuide: (id: string) => void;
   openAdopt: (id: string) => void;
   openEliminate: (id: string) => void;
-  openPackage: (id: string) => void;
+  openProgram: (id: string) => void;
   close: () => void;
 }
 
@@ -123,10 +123,10 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
     [pushTarget]
   );
 
-  const openPackage = useCallback(
+  const openProgram = useCallback(
     (id: string) => {
-      const pkg = LIBRARY_PACKAGES.find((p) => p.id === id);
-      if (pkg) pushTarget({ kind: 'package', pkg });
+      const program = LIBRARY_PROGRAMS.find((p) => p.id === id);
+      if (program) pushTarget({ kind: 'program', program });
     },
     [pushTarget]
   );
@@ -169,7 +169,7 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
       if (!replacement) {
         Alert.alert(
           'Add replacement first',
-          `"${template.title}" needs the Adopt state "${adoptTemplate?.title ?? 'replacement'}" to be active.`,
+          `"${template.title}" needs the Adopt behavior "${adoptTemplate?.title ?? 'replacement'}" to be active.`,
           [
             { text: 'Cancel', style: 'cancel' },
             ...(adoptTemplate
@@ -224,8 +224,8 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
       : false;
 
   const api = useMemo<ContentModalsApi>(
-    () => ({ openGuide, openAdopt, openEliminate, openPackage, close }),
-    [openGuide, openAdopt, openEliminate, openPackage, close]
+    () => ({ openGuide, openAdopt, openEliminate, openProgram, close }),
+    [openGuide, openAdopt, openEliminate, openProgram, close]
   );
 
   return (

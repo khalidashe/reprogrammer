@@ -34,7 +34,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="states"
         options={{
-          title: 'States',
+          title: 'Behaviors',
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="square.stack.fill" color={color} />
           ),

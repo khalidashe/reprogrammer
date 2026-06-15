@@ -1,10 +1,10 @@
 import {
   LIBRARY_GUIDES,
-  LIBRARY_PACKAGES,
+  LIBRARY_PROGRAMS,
   ADOPT_TEMPLATES,
   ELIMINATE_TEMPLATES,
   type LibraryGuide,
-  type LibraryPackage,
+  type LibraryProgram,
   type AdoptTemplate,
   type EliminateTemplate,
 } from '@/services/library-content';
@@ -13,7 +13,7 @@ export type ContentTarget =
   | { kind: 'guide'; guide: LibraryGuide }
   | { kind: 'adopt'; template: AdoptTemplate }
   | { kind: 'eliminate'; template: EliminateTemplate }
-  | { kind: 'package'; pkg: LibraryPackage }
+  | { kind: 'program'; program: LibraryProgram }
   | null;
 
 function normalize(s: string): string {
@@ -33,8 +33,8 @@ export function resolveWikiLabel(label: string): ContentTarget {
   const eliminate = ELIMINATE_TEMPLATES.find((t) => normalize(t.title) === norm);
   if (eliminate) return { kind: 'eliminate', template: eliminate };
 
-  const pkg = LIBRARY_PACKAGES.find((p) => normalize(p.title) === norm);
-  if (pkg) return { kind: 'package', pkg };
+  const program = LIBRARY_PROGRAMS.find((p) => normalize(p.title) === norm);
+  if (program) return { kind: 'program', program };
 
   return null;
 }

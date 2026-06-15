@@ -10,7 +10,7 @@ export interface LibraryGuide {
   body: string;
 }
 
-export interface LibraryPackage {
+export interface LibraryProgram {
   id: string;
   title: string;
   description: string;
@@ -43,11 +43,11 @@ export interface EliminateTemplate {
 }
 
 import { LIBRARY_GUIDES } from './content/guides';
-import { LIBRARY_PACKAGES } from './content/packages';
+import { LIBRARY_PROGRAMS } from './content/programs';
 import { ADOPT_TEMPLATES } from './content/adopt-templates';
 import { ELIMINATE_TEMPLATES } from './content/eliminate-templates';
 
-export { LIBRARY_GUIDES, LIBRARY_PACKAGES, ADOPT_TEMPLATES, ELIMINATE_TEMPLATES };
+export { LIBRARY_GUIDES, LIBRARY_PROGRAMS, ADOPT_TEMPLATES, ELIMINATE_TEMPLATES };
 
 export function featuredTemplates(): AdoptTemplate[] {
   return ADOPT_TEMPLATES.filter((t) => t.featured);
@@ -70,15 +70,46 @@ export function domainLabel(domain: Domain): string {
   }
 }
 
-export function practiceTypeIcon(type: PracticeType): string {
+/**
+ * Base SF Symbols that compose a practice type — one icon for the three base
+ * models, two for a combination (e.g. Mental + Physical shows both).
+ */
+export function practiceTypeIcons(type: PracticeType): string[] {
   switch (type) {
     case 'mental':
-      return 'brain.head.profile';
+      return ['brain.head.profile'];
     case 'physical':
-      return 'figure.walk';
+      return ['figure.walk'];
     case 'learning':
-      return 'book.fill';
-    case 'dual':
-      return 'rectangle.stack.fill';
+      return ['book.fill'];
+    case 'mental_physical':
+      return ['brain.head.profile', 'figure.walk'];
+    case 'mental_learning':
+      return ['brain.head.profile', 'book.fill'];
+    case 'physical_learning':
+      return ['figure.walk', 'book.fill'];
+  }
+}
+
+/** Single representative icon (the first base icon of a combination). */
+export function practiceTypeIcon(type: PracticeType): string {
+  return practiceTypeIcons(type)[0];
+}
+
+/** Human-readable label, e.g. "Mental" or "Mental + Physical". */
+export function practiceTypeLabel(type: PracticeType): string {
+  switch (type) {
+    case 'mental':
+      return 'Mental';
+    case 'physical':
+      return 'Physical';
+    case 'learning':
+      return 'Learning';
+    case 'mental_physical':
+      return 'Mental + Physical';
+    case 'mental_learning':
+      return 'Mental + Learning';
+    case 'physical_learning':
+      return 'Physical + Learning';
   }
 }

@@ -1,5 +1,11 @@
 export type BehaviorKind = 'adopt' | 'eliminate';
-export type PracticeType = 'mental' | 'physical' | 'learning' | 'dual';
+export type PracticeType =
+  | 'mental'
+  | 'physical'
+  | 'learning'
+  | 'mental_physical'
+  | 'mental_learning'
+  | 'physical_learning';
 export type Domain =
   | 'language_cognitive'
   | 'physical'

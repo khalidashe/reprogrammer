@@ -1,6 +1,6 @@
-import type { LibraryPackage } from '../library-content';
+import type { LibraryProgram } from '../library-content';
 
-export const LIBRARY_PACKAGES: LibraryPackage[] = [
+export const LIBRARY_PROGRAMS: LibraryProgram[] = [
   {
     id: 'pkg-public-speaking',
     title: 'Public Speaking',
@@ -25,15 +25,15 @@ export const LIBRARY_PACKAGES: LibraryPackage[] = [
       'Calm Under Pressure',
       'Topic Mastery',
     ],
-    body: `Public speaking is not a single skill — it is a stack of trainable states that operate simultaneously. Each component can be isolated, practiced, and encoded into the basal ganglia before being brought together. Build them separately; they compound.
+    body: `Public speaking is not a single skill — it is a stack of trainable behaviors that operate simultaneously. Each component can be isolated, practiced, and encoded into the basal ganglia before being brought together. Build them separately; they compound.
 
-This package groups all states relevant to effective public speaking into a single reference hub. Each component links to its full Library guide.
+This program groups all behaviors relevant to effective public speaking into a single reference hub. Each component links to its full Library guide.
 
 ---
 
 ## The Stack
 
-| State | Type | Guide |
+| Behavior | Type | Guide |
 |---|---|---|
 | Confidence | 🧠 Mental + 💪 Physical | [[Confidence]] |
 | Eye Contact | 💪 Physical | [[Eye Contact]] |

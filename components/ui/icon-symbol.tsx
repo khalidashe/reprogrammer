@@ -37,6 +37,20 @@ const MAPPING = {
   'play.fill': 'play-arrow',
   'flame.fill': 'local-fire-department',
   'bell.fill': 'notifications',
+  // Edit / manage actions
+  'pencil': 'edit',
+  'bookmark': 'bookmark-border',
+  'bookmark.fill': 'bookmark',
+  'archivebox.fill': 'inventory-2',
+  'trash.fill': 'delete-outline',
+  'lock.fill': 'lock',
+  // Practice types (Mental / Physical / Learning)
+  'brain.head.profile': 'psychology',
+  'figure.walk': 'directions-walk',
+  'circle.lefthalf.filled': 'contrast',
+  // Catalog rows
+  'minus.circle': 'remove-circle-outline',
+  'circle': 'circle',
 } as IconMapping;
 
 /**

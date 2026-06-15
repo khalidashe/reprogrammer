@@ -11,10 +11,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import { CheckIn } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { handleCheckInResponse } from '@/services/notifications';
+import { practiceTypeLabel } from '@/services/library-content';
 import { useEffect, useState, useMemo, useRef } from 'react';
 
 function draftKey(attemptId: string): string {
@@ -100,19 +102,19 @@ export default function CheckInScreen() {
   if (!behavior) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorText, { color: colors.text }]}>State not found</Text>
+        <Text style={[styles.errorText, { color: colors.text }]}>Behavior not found</Text>
       </View>
     );
   }
 
   const isEliminate = behavior.kind === 'eliminate';
-  const yesLabel = isEliminate ? 'Caught It' : 'Check-in';
+  const yesLabel = isEliminate ? 'Caught it' : 'Check-in';
   const triedLabel = isEliminate ? 'Struggled' : 'Tried';
-  const noLabel = isEliminate ? "Didn't Notice" : 'Snooze';
+  const noLabel = isEliminate ? "Didn't notice" : 'Snooze';
   const messageBody = behavior.pingMessage;
-  const noHint = isEliminate
-    ? "Marks this prompt as missed. Doesn't reset your streak."
-    : 'Reschedules this reminder for later. Use when you can\'t practice right now.';
+  const kindText =
+    (isEliminate ? 'Eliminate' : 'Adopt') +
+    (behavior.practiceType ? ` · ${practiceTypeLabel(behavior.practiceType)}` : '');
 
   return (
     <KeyboardAvoidingView
@@ -123,20 +125,20 @@ export default function CheckInScreen() {
         <View
           style={[
             styles.kindPill,
-            { backgroundColor: isEliminate ? colors.warningSoft : colors.tintSoft },
+            { backgroundColor: isEliminate ? colors.dangerSoft : colors.tintSoft },
           ]}
         >
           <Text
             style={[
               styles.kindPillText,
-              { color: isEliminate ? colors.warning : colors.tint },
+              { color: isEliminate ? colors.danger : colors.accentText },
             ]}
           >
-            {isEliminate ? 'ELIMINATE' : 'ADOPT'}
+            {kindText}
           </Text>
         </View>
         <Text style={[styles.behaviorTitle, { color: colors.text }]}>{behavior.title}</Text>
-        <Text style={[styles.message, { color: colors.text }]}>{messageBody}</Text>
+        <Text style={[styles.message, { color: colors.textMuted }]}>{messageBody}</Text>
 
         <View style={styles.buttonContainer}>
           <Pressable
@@ -148,14 +150,15 @@ export default function CheckInScreen() {
             ]}
             accessibilityLabel={yesLabel}
           >
-            <Text style={styles.buttonText}>{yesLabel}</Text>
+            <IconSymbol name="checkmark" size={18} color={colors.textOnBrand} />
+            <Text style={[styles.buttonText, { color: colors.textOnBrand }]}>{yesLabel}</Text>
           </Pressable>
           <Pressable
             onPress={() => handleResponse('tried')}
             disabled={isSubmitting}
             style={[
               styles.button,
-              styles.triedButton,
+              styles.outlineButton,
               {
                 borderColor: colors.warning,
                 backgroundColor: colors.warningSoft,
@@ -172,27 +175,38 @@ export default function CheckInScreen() {
             disabled={isSubmitting}
             style={[
               styles.button,
-              styles.noButton,
-              { borderColor: colors.border, opacity: isSubmitting ? 0.5 : 1 },
+              styles.outlineButton,
+              {
+                borderColor: colors.border,
+                backgroundColor: 'transparent',
+                opacity: isSubmitting ? 0.5 : 1,
+              },
             ]}
             accessibilityLabel={noLabel}
-            accessibilityHint={noHint}
+            accessibilityHint={
+              isEliminate
+                ? "Marks this prompt as missed. Doesn't reset your streak."
+                : "Reschedules this reminder for later. Use when you can't practice right now."
+            }
           >
             <Text style={[styles.buttonText, { color: colors.textMuted }]}>{noLabel}</Text>
           </Pressable>
         </View>
 
-        <Text style={[styles.label, { color: colors.text }]}>Add a note (optional)</Text>
-        <TextInput
-          style={[styles.noteInput, { color: colors.text, borderColor: colors.border }]}
-          placeholder="How did it go?"
-          placeholderTextColor={colors.textMuted}
-          value={note}
-          onChangeText={setNote}
-          multiline
-          editable={!isSubmitting}
-          accessibilityLabel="Optional note about this check-in"
-        />
+        <View
+          style={[styles.noteWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}
+        >
+          <TextInput
+            style={[styles.noteInput, { color: colors.text }]}
+            placeholder="How did it go? (optional)"
+            placeholderTextColor={colors.textMuted}
+            value={note}
+            onChangeText={setNote}
+            multiline
+            editable={!isSubmitting}
+            accessibilityLabel="Optional note about this check-in"
+          />
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -204,19 +218,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     paddingHorizontal: Space.xl,
     paddingVertical: Space.xxxl + Space.sm,
   },
   kindPill: {
     alignSelf: 'center',
-    paddingHorizontal: Space.sm,
+    paddingHorizontal: Space.md,
     paddingVertical: Space.xs,
     borderRadius: Radius.sm,
-    marginBottom: Space.md,
+    marginBottom: Space.lg,
   },
-  kindPillText: { ...Type.micro },
+  kindPillText: { ...Type.micro, letterSpacing: 0 },
   behaviorTitle: {
-    ...Type.h1,
+    ...Type.display2,
     textAlign: 'center',
     marginBottom: Space.md,
   },
@@ -228,34 +245,34 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'column',
     gap: Space.sm,
-    marginBottom: Space.xxxl + Space.sm,
+    marginBottom: Space.xxl,
   },
   button: {
+    flexDirection: 'row',
+    gap: Space.sm,
     paddingVertical: Space.lg,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 54,
   },
-  triedButton: {
-    borderWidth: 2,
-  },
-  noButton: {
-    borderWidth: 2,
-    backgroundColor: 'transparent',
+  outlineButton: {
+    borderWidth: 1,
   },
   buttonText: {
     ...Type.h2,
-    color: 'white',
   },
-  label: {
-    ...Type.bodyBold,
-    marginBottom: Space.sm,
-  },
-  noteInput: {
+  noteWrap: {
     borderWidth: 1,
     borderRadius: Radius.md,
-    padding: Space.md,
-    minHeight: 80,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.xs,
+  },
+  noteInput: {
+    minHeight: 64,
     ...Type.body,
+    textAlignVertical: 'top',
+    paddingTop: Space.sm,
   },
   errorText: {
     textAlign: 'center',
