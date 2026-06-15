@@ -10,7 +10,7 @@ import Markdown from 'react-native-markdown-display';
 import {
   domainLabel,
   type LibraryGuide,
-  type LibraryPackage,
+  type LibraryProgram,
   type AdoptTemplate,
   type EliminateTemplate,
   LIBRARY_GUIDES,
@@ -309,24 +309,24 @@ export function EliminateView({
   );
 }
 
-interface PackageViewProps {
-  pkg: LibraryPackage;
+interface ProgramViewProps {
+  program: LibraryProgram;
   colors: ThemeColors;
   onOpenTarget: (target: NonNullable<ContentTarget>) => void;
 }
 
-export function PackageView({ pkg, colors, onOpenTarget }: PackageViewProps) {
-  const guides: LibraryGuide[] = pkg.guideIds
+export function ProgramView({ program, colors, onOpenTarget }: ProgramViewProps) {
+  const guides: LibraryGuide[] = program.guideIds
     .map((id) => LIBRARY_GUIDES.find((g) => g.id === id))
     .filter((g): g is LibraryGuide => g !== undefined);
 
   return (
     <ScrollView contentContainerStyle={styles.modalContent}>
-      <Text style={[styles.modalTitle, { color: colors.text }]}>{pkg.title}</Text>
+      <Text style={[styles.modalTitle, { color: colors.text }]}>{program.title}</Text>
       <Text style={[styles.modalMeta, { color: colors.textMuted }]}>
-        {pkg.guideIds.length} guides
+        {program.guideIds.length} guides
       </Text>
-      <Text style={[styles.intro, { color: colors.text }]}>{pkg.description}</Text>
+      <Text style={[styles.intro, { color: colors.text }]}>{program.description}</Text>
 
       <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
         Included guides
@@ -354,9 +354,9 @@ export function PackageView({ pkg, colors, onOpenTarget }: PackageViewProps) {
         </Pressable>
       ))}
 
-      {pkg.body ? (
+      {program.body ? (
         <View style={{ marginTop: 16 }}>
-          <MarkdownBody body={pkg.body} colors={colors} onOpenTarget={onOpenTarget} />
+          <MarkdownBody body={program.body} colors={colors} onOpenTarget={onOpenTarget} />
         </View>
       ) : null}
     </ScrollView>
@@ -428,9 +428,9 @@ export function ContentModal({
               onAdd={onAdd}
             />
           )}
-          {target.kind === 'package' && (
-            <PackageView
-              pkg={target.pkg}
+          {target.kind === 'program' && (
+            <ProgramView
+              program={target.program}
               colors={colors}
               onOpenTarget={onOpenTarget}
             />

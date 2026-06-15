@@ -12,7 +12,9 @@ const practiceTypeValidator = v.union(
   v.literal("mental"),
   v.literal("physical"),
   v.literal("learning"),
-  v.literal("dual"),
+  v.literal("mental_physical"),
+  v.literal("mental_learning"),
+  v.literal("physical_learning"),
 );
 const domainValidator = v.union(
   v.literal("language_cognitive"),

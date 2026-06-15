@@ -133,7 +133,7 @@ export default function CreateScreen() {
     }
 
     if (!title.trim()) {
-      Alert.alert('Label required', 'Please enter a state label');
+      Alert.alert('Label required', 'Please enter a behavior label');
       return;
     }
 
@@ -143,14 +143,14 @@ export default function CreateScreen() {
     }
 
     if (activeDays.length === 0) {
-      Alert.alert('No active days', 'Pick at least one day for this state.');
+      Alert.alert('No active days', 'Pick at least one day for this behavior.');
       return;
     }
 
     if (kind === 'eliminate' && !replacementStateId) {
       Alert.alert(
         'Replacement required',
-        'An Eliminate state must be linked to an Adopt state. Create the Adopt first, then come back.'
+        'An Eliminate behavior must be linked to an Adopt behavior. Create the Adopt first, then come back.'
       );
       return;
     }
@@ -207,8 +207,8 @@ export default function CreateScreen() {
         style={[
           styles.timeChip,
           {
-            backgroundColor: isOpen ? colors.tint : colors.background,
-            borderColor: colors.tint,
+            backgroundColor: isOpen ? colors.tint : colors.surfaceMuted,
+            borderColor: isOpen ? colors.tint : colors.border,
           },
         ]}
       >
@@ -228,14 +228,14 @@ export default function CreateScreen() {
         {wouldExceedFreeCap && (
           <Pressable
             onPress={() => router.push('/paywall')}
-            style={[styles.capBanner, { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted }]}
+            style={[styles.capBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityLabel="Free tier limit reached. Upgrade to Pro."
           >
             <Text style={[styles.capBannerTitle, { color: colors.text }]}>
-              Free plan: {FREE_TIER_STATE_CAP} of {FREE_TIER_STATE_CAP} states used
+              Free plan: {FREE_TIER_STATE_CAP} of {FREE_TIER_STATE_CAP} behaviors used
             </Text>
-            <Text style={[styles.capBannerSubtitle, { color: colors.textMuted }]}>
-              Upgrade to Pro for unlimited states →
+            <Text style={[styles.capBannerSubtitle, { color: colors.accentText }]}>
+              Upgrade to Pro for unlimited behaviors →
             </Text>
           </Pressable>
         )}
@@ -287,7 +287,7 @@ export default function CreateScreen() {
             <View style={styles.replacementChips}>
               {adoptStateOptions.length === 0 ? (
                 <Text style={[Type.caption, { color: colors.textMuted, flex: 1 }]}>
-                  No Adopt states yet — create one first.
+                  No Adopt behaviors yet — create one first.
                 </Text>
               ) : (
                 adoptStateOptions.map((b) => {
@@ -391,7 +391,7 @@ export default function CreateScreen() {
           <Text style={[styles.rowLabel, { color: colors.text }]}>Label:</Text>
           <TextInput
             style={[styles.fieldInput, { color: colors.text, backgroundColor: colors.surfaceMuted }]}
-            placeholder="State"
+            placeholder="Behavior"
             placeholderTextColor={colors.textMuted}
             value={title}
             onChangeText={setTitle}
@@ -461,7 +461,7 @@ export default function CreateScreen() {
           <Pressable
             onPress={handleSave}
             style={[styles.actionButton, { backgroundColor: colors.tint }]}
-            accessibilityLabel="Save state"
+            accessibilityLabel="Save behavior"
           >
             <Text style={[styles.actionButtonText, { color: colors.textOnBrand }]}>Save</Text>
           </Pressable>
@@ -478,6 +478,9 @@ const styles = StyleSheet.create({
   content: {
     padding: Space.xxl,
     gap: Space.xl,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   timeBlock: {
     flexDirection: 'row',
@@ -600,9 +603,11 @@ const styles = StyleSheet.create({
   actionButton: {
     paddingHorizontal: Space.xxl,
     paddingVertical: Space.md,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     minWidth: 100,
+    minHeight: 48,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonText: {
     ...Type.bodyBold,

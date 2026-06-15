@@ -25,10 +25,10 @@ import {
 } from '@/services/revenuecat';
 
 const BULLETS = [
-  'Unlimited states (free is capped at 3)',
+  'Unlimited behaviors (free is capped at 3)',
   'Cloud sync across all your devices',
   'AI assistant for refining behaviors',
-  'Full library — every guide and pack',
+  'Full library — every guide and program',
 ];
 
 export default function PaywallScreen() {
@@ -112,7 +112,7 @@ export default function PaywallScreen() {
           Go deeper. Sync everywhere. Use the assistant.
         </Text>
 
-        <View style={[styles.bulletCard, { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted }]}>
+        <View style={[styles.bulletCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {BULLETS.map((b) => (
             <View key={b} style={styles.bulletRow}>
               <Text style={[styles.bulletDot, { color: colors.tint }]}>•</Text>
@@ -265,7 +265,13 @@ function PriceCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: Space.xxl, gap: Space.lg },
+  content: {
+    padding: Space.xxl,
+    gap: Space.lg,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+  },
   title: { ...Type.h1, textAlign: 'center' },
   subtitle: { ...Type.body, textAlign: 'center' },
   bulletCard: {

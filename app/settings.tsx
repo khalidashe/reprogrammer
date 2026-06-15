@@ -63,8 +63,8 @@ export default function SettingsScreen() {
   ).length;
 
   const stats: { value: string | number; isZero: boolean; label: string }[] = [
-    { value: activeStates.length, isZero: activeStates.length === 0, label: 'Active states' },
-    { value: habitualCount, isZero: habitualCount === 0, label: 'Habitual states' },
+    { value: activeStates.length, isZero: activeStates.length === 0, label: 'Active behaviors' },
+    { value: habitualCount, isZero: habitualCount === 0, label: 'Habitual behaviors' },
     { value: totalCheckIns, isZero: totalCheckIns === 0, label: 'Total check-ins' },
     {
       value: totalCheckIns > 0 ? `${successRate}%` : '—',
@@ -154,17 +154,17 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.scrollInner}
+    >
       <View style={styles.statsGrid}>
         {stats.map((stat) => (
           <View
             key={stat.label}
             style={[
               styles.statCard,
-              {
-                backgroundColor: stat.isZero ? colors.surfaceMuted : colors.tintSoft,
-                borderColor: stat.isZero ? colors.border : colors.tintMuted,
-              },
+              { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
             <Text
@@ -185,7 +185,7 @@ export default function SettingsScreen() {
       <Section title="Subscription" colors={colors}>
         <Row
           label={isPro ? 'Reprogrammer Pro' : 'Free plan'}
-          value={isPro ? 'Active' : 'Upgrade for unlimited states + sync + AI'}
+          value={isPro ? 'Active' : 'Upgrade for unlimited behaviors + sync + AI'}
           colors={colors}
         />
         {!isPro && (
@@ -265,7 +265,7 @@ export default function SettingsScreen() {
       <Section title="Quiet hours" colors={colors}>
         <View style={styles.sectionRow}>
           <Text style={[styles.sectionSub, { color: colors.textMuted, flex: 1 }]}>
-            Reminders pause inside this window across every state.
+            Reminders pause inside this window across every behavior.
           </Text>
           <Pressable
             onPress={handleToggleQuietHours}
@@ -396,6 +396,12 @@ function ActionButton({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  scrollInner: {
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    paddingBottom: Space.lg,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -433,8 +439,10 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: Space.md,
     paddingHorizontal: Space.lg,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
     marginTop: Space.xs,
   },
   buttonText: { ...Type.bodyBold },

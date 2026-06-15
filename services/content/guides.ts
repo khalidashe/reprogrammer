@@ -125,7 +125,7 @@ Body Language is the non-verbal foundation of [[Public Speaking]]. It amplifies 
     id: 'guide-communication-process',
     title: 'Communication Process',
     domain: 'social',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 9,
     summary: 'Listen → understand → respond. Drop a step and the loop breaks.',
     body: `## The Story
@@ -185,7 +185,7 @@ Pairs tightly with [[Small Talk]] and [[Public Speaking]]. The same deliberate p
     id: 'guide-confidence',
     title: 'Confidence',
     domain: 'emotional',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 6,
     summary:
       'Confidence follows action, not the other way around. Action → encode → identity.',
@@ -242,7 +242,7 @@ Most confidence advice fails because it targets the feeling without producing th
 
 ## Connection to the System
 
-Confidence is the foundation of the [[Public Speaking]] package — without it, every other component collapses under pressure. Connects directly to [[Fear & Panic]] (the physiological side) and [[Dominant Posture]] (proprioceptive feedback that supports the estimate).`,
+Confidence is the foundation of the [[Public Speaking]] program — without it, every other component collapses under pressure. Connects directly to [[Fear & Panic]] (the physiological side) and [[Dominant Posture]] (proprioceptive feedback that supports the estimate).`,
   },
   {
     id: 'guide-deep-focus',
@@ -307,7 +307,7 @@ Pairs with [[Digital Discipline]] — Deep Focus defines what to protect; Digita
     id: 'guide-digital-discipline',
     title: 'Digital Discipline',
     domain: 'professional',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 7,
     summary:
       'Remove the slot machine. Most "self-control" failures are environment-design failures.',
@@ -421,13 +421,13 @@ The body and mind have a two-way relationship. Your posture doesn't just broadca
 
 ## Connection to the System
 
-Foundational to the [[Public Speaking]] package. Connects to [[Body Language]] (posture is the base everything else builds on), [[Confidence]] (proprioceptive feedback supports the self-efficacy estimate), and [[Poker Face]] (physical self-management in observed environments).`,
+Foundational to the [[Public Speaking]] program. Connects to [[Body Language]] (posture is the base everything else builds on), [[Confidence]] (proprioceptive feedback supports the self-efficacy estimate), and [[Poker Face]] (physical self-management in observed environments).`,
   },
   {
     id: 'guide-dont-laugh',
     title: "Don't Laugh",
     domain: 'social',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 6,
     summary:
       'Composure in serious moments is trainable. The mechanism is breath, not willpower.',
@@ -541,7 +541,7 @@ Empathy requires a deliberate shift: not "I'd feel X in this situation" but "giv
 
 ## Connection to the System
 
-Supports the empathy and perspective-taking items in [[States to Adopt]]. Connects to [[Small Talk]] (accurate empathy makes casual conversation feel genuinely interested, not performed) and [[Communication Process]] (knowing what someone needs changes what you say and when).`,
+Supports the empathy and perspective-taking items in [[Behaviors to Adopt]]. Connects to [[Small Talk]] (accurate empathy makes casual conversation feel genuinely interested, not performed) and [[Communication Process]] (knowing what someone needs changes what you say and when).`,
   },
   {
     id: 'guide-eye-contact',
@@ -600,13 +600,13 @@ Eye contact is a credibility signal that operates before the audience consciousl
 
 ## Connection to the System
 
-Primary credibility signal in the [[Public Speaking]] package. Most effective when paired with [[Body Language]] and [[Confidence]], both of which support the ability to hold gaze under pressure. Without it, [[Communication Process]] delivery loses much of its impact.`,
+Primary credibility signal in the [[Public Speaking]] program. Most effective when paired with [[Body Language]] and [[Confidence]], both of which support the ability to hold gaze under pressure. Without it, [[Communication Process]] delivery loses much of its impact.`,
   },
   {
     id: 'guide-fear-and-panic',
     title: 'Fear & Panic',
     domain: 'emotional',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 9,
     summary:
       'Why the freeze response fires before thought, and how to interrupt it with the breath.',
@@ -667,7 +667,7 @@ Pairs with [[Let Go of Rage]] — both involve the interrupt window for high-aro
     id: 'guide-let-go-of-rage',
     title: 'Let Go of Rage',
     domain: 'emotional',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 8,
     summary:
       'Name the body sensation, then the emotion, then the trigger. The naming is the regulator.',
@@ -727,7 +727,7 @@ Pairs with [[Fear & Panic]] — same interrupt window, opposite end of the arous
     id: 'guide-poker-face',
     title: 'Poker Face',
     domain: 'social',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 6,
     summary:
       'Emotional neutrality on command is a muscle. Train it before you need it.',
@@ -782,13 +782,13 @@ Global suppression fails because it doesn't target the actual leak. Contempt is 
 
 ## Connection to the System
 
-Pairs directly with [[Don't Laugh]] — same mechanism, different trigger. [[Fear & Panic]] covers the internal state; this covers the external broadcast. Both are components of the [[Public Speaking]] package.`,
+Pairs directly with [[Don't Laugh]] — same mechanism, different trigger. [[Fear & Panic]] covers the internal state; this covers the external broadcast. Both are components of the [[Public Speaking]] program.`,
   },
   {
     id: 'guide-public-speaking',
     title: 'Public Speaking',
     domain: 'professional',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 10,
     summary:
       'You are not afraid of speaking — you are afraid of social rejection. Decouple the two.',
@@ -841,7 +841,7 @@ Two things undermine public speaking performance. First, overestimating how clos
 
 ## Connection to the System
 
-This guide covers delivery mechanics. [[Communication Process]] covers what to say and how to structure it. [[Fear & Panic]] covers managing arousal before taking the floor. [[Eye Contact]] and [[Body Language]] cover the non-verbal signals. Together these form the Public Speaking package.`,
+This guide covers delivery mechanics. [[Communication Process]] covers what to say and how to structure it. [[Fear & Panic]] covers managing arousal before taking the floor. [[Eye Contact]] and [[Body Language]] cover the non-verbal signals. Together these form the Public Speaking program.`,
   },
   {
     id: 'guide-rumination-interrupt',
@@ -908,7 +908,7 @@ Pairs with [[Let Go of Rage]] — rage is the hot end of unresolved activation; 
     id: 'guide-small-talk',
     title: 'Small Talk',
     domain: 'social',
-    practiceType: 'dual',
+    practiceType: 'mental_physical',
     estimatedMinutes: 6,
     summary:
       'Small talk is not the goal — it is the bridge. Three sentences and an open question.',

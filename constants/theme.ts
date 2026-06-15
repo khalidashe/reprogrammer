@@ -1,13 +1,12 @@
 /**
  * Reprogrammer theme tokens.
  *
- * Palette comes from the design system: a neon-green brand scale (50–900) and
- * a neutrals scale (1–13). The semantic colors map below reflects the
- * mental-health-app tuning recommended in the design review:
- *   - 700/800 as primary brand for body text and AA contrast
- *   - 50–200 as soft surfaces / enabled-state tile fills
- *   - 400/500 reserved for celebration moments (streak milestones)
- *   - complementary amber / muted red / calm blue for semantic states
+ * Calm dark-premium system (Atoms north star). Surfaces are neutral; the green
+ * brand (#46E06A, a calmer take on the original neon) is reserved as a sparse
+ * accent for progress / mastery / affirmative moments — never a flood fill.
+ * Amber marks streaks and "tried"; coral marks eliminate / destructive actions.
+ * The raw NeonGreen / Neutrals / Semantic scales below are kept for reference;
+ * components should consume the semantic `Colors[scheme]` tokens.
  */
 
 import { Platform } from 'react-native';
@@ -77,6 +76,7 @@ type ThemeVariant = {
   tintMuted: string;
   tintSoft: string;
   tintCelebrate: string;
+  accentText: string;
   stateEnabledBg: string;
   stateEnabledText: string;
   stateDisabledBg: string;
@@ -99,86 +99,90 @@ type ThemeVariant = {
 export const Colors: { light: ThemeVariant; dark: ThemeVariant } = {
   light: {
     // Foreground / text
-    text: Neutrals[11],
-    textMuted: Neutrals[8],
-    textOnBrand: Neutrals[1],
+    text: '#1A1C1A',
+    textMuted: '#5F655E',
+    textOnBrand: '#FFFFFF',
 
-    // Surfaces
-    background: Neutrals[1],
-    surface: Neutrals[2],
-    surfaceMuted: Neutrals[3],
-    border: Neutrals[5],
+    // Surfaces — neutral
+    background: '#FBFCFB',
+    surface: '#FFFFFF',
+    surfaceMuted: '#F1F3F1',
+    border: '#E3E6E3',
 
-    // Brand — toned down for mental-health calm
-    tint: NeonGreen[700],
-    tintMuted: NeonGreen[200],
-    tintSoft: NeonGreen[50],
+    // Brand green — calmer (#46E06A), darkened for AA on light surfaces
+    tint: '#149544',
+    tintMuted: '#BFE8CC',
+    tintSoft: '#EAF8EF',
     /** Reserve for celebration / streak hits — used sparingly. */
-    tintCelebrate: NeonGreen[400],
+    tintCelebrate: '#46E06A',
+    /** Green text on a green-tint background (pills, labels). */
+    accentText: '#15803D',
 
-    // States — used by tile fills
-    stateEnabledBg: NeonGreen[200],
-    stateEnabledText: NeonGreen[900],
-    stateDisabledBg: NeonGreen[50],
-    stateDisabledStripe: NeonGreen[200],
-    stateDisabledText: Neutrals[8],
+    // State tiles — now neutral surfaces (green is an accent, not the fill)
+    stateEnabledBg: '#FFFFFF',
+    stateEnabledText: '#1A1C1A',
+    stateDisabledBg: '#F1F3F1',
+    stateDisabledStripe: '#E3E6E3',
+    stateDisabledText: '#5F655E',
 
     // Tabs
-    icon: Neutrals[8],
-    tabIconDefault: Neutrals[7],
-    tabIconSelected: NeonGreen[700],
-    tabBarBackground: Neutrals[1],
+    icon: '#5F655E',
+    tabIconDefault: '#9AA09A',
+    tabIconSelected: '#149544',
+    tabBarBackground: '#FFFFFF',
 
     // Semantic
-    success: NeonGreen[700],
-    successSoft: NeonGreen[100],
-    warning: Semantic.amber,
-    warningSoft: Semantic.amberSoft,
-    danger: Semantic.danger,
-    dangerSoft: Semantic.dangerSoft,
-    info: Semantic.info,
-    infoSoft: Semantic.infoSoft,
+    success: '#149544',
+    successSoft: '#EAF8EF',
+    warning: '#C97A0E',
+    warningSoft: '#FBF0DA',
+    danger: '#D4544C',
+    dangerSoft: '#FCEBEA',
+    info: '#2F6FD0',
+    infoSoft: '#E6F0FB',
   },
   dark: {
     // Foreground / text
-    text: Neutrals[3],
-    textMuted: Neutrals[6],
-    textOnBrand: Neutrals[1],
+    text: '#ECEFE9',
+    textMuted: '#8A908A',
+    textOnBrand: '#0C2A13', // dark green — reads on the bright-green accent
 
-    // Surfaces
-    background: Neutrals[12],
-    surface: Neutrals[11],
-    surfaceMuted: Neutrals[10],
-    border: Neutrals[10],
+    // Surfaces — neutral, dark-first
+    background: '#111312',
+    surface: '#1A1E1B',
+    surfaceMuted: '#202420',
+    border: '#2A2E2A',
 
-    // Brand — slightly brighter green for dark backgrounds, but still tamed
-    tint: NeonGreen[500],
-    tintMuted: NeonGreen[800],
-    tintSoft: NeonGreen[900],
-    tintCelebrate: NeonGreen[400],
+    // Brand green — calmer #46E06A, used sparingly
+    tint: '#46E06A',
+    tintMuted: '#2E8F4A',
+    tintSoft: 'rgba(70, 224, 106, 0.12)',
+    tintCelebrate: '#5FE87E',
+    /** Green text on a green-tint background (pills, labels). */
+    accentText: '#7FE39A',
 
-    // States
-    stateEnabledBg: NeonGreen[800],
-    stateEnabledText: NeonGreen[50],
-    stateDisabledBg: NeonGreen[900],
-    stateDisabledStripe: NeonGreen[700],
-    stateDisabledText: Neutrals[6],
+    // State tiles — neutral surfaces
+    stateEnabledBg: '#1A1E1B',
+    stateEnabledText: '#ECEFE9',
+    stateDisabledBg: '#161917',
+    stateDisabledStripe: '#2A2E2A',
+    stateDisabledText: '#8A908A',
 
     // Tabs
-    icon: Neutrals[6],
-    tabIconDefault: Neutrals[7],
-    tabIconSelected: NeonGreen[500],
-    tabBarBackground: Neutrals[12],
+    icon: '#8A908A',
+    tabIconDefault: '#6C726A',
+    tabIconSelected: '#46E06A',
+    tabBarBackground: '#111312',
 
     // Semantic
-    success: NeonGreen[500],
-    successSoft: NeonGreen[900],
-    warning: Semantic.amber,
-    warningSoft: '#451a03',
-    danger: '#f87171',
-    dangerSoft: '#450a0a',
-    info: '#60a5fa',
-    infoSoft: '#172554',
+    success: '#46E06A',
+    successSoft: 'rgba(70, 224, 106, 0.12)',
+    warning: '#F4B740',
+    warningSoft: 'rgba(244, 183, 64, 0.12)',
+    danger: '#E0726B',
+    dangerSoft: 'rgba(224, 114, 107, 0.12)',
+    info: '#6BA8F5',
+    infoSoft: 'rgba(107, 168, 245, 0.12)',
   },
 };
 

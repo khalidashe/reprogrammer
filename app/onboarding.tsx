@@ -121,9 +121,9 @@ export default function OnboardingScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.content, { paddingTop: contentPaddingTop }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Pick a state to start</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Pick a behavior to start</Text>
         <Text style={[styles.description, { color: colors.textMuted }]}>
-          One state. Get it to automatic before adding another.
+          One behavior. Get it to automatic before adding another.
         </Text>
 
         <View style={styles.templates}>
@@ -131,7 +131,10 @@ export default function OnboardingScreen() {
             <Pressable
               key={template.id}
               onPress={() => addTemplate(template)}
-              style={[styles.templateCard, { borderColor: colors.tint }]}
+              style={[
+                styles.templateCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
             >
               <Text style={[styles.templateTitle, { color: colors.text }]}>
                 {template.title}
@@ -183,6 +186,9 @@ const styles = StyleSheet.create({
   content: {
     padding: Space.xl,
     paddingBottom: Space.xxxl + Space.sm,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   title: {
     ...Type.display2,
@@ -236,9 +242,9 @@ const styles = StyleSheet.create({
     marginBottom: Space.xxl,
   },
   templateCard: {
-    borderWidth: 2,
-    borderRadius: Radius.md,
-    padding: Space.md + Space.xxs, // = 14
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    padding: Space.lg,
     gap: Space.xs,
   },
   templateTitle: {
@@ -253,6 +259,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.xxl,
     borderRadius: Radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
     marginTop: Space.sm,
   },
   ctaText: {
