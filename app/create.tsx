@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useMemo, useState } from 'react';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -103,6 +104,7 @@ export default function CreateScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
   const { behaviors, addBehavior, updateBehavior } = useStore();
   const { isPro } = useIsPro();
@@ -239,7 +241,6 @@ export default function CreateScreen() {
   const goBack = () => {
     setPickerOpen(null);
     if (index > 0) setStepId(steps[index - 1]);
-    else router.back();
   };
 
   const currentValid = isStepValid(stepId, state);
@@ -298,21 +299,28 @@ export default function CreateScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + Space.sm }]}>
+        {index > 0 ? (
+          <Pressable
+            onPress={goBack}
+            hitSlop={8}
+            style={styles.headerButton}
+            accessibilityLabel="Back"
+          >
+            <IconSymbol name="chevron.left" size={22} color={colors.textMuted} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerButton} />
+        )}
+        <ProgressDots total={steps.length} current={index} colors={colors} />
         <Pressable
-          onPress={goBack}
+          onPress={() => router.back()}
           hitSlop={8}
           style={styles.headerButton}
-          accessibilityLabel={index > 0 ? 'Back' : 'Close'}
+          accessibilityLabel="Close"
         >
-          <IconSymbol
-            name={index > 0 ? 'chevron.left' : 'xmark'}
-            size={22}
-            color={colors.textMuted}
-          />
+          <IconSymbol name="xmark" size={20} color={colors.textMuted} />
         </Pressable>
-        <ProgressDots total={steps.length} current={index} colors={colors} />
-        <View style={styles.headerButton} />
       </View>
 
       <ScrollView
