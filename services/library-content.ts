@@ -199,6 +199,40 @@ export function practiceTypeIcon(type: PracticeType): string {
   return practiceTypeIcons(type)[0];
 }
 
+/**
+ * The three base practice models. The create flow lets the user pick 1–2 of
+ * these; `composePracticeType` folds them into the stored `PracticeType` (a
+ * single base, or a two-base combination). This keeps the picker simple while
+ * still producing the combo types the tile icons read.
+ */
+export type PracticeBase = 'mental' | 'physical' | 'learning';
+export const PRACTICE_BASES: PracticeBase[] = ['mental', 'physical', 'learning'];
+
+export function practiceBaseLabel(base: PracticeBase): string {
+  switch (base) {
+    case 'mental':
+      return 'Mental';
+    case 'physical':
+      return 'Physical';
+    case 'learning':
+      return 'Learning';
+  }
+}
+
+/** Fold 0–2 base models into a stored PracticeType (canonical order). */
+export function composePracticeType(bases: PracticeBase[]): PracticeType | undefined {
+  const sel = PRACTICE_BASES.filter((b) => bases.includes(b));
+  if (sel.length === 0) return undefined;
+  if (sel.length === 1) return sel[0];
+  return `${sel[0]}_${sel[1]}` as PracticeType;
+}
+
+/** Split a stored PracticeType back into its base models (for editing). */
+export function decomposePracticeType(type?: PracticeType): PracticeBase[] {
+  if (!type) return [];
+  return type.split('_') as PracticeBase[];
+}
+
 /** Human-readable label, e.g. "Mental" or "Mental + Physical". */
 export function practiceTypeLabel(type: PracticeType): string {
   switch (type) {

@@ -10,9 +10,12 @@ import { Alert } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import useStore from '@/store/useStore';
-import { generateUUID } from '@/utils/uuid';
 import { scheduleForBehavior } from '@/services/notifications';
-import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from '@/services/levels';
+import {
+  buildBehavior,
+  draftFromAdoptTemplate,
+  draftFromEliminateTemplate,
+} from '@/services/behavior-factory';
 import {
   LIBRARY_GUIDES,
   LIBRARY_PROGRAMS,
@@ -21,7 +24,6 @@ import {
   type AdoptTemplate,
   type EliminateTemplate,
 } from '@/services/library-content';
-import type { Behavior } from '@/types';
 import { ContentModal } from './modals';
 import type { ContentTarget } from './content-link-resolver';
 
@@ -31,48 +33,6 @@ interface ContentModalsApi {
   openEliminate: (id: string) => void;
   openProgram: (id: string) => void;
   close: () => void;
-}
-
-function buildAdoptBehavior(template: AdoptTemplate): Behavior {
-  return {
-    id: generateUUID(),
-    kind: 'adopt',
-    title: template.title,
-    pingMessage: template.pingMessage,
-    practiceType: template.practiceType,
-    domain: template.domain,
-    libraryGuideId: template.libraryGuideId,
-    window: template.window,
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-    intervalMinutes: template.intervalMinutes,
-    level: INITIAL_LEVEL,
-    lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
-    createdAt: Date.now(),
-    hidden: false,
-    bookmarked: false,
-  };
-}
-
-function buildEliminateBehavior(
-  template: EliminateTemplate,
-  replacementStateId: string
-): Behavior {
-  return {
-    id: generateUUID(),
-    kind: 'eliminate',
-    title: template.title,
-    pingMessage: template.pingMessage,
-    domain: template.domain,
-    replacementStateId,
-    window: { from: '09:00', to: '21:00' },
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-    intervalMinutes: 30,
-    level: INITIAL_LEVEL,
-    lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
-    createdAt: Date.now(),
-    hidden: false,
-    bookmarked: false,
-  };
 }
 
 const ContentModalsContext = createContext<ContentModalsApi | null>(null);
@@ -146,7 +106,7 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
 
   const handleAddAdopt = useCallback(
     async (template: AdoptTemplate) => {
-      const behavior = buildAdoptBehavior(template);
+      const behavior = buildBehavior(draftFromAdoptTemplate(template));
       await addBehavior(behavior);
       await scheduleForBehavior(behavior);
       close();
@@ -181,12 +141,13 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
                   {
                     text: 'Add it',
                     onPress: async () => {
-                      const adoptBehavior = buildAdoptBehavior(adoptTemplate);
+                      const adoptBehavior = buildBehavior(
+                        draftFromAdoptTemplate(adoptTemplate)
+                      );
                       await addBehavior(adoptBehavior);
                       await scheduleForBehavior(adoptBehavior);
-                      const elimBehavior = buildEliminateBehavior(
-                        template,
-                        adoptBehavior.id
+                      const elimBehavior = buildBehavior(
+                        draftFromEliminateTemplate(template, adoptBehavior.id)
                       );
                       await addBehavior(elimBehavior);
                       await scheduleForBehavior(elimBehavior);
@@ -203,7 +164,9 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
         );
         return;
       }
-      const behavior = buildEliminateBehavior(template, replacement.id);
+      const behavior = buildBehavior(
+        draftFromEliminateTemplate(template, replacement.id)
+      );
       await addBehavior(behavior);
       await scheduleForBehavior(behavior);
       close();

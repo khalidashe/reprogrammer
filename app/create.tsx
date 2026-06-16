@@ -1,47 +1,103 @@
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Pressable,
   ScrollView,
-  Alert,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
-import { Behavior, BehaviorKind } from '@/types';
-import { generateUUID } from '@/utils/uuid';
-import { cancelForBehavior, scheduleForBehavior } from '@/services/notifications';
+import type { Behavior } from '@/types';
 import { useIsPro } from '@/hooks/useIsPro';
 import { FREE_TIER_STATE_CAP } from '@/constants/limits';
+import { cancelForBehavior, scheduleForBehavior } from '@/services/notifications';
+import { INITIAL_LEVEL, effectiveIntervalMinutes } from '@/services/levels';
 import {
-  INITIAL_LEVEL,
-  INITIAL_LAST_LEVELUP_STREAK,
-  INTERVAL_PRESETS,
-  effectiveIntervalMinutes,
-} from '@/services/levels';
-import { useState, useMemo } from 'react';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+  buildBehavior,
+  type BehaviorDraft,
+} from '@/services/behavior-factory';
 import {
-  hhmmToDate,
-  dateToHHmm,
-  hhmmToMinutes,
-  formatTimeForDisplay,
-} from '@/utils/time';
+  composePracticeType,
+  decomposePracticeType,
+  featuredTemplates,
+  type AdoptTemplate,
+} from '@/services/library-content';
+import {
+  DEFAULT_CADENCE,
+  cadenceForInterval,
+  intervalForCadence,
+} from '@/services/cadence';
+import { hhmmToMinutes, dateToHHmm } from '@/utils/time';
+import {
+  ProgressDots,
+  StartStep,
+  KindStep,
+  WhatStep,
+  InsteadStep,
+  WhenStep,
+  CadenceStep,
+  ReviewStep,
+  type StepId,
+  type WizardState,
+} from '@/components/create/steps';
 
-const DAY_LETTERS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const DAY_NAMES = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
+function initialState(b: Behavior | null | undefined): WizardState {
+  if (b) {
+    return {
+      kind: b.kind,
+      title: b.title,
+      pingMessage: b.pingMessage === b.title ? '' : b.pingMessage,
+      practiceBases: decomposePracticeType(b.practiceType),
+      domain: b.domain,
+      libraryGuideId: b.libraryGuideId,
+      startTime: b.window.from,
+      endTime: b.window.to,
+      activeDays: b.activeDays,
+      cadenceId: cadenceForInterval(b.intervalMinutes),
+      replacementStateId: b.replacementStateId,
+      newReplacementTitle: '',
+    };
+  }
+  return {
+    kind: 'adopt',
+    title: '',
+    pingMessage: '',
+    practiceBases: [],
+    domain: undefined,
+    libraryGuideId: undefined,
+    startTime: '09:00',
+    endTime: '21:00',
+    activeDays: [0, 1, 2, 3, 4, 5, 6],
+    cadenceId: DEFAULT_CADENCE,
+    replacementStateId: undefined,
+    newReplacementTitle: '',
+  };
+}
+
+function buildSteps(kind: WizardState['kind'], editing: boolean): StepId[] {
+  const arr: StepId[] = editing ? ['kind', 'what'] : ['start', 'kind', 'what'];
+  if (kind === 'eliminate') arr.push('instead');
+  arr.push('when', 'cadence', 'review');
+  return arr;
+}
+
+function isStepValid(stepId: StepId, s: WizardState): boolean {
+  if (stepId === 'what') return s.title.trim().length > 0;
+  if (stepId === 'instead') {
+    return !!s.replacementStateId || s.newReplacementTitle.trim().length > 0;
+  }
+  if (stepId === 'when') {
+    return hhmmToMinutes(s.endTime) > hhmmToMinutes(s.startTime) && s.activeDays.length > 0;
+  }
+  return true;
+}
 
 export default function CreateScreen() {
   const router = useRouter();
@@ -52,606 +108,296 @@ export default function CreateScreen() {
   const { isPro } = useIsPro();
 
   const editingBehavior = useMemo(
-    () => (id ? behaviors.find(b => b.id === id as string) : null),
+    () => (id ? behaviors.find((b) => b.id === (id as string)) ?? null : null),
     [id, behaviors]
   );
+  const isEditing = !!editingBehavior;
 
-  const activeStateCount = useMemo(
-    () => behaviors.filter((b) => !b.hidden).length,
-    [behaviors]
-  );
-  const wouldExceedFreeCap =
-    !isPro && !editingBehavior && activeStateCount >= FREE_TIER_STATE_CAP;
-
-  const [title, setTitle] = useState(editingBehavior?.title || '');
-  const [pingMessage, setPingMessage] = useState(editingBehavior?.pingMessage || '');
-  const [startTime, setStartTime] = useState(editingBehavior?.window.from || '09:00');
-  const [endTime, setEndTime] = useState(editingBehavior?.window.to || '21:00');
+  const [state, setState] = useState<WizardState>(() => initialState(editingBehavior));
+  const [stepId, setStepId] = useState<StepId>(editingBehavior ? 'review' : 'start');
   const [pickerOpen, setPickerOpen] = useState<'start' | 'end' | null>(null);
-  const [intervalMinutes, setIntervalMinutes] = useState<number>(
-    editingBehavior?.intervalMinutes ?? 15
-  );
-  const [activeDays, setActiveDays] = useState<number[]>(
-    editingBehavior?.activeDays || [0, 1, 2, 3, 4, 5, 6]
-  );
-  const [kind, setKind] = useState<BehaviorKind>(editingBehavior?.kind ?? 'adopt');
-  const [replacementStateId, setReplacementStateId] = useState<string | undefined>(
-    editingBehavior?.replacementStateId
-  );
 
-  const adoptStateOptions = useMemo(
-    () => behaviors.filter((b) => b.kind === 'adopt' && !b.hidden && b.id !== editingBehavior?.id),
+  const update = useCallback((patch: Partial<WizardState>) => {
+    setState((s) => ({ ...s, ...patch }));
+  }, []);
+
+  const steps = useMemo(() => buildSteps(state.kind, isEditing), [state.kind, isEditing]);
+  const index = Math.max(0, steps.indexOf(stepId));
+
+  const adoptOptions = useMemo(
+    () =>
+      behaviors.filter(
+        (b) => b.kind === 'adopt' && !b.hidden && b.id !== editingBehavior?.id
+      ),
     [behaviors, editingBehavior?.id]
   );
 
-  const startDisplay = formatTimeForDisplay(startTime);
-  const endDisplay = formatTimeForDisplay(endTime);
-
-  const toggleDay = (day: number) => {
-    setActiveDays((prev) =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    );
-  };
+  const activeStateCount = useMemo(() => behaviors.filter((b) => !b.hidden).length, [behaviors]);
+  const wouldExceedFreeCap = !isPro && !isEditing && activeStateCount >= FREE_TIER_STATE_CAP;
 
   const previewText = useMemo(() => {
-    const startMin = hhmmToMinutes(startTime);
-    const endMin = hhmmToMinutes(endTime);
+    const startMin = hhmmToMinutes(state.startTime);
+    const endMin = hhmmToMinutes(state.endTime);
     const durationMin = endMin - startMin;
-    if (durationMin <= 0 || intervalMinutes <= 0) return 'Invalid time window';
+    const interval = intervalForCadence(state.cadenceId);
+    if (durationMin <= 0) return 'Pick a valid time window';
     const level = editingBehavior?.level ?? INITIAL_LEVEL;
-    const effMin = effectiveIntervalMinutes(intervalMinutes, level);
+    const effMin = effectiveIntervalMinutes(interval, level);
     const totalPings = Math.max(1, Math.floor(durationMin / effMin));
-    let spacingLabel: string;
-    if (effMin >= 60) {
-      const h = Math.floor(effMin / 60);
-      const m = Math.round(effMin % 60);
-      spacingLabel = m > 0 ? `${h}h ${m}m` : `${h}h`;
-    } else {
-      spacingLabel = `${Math.round(effMin)} min`;
-    }
-    const tail = effMin !== intervalMinutes ? ` (level ${level}, every ${intervalMinutes}m base)` : '';
-    return `~${totalPings} pings today, ~every ${spacingLabel}${tail}`;
-  }, [startTime, endTime, intervalMinutes, editingBehavior?.level]);
+    const spacing =
+      effMin >= 60
+        ? `${Math.floor(effMin / 60)}h${effMin % 60 ? ` ${Math.round(effMin % 60)}m` : ''}`
+        : `${Math.round(effMin)} min`;
+    return `≈ ${totalPings} nudges a day, about every ${spacing}`;
+  }, [state.startTime, state.endTime, state.cadenceId, editingBehavior?.level]);
 
-  const handleTimeChange = (which: 'start' | 'end') => (
+  const onTimeChange = (which: 'start' | 'end') => (
     event: DateTimePickerEvent,
     selected?: Date
   ) => {
-    if (Platform.OS === 'android') {
-      setPickerOpen(null);
-    }
+    if (Platform.OS === 'android') setPickerOpen(null);
     if (event.type === 'dismissed' || !selected) return;
     const value = dateToHHmm(selected);
-    if (which === 'start') setStartTime(value);
-    else setEndTime(value);
+    update(which === 'start' ? { startTime: value } : { endTime: value });
+  };
+
+  const pickTemplate = (t: AdoptTemplate) => {
+    setState((s) => ({
+      ...s,
+      kind: 'adopt',
+      title: t.title,
+      pingMessage: t.pingMessage,
+      practiceBases: decomposePracticeType(t.practiceType),
+      domain: t.domain,
+      libraryGuideId: t.libraryGuideId,
+      startTime: t.window.from,
+      endTime: t.window.to,
+      activeDays: [0, 1, 2, 3, 4, 5, 6],
+      cadenceId: cadenceForInterval(t.intervalMinutes),
+      replacementStateId: undefined,
+      newReplacementTitle: '',
+    }));
+    setStepId('review');
   };
 
   const handleSave = async () => {
-    if (wouldExceedFreeCap) {
+    if (!isEditing && wouldExceedFreeCap) {
       router.push('/paywall');
       return;
     }
+    const intervalMinutes = intervalForCadence(state.cadenceId);
+    const window = { from: state.startTime, to: state.endTime };
 
-    if (!title.trim()) {
-      Alert.alert('Label required', 'Please enter a behavior label');
-      return;
+    let replacementStateId = state.replacementStateId;
+    if (state.kind === 'eliminate' && !replacementStateId && state.newReplacementTitle.trim()) {
+      const adopt = buildBehavior({
+        kind: 'adopt',
+        title: state.newReplacementTitle,
+        window,
+        activeDays: state.activeDays,
+        intervalMinutes,
+      });
+      await addBehavior(adopt);
+      await scheduleForBehavior(adopt);
+      replacementStateId = adopt.id;
     }
 
-    if (hhmmToMinutes(endTime) <= hhmmToMinutes(startTime)) {
-      Alert.alert('Invalid time window', 'The end time must be after the start time.');
-      return;
-    }
-
-    if (activeDays.length === 0) {
-      Alert.alert('No active days', 'Pick at least one day for this behavior.');
-      return;
-    }
-
-    if (kind === 'eliminate' && !replacementStateId) {
-      Alert.alert(
-        'Replacement required',
-        'An Eliminate behavior must be linked to an Adopt behavior. Create the Adopt first, then come back.'
-      );
-      return;
-    }
-
-    const effectivePing = pingMessage.trim() || title;
+    const draft: BehaviorDraft = {
+      kind: state.kind,
+      title: state.title,
+      pingMessage: state.pingMessage,
+      practiceType: state.kind === 'adopt' ? composePracticeType(state.practiceBases) : undefined,
+      domain: state.domain,
+      libraryGuideId: state.libraryGuideId,
+      replacementStateId,
+      window,
+      activeDays: state.activeDays,
+      intervalMinutes,
+    };
 
     if (editingBehavior) {
-      const updated: Behavior = {
-        ...editingBehavior,
-        kind,
-        title,
-        pingMessage: effectivePing,
-        window: { from: startTime, to: endTime },
-        intervalMinutes,
-        activeDays,
-        replacementStateId: kind === 'eliminate' ? replacementStateId : undefined,
-      };
+      const updated = buildBehavior(draft, editingBehavior);
       await cancelForBehavior(editingBehavior.id);
       await updateBehavior(updated);
       await scheduleForBehavior(updated);
     } else {
-      const behavior: Behavior = {
-        id: generateUUID(),
-        kind,
-        title,
-        pingMessage: effectivePing,
-        window: { from: startTime, to: endTime },
-        intervalMinutes,
-        activeDays,
-        level: INITIAL_LEVEL,
-        lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
-        replacementStateId: kind === 'eliminate' ? replacementStateId : undefined,
-        createdAt: Date.now(),
-        hidden: false,
-        bookmarked: false,
-      };
+      const behavior = buildBehavior(draft);
       await addBehavior(behavior);
       await scheduleForBehavior(behavior);
     }
-
     router.replace('/');
   };
 
-  const handleCancel = () => router.back();
-
-  const renderTimeChip = (
-    which: 'start' | 'end',
-    display: { time: string; period: string }
-  ) => {
-    const isOpen = pickerOpen === which;
-    return (
-      <Pressable
-        onPress={() => setPickerOpen(isOpen ? null : which)}
-        style={[
-          styles.timeChip,
-          {
-            backgroundColor: isOpen ? colors.tint : colors.surfaceMuted,
-            borderColor: isOpen ? colors.tint : colors.border,
-          },
-        ]}
-      >
-        <Text style={[styles.timeChipText, { color: isOpen ? colors.textOnBrand : colors.text }]}>
-          {display.time}
-        </Text>
-        <Text style={[styles.timeChipPeriod, { color: isOpen ? colors.textOnBrand : colors.textMuted }]}>
-          {display.period}
-        </Text>
-      </Pressable>
-    );
+  const goNext = () => {
+    if (stepId === 'review') {
+      void handleSave();
+      return;
+    }
+    if (index < steps.length - 1) setStepId(steps[index + 1]);
   };
 
+  const goBack = () => {
+    setPickerOpen(null);
+    if (index > 0) setStepId(steps[index - 1]);
+    else router.back();
+  };
+
+  const currentValid = isStepValid(stepId, state);
+
+  const renderStep = () => {
+    switch (stepId) {
+      case 'start':
+        return (
+          <StartStep
+            featuredAdopt={featuredTemplates()}
+            onPickTemplate={pickTemplate}
+            onBuildOwn={() => setStepId('kind')}
+            colors={colors}
+          />
+        );
+      case 'kind':
+        return <KindStep state={state} update={update} colors={colors} />;
+      case 'what':
+        return <WhatStep state={state} update={update} colors={colors} />;
+      case 'instead':
+        return (
+          <InsteadStep state={state} update={update} adoptOptions={adoptOptions} colors={colors} />
+        );
+      case 'when':
+        return (
+          <WhenStep
+            state={state}
+            update={update}
+            pickerOpen={pickerOpen}
+            onOpenPicker={setPickerOpen}
+            onTimeChange={onTimeChange}
+            colors={colors}
+          />
+        );
+      case 'cadence':
+        return (
+          <CadenceStep state={state} update={update} previewText={previewText} colors={colors} />
+        );
+      case 'review':
+        return (
+          <ReviewStep
+            state={state}
+            adoptOptions={adoptOptions}
+            previewText={previewText}
+            onJump={setStepId}
+            colors={colors}
+          />
+        );
+    }
+  };
+
+  const primaryLabel = stepId === 'review' ? (isEditing ? 'Save changes' : 'Create behavior') : 'Next';
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        {wouldExceedFreeCap && (
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.header}>
+        <Pressable
+          onPress={goBack}
+          hitSlop={8}
+          style={styles.headerButton}
+          accessibilityLabel={index > 0 ? 'Back' : 'Close'}
+        >
+          <IconSymbol
+            name={index > 0 ? 'chevron.left' : 'xmark'}
+            size={22}
+            color={colors.textMuted}
+          />
+        </Pressable>
+        <ProgressDots total={steps.length} current={index} colors={colors} />
+        <View style={styles.headerButton} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        {wouldExceedFreeCap ? (
           <Pressable
             onPress={() => router.push('/paywall')}
             style={[styles.capBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}
             accessibilityLabel="Free tier limit reached. Upgrade to Pro."
           >
-            <Text style={[styles.capBannerTitle, { color: colors.text }]}>
+            <Text style={[styles.capTitle, { color: colors.text }]}>
               Free plan: {FREE_TIER_STATE_CAP} of {FREE_TIER_STATE_CAP} behaviors used
             </Text>
-            <Text style={[styles.capBannerSubtitle, { color: colors.accentText }]}>
+            <Text style={[styles.capSub, { color: colors.accentText }]}>
               Upgrade to Pro for unlimited behaviors →
             </Text>
           </Pressable>
-        )}
+        ) : null}
+        {renderStep()}
+      </ScrollView>
 
-        <View style={styles.kindToggle}>
+      {stepId !== 'start' ? (
+        <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
           <Pressable
-            onPress={() => setKind('adopt')}
+            onPress={goNext}
+            disabled={!currentValid}
             style={[
-              styles.kindButton,
-              {
-                backgroundColor: kind === 'adopt' ? colors.tint : colors.surfaceMuted,
-              },
+              styles.primaryButton,
+              { backgroundColor: currentValid ? colors.tint : colors.surfaceMuted },
             ]}
-            accessibilityLabel={`Adopt${kind === 'adopt' ? ', selected' : ''}`}
+            accessibilityLabel={primaryLabel}
+            accessibilityState={{ disabled: !currentValid }}
           >
             <Text
               style={[
-                styles.kindButtonText,
-                { color: kind === 'adopt' ? colors.textOnBrand : colors.text },
+                styles.primaryText,
+                { color: currentValid ? colors.textOnBrand : colors.textMuted },
               ]}
             >
-              Adopt
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setKind('eliminate')}
-            style={[
-              styles.kindButton,
-              {
-                backgroundColor: kind === 'eliminate' ? colors.tint : colors.surfaceMuted,
-              },
-            ]}
-            accessibilityLabel={`Eliminate${kind === 'eliminate' ? ', selected' : ''}`}
-          >
-            <Text
-              style={[
-                styles.kindButtonText,
-                { color: kind === 'eliminate' ? colors.textOnBrand : colors.text },
-              ]}
-            >
-              Eliminate
+              {primaryLabel}
             </Text>
           </Pressable>
         </View>
-
-        {kind === 'eliminate' && (
-          <View style={styles.replacementRow}>
-            <Text style={[styles.rowLabel, { color: colors.text }]}>Replace with:</Text>
-            <View style={styles.replacementChips}>
-              {adoptStateOptions.length === 0 ? (
-                <Text style={[Type.caption, { color: colors.textMuted, flex: 1 }]}>
-                  No Adopt behaviors yet — create one first.
-                </Text>
-              ) : (
-                adoptStateOptions.map((b) => {
-                  const active = replacementStateId === b.id;
-                  return (
-                    <Pressable
-                      key={b.id}
-                      onPress={() => setReplacementStateId(b.id)}
-                      style={[
-                        styles.replacementChip,
-                        { backgroundColor: active ? colors.tint : colors.surfaceMuted },
-                      ]}
-                      accessibilityLabel={`Replace with ${b.title}${
-                        active ? ', selected' : ''
-                      }`}
-                    >
-                      <Text
-                        style={[
-                          styles.replacementChipText,
-                          { color: active ? colors.textOnBrand : colors.text },
-                        ]}
-                      >
-                        {b.title}
-                      </Text>
-                    </Pressable>
-                  );
-                })
-              )}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.timeBlock}>
-          <View style={styles.timeColumn}>
-            <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>From</Text>
-            {renderTimeChip('start', startDisplay)}
-          </View>
-          <Text style={[styles.timeArrow, { color: colors.textMuted }]}>→</Text>
-          <View style={styles.timeColumn}>
-            <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>To</Text>
-            {renderTimeChip('end', endDisplay)}
-          </View>
-        </View>
-
-        {pickerOpen === 'start' && (
-          <View style={styles.pickerWrapper}>
-            <DateTimePicker
-              value={hhmmToDate(startTime)}
-              mode="time"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleTimeChange('start')}
-            />
-          </View>
-        )}
-        {pickerOpen === 'end' && (
-          <View style={styles.pickerWrapper}>
-            <DateTimePicker
-              value={hhmmToDate(endTime)}
-              mode="time"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleTimeChange('end')}
-            />
-          </View>
-        )}
-
-        <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: colors.text }]}>Repeat:</Text>
-          <View style={styles.dayPills}>
-            {DAY_LETTERS.map((letter, index) => {
-              const active = activeDays.includes(index);
-              return (
-                <Pressable
-                  key={index}
-                  onPress={() => toggleDay(index)}
-                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                  style={[
-                    styles.dayPill,
-                    {
-                      backgroundColor: active ? colors.tint : colors.surfaceMuted,
-                    },
-                  ]}
-                  accessibilityLabel={`${DAY_NAMES[index]} ${
-                    active ? 'active' : 'inactive'
-                  }`}
-                >
-                  <Text
-                    style={[
-                      styles.dayPillLetter,
-                      { color: active ? colors.textOnBrand : colors.text },
-                    ]}
-                  >
-                    {letter}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: colors.text }]}>Label:</Text>
-          <TextInput
-            style={[styles.fieldInput, { color: colors.text, backgroundColor: colors.surfaceMuted }]}
-            placeholder="Behavior"
-            placeholderTextColor={colors.textMuted}
-            value={title}
-            onChangeText={setTitle}
-          />
-        </View>
-
-        <View style={styles.pingRow}>
-          <Text style={[styles.rowLabel, { color: colors.text }]}>Reminder:</Text>
-          <TextInput
-            style={[
-              styles.pingInput,
-              { color: colors.text, backgroundColor: colors.surfaceMuted },
-            ]}
-            placeholder={title ? `Default: "${title}"` : 'What should the reminder say?'}
-            placeholderTextColor={colors.textMuted}
-            value={pingMessage}
-            onChangeText={setPingMessage}
-            multiline
-            accessibilityLabel="Reminder message shown in the notification"
-            accessibilityHint="Optional. If left blank, the label is used."
-          />
-        </View>
-
-        <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: colors.text }]}>Every:</Text>
-          <View style={styles.intervalChips}>
-            {INTERVAL_PRESETS.map((mins) => {
-              const active = intervalMinutes === mins;
-              return (
-                <Pressable
-                  key={mins}
-                  onPress={() => setIntervalMinutes(mins)}
-                  style={[
-                    styles.intervalChip,
-                    {
-                      backgroundColor: active ? colors.tint : colors.surfaceMuted,
-                    },
-                  ]}
-                  accessibilityLabel={`Every ${mins} minutes${
-                    active ? ', selected' : ''
-                  }`}
-                >
-                  <Text
-                    style={[
-                      styles.intervalChipText,
-                      { color: active ? colors.textOnBrand : colors.text },
-                    ]}
-                  >
-                    {mins}m
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <Text style={[styles.previewText, { color: colors.textMuted }]}>{previewText}</Text>
-
-        <View style={styles.buttonRow}>
-          <Pressable
-            onPress={handleCancel}
-            style={[styles.actionButton, { backgroundColor: colors.surfaceMuted }]}
-            accessibilityLabel="Cancel"
-          >
-            <Text style={[styles.actionButtonText, { color: colors.text }]}>Cancel</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleSave}
-            style={[styles.actionButton, { backgroundColor: colors.tint }]}
-            accessibilityLabel="Save behavior"
-          >
-            <Text style={[styles.actionButtonText, { color: colors.textOnBrand }]}>Save</Text>
-          </Pressable>
-        </View>
-      </View>
-    </ScrollView>
+      ) : null}
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Space.lg,
+    paddingTop: Space.md,
+    paddingBottom: Space.sm,
   },
-  content: {
-    padding: Space.xxl,
-    gap: Space.xl,
+  headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  scroll: {
+    padding: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.xxxl,
+    gap: Space.lg,
     width: '100%',
-    maxWidth: 600,
+    maxWidth: 560,
     alignSelf: 'center',
   },
-  timeBlock: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    gap: Space.lg,
-    marginTop: Space.sm,
+  footer: {
+    borderTopWidth: 1,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.md,
+    paddingBottom: Space.xl,
   },
-  timeColumn: {
-    alignItems: 'center',
-    gap: Space.xs,
-  },
-  timeColumnLabel: {
-    ...Type.micro,
-    textTransform: 'uppercase',
-  },
-  timeChip: {
-    minWidth: 120,
-    paddingHorizontal: Space.lg,
+  primaryButton: {
     paddingVertical: Space.md,
     borderRadius: Radius.md,
-    borderWidth: 2,
-    alignItems: 'center',
-  },
-  // The time chip is the visual centerpiece of the schedule section — a
-  // larger-than-display2 numeric (32pt vs 28pt) to feel tappable as a target
-  // without competing with screen headers.
-  timeChipText: {
-    fontSize: 32,
-    fontWeight: '700',
-    lineHeight: 36,
-  },
-  timeChipPeriod: {
-    ...Type.micro,
-    marginTop: 2,
-    letterSpacing: 1,
-  },
-  timeArrow: {
-    ...Type.h1,
-    paddingBottom: Space.lg,
-  },
-  pickerWrapper: {
-    alignItems: 'center',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-  },
-  rowLabel: {
-    width: 76,
-    ...Type.bodyBold,
-    textAlign: 'right',
-  },
-  dayPills: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: Space.xs,
-  },
-  dayPill: {
-    width: 34,
-    height: 34,
-    borderRadius: Radius.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayPillLetter: {
-    ...Type.bodyBold,
-  },
-  fieldInput: {
-    flex: 1,
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
-    ...Type.body,
-  },
-  pingRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.md,
-  },
-  pingInput: {
-    flex: 1,
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
-    minHeight: 60,
-    ...Type.body,
-  },
-  intervalChips: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.xs,
-  },
-  intervalChip: {
-    minWidth: 44,
-    minHeight: 44,
-    paddingHorizontal: Space.sm,
-    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 52,
   },
-  intervalChipText: {
-    ...Type.caption,
-    fontWeight: '600',
-  },
-  previewText: {
-    ...Type.caption,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: -4,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: Space.md,
-    marginTop: Space.sm,
-  },
-  actionButton: {
-    paddingHorizontal: Space.xxl,
-    paddingVertical: Space.md,
-    borderRadius: Radius.md,
-    minWidth: 100,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonText: {
-    ...Type.bodyBold,
-  },
-  kindToggle: {
-    flexDirection: 'row',
-    gap: Space.sm,
-  },
-  kindButton: {
-    flex: 1,
-    paddingVertical: Space.md,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-  },
-  kindButtonText: {
-    ...Type.bodyBold,
-    letterSpacing: 0.5,
-  },
-  replacementRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.md,
-  },
-  replacementChips: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.xs,
-  },
-  replacementChip: {
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.xs + 2,
-    borderRadius: Radius.sm,
-  },
-  replacementChipText: {
-    ...Type.caption,
-    fontWeight: '600',
-  },
-  capBanner: {
-    padding: Space.md,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    gap: 2,
-  },
-  capBannerTitle: { ...Type.bodyBold },
-  capBannerSubtitle: { ...Type.caption },
+  primaryText: { ...Type.bodyBold },
+  capBanner: { padding: Space.md, borderRadius: Radius.md, borderWidth: 1, gap: 2 },
+  capTitle: { ...Type.bodyBold },
+  capSub: { ...Type.caption },
 });
