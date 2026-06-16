@@ -123,6 +123,7 @@ function AppShell() {
           <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
           <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          <Stack.Screen name="manage-behaviors" options={{ title: 'Saved & archived' }} />
         </Stack>
       </ContentModalsProvider>
       <StatusBar style="auto" />

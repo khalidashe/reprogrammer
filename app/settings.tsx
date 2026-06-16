@@ -50,6 +50,8 @@ export default function SettingsScreen() {
   );
 
   const activeStates = behaviors.filter((b) => !b.hidden);
+  const bookmarkedCount = behaviors.filter((b) => b.bookmarked).length;
+  const archivedCount = behaviors.filter((b) => b.hidden).length;
   const totalCheckIns = checkIns.length;
   const successCount = checkIns.filter((c) => c.result === 'yes').length;
   const successRate =
@@ -181,6 +183,23 @@ export default function SettingsScreen() {
           </View>
         ))}
       </View>
+
+      <Section title="Your behaviors" colors={colors}>
+        <ActionButton
+          label={`Bookmarked${bookmarkedCount ? ` (${bookmarkedCount})` : ''}`}
+          onPress={() =>
+            router.push({ pathname: '/manage-behaviors', params: { tab: 'bookmarked' } })
+          }
+          colors={colors}
+        />
+        <ActionButton
+          label={`Archived${archivedCount ? ` (${archivedCount})` : ''}`}
+          onPress={() =>
+            router.push({ pathname: '/manage-behaviors', params: { tab: 'archived' } })
+          }
+          colors={colors}
+        />
+      </Section>
 
       <Section title="Subscription" colors={colors}>
         <Row
