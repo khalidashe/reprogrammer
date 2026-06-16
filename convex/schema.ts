@@ -92,6 +92,7 @@ export default defineSchema({
     level: v.number(),
     lastLevelUpStreak: v.number(),
     pausedUntil: v.optional(v.number()),
+    pausedIndefinitely: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
     hidden: v.boolean(),
@@ -139,6 +140,9 @@ export default defineSchema({
     lastLapseAcknowledged: v.optional(v.boolean()),
     quietHours: v.optional(v.object({ from: v.string(), to: v.string() })),
     notificationsDenied: v.optional(v.boolean()),
+    remindersMutedUntil: v.optional(
+      v.union(v.number(), v.literal("indefinite")),
+    ),
     updatedAt: v.number(),
   }).index("by_userId", ["userId"]),
 });

@@ -24,6 +24,7 @@ import {
 import useStore from '@/store/useStore';
 import { deriveStage } from '@/services/levels';
 import { rescheduleAll } from '@/services/notifications';
+import { isReminderMuteActive } from '@/services/scheduler-core';
 import { hhmmToDate, dateToHHmm, formatTimeForDisplayString } from '@/utils/time';
 
 const MANAGE_URL = Platform.select({
@@ -79,6 +80,14 @@ export default function SettingsScreen() {
 
   const quietHours = appProfile.quietHours;
   const quietHoursEnabled = quietHours != null;
+  const remindersMuted = isReminderMuteActive(appProfile);
+
+  const handleToggleMute = async () => {
+    await updateAppProfile({
+      remindersMutedUntil: remindersMuted ? undefined : 'indefinite',
+    });
+    await rescheduleAll({ force: true });
+  };
 
   const handleRestore = async () => {
     try {
@@ -279,6 +288,30 @@ export default function SettingsScreen() {
             colors={colors}
           />
         )}
+        <View style={styles.sectionRow}>
+          <Text style={[styles.sectionSub, { color: colors.textMuted, flex: 1 }]}>
+            Mute all reminders — silence every ping until you turn it back on.
+          </Text>
+          <Pressable
+            onPress={handleToggleMute}
+            style={[
+              styles.toggle,
+              { backgroundColor: remindersMuted ? colors.tint : colors.surfaceMuted },
+            ]}
+            accessibilityLabel={
+              remindersMuted ? 'Unmute all reminders' : 'Mute all reminders'
+            }
+          >
+            <Text
+              style={[
+                styles.toggleText,
+                { color: remindersMuted ? colors.textOnBrand : colors.text },
+              ]}
+            >
+              {remindersMuted ? 'Muted' : 'Off'}
+            </Text>
+          </Pressable>
+        </View>
       </Section>
 
       <Section title="Quiet hours" colors={colors}>

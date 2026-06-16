@@ -18,7 +18,7 @@ import { deriveStage, stageLabel } from '@/services/levels';
 import { practiceTypeIcons } from '@/services/library-content';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { cancelForBehavior, rescheduleAll } from '@/services/notifications';
-import { endOfLocalDay } from '@/services/scheduler-core';
+import { endOfLocalDay, isBehaviorPaused, isReminderMuteActive } from '@/services/scheduler-core';
 
 const RELAPSE_BANNER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -125,15 +125,25 @@ export default function DashboardScreen() {
   };
 
   const selectedBehaviors = activeBehaviors.filter((b) => selectedIds.has(b.id));
-  const anySelectedPaused = selectedBehaviors.some(
-    (b) => b.pausedUntil != null && b.pausedUntil > Date.now()
-  );
+  const anySelectedPaused = selectedBehaviors.some((b) => isBehaviorPaused(b));
 
   const bulkPauseUntil = async (resumeAt: number) => {
     await Promise.all(
       selectedBehaviors.map((b) =>
         Promise.all([
-          updateBehavior({ ...b, pausedUntil: resumeAt }),
+          updateBehavior({ ...b, pausedUntil: resumeAt, pausedIndefinitely: false }),
+          cancelForBehavior(b.id),
+        ])
+      )
+    );
+    exitSelectMode();
+  };
+
+  const bulkPauseIndefinitely = async () => {
+    await Promise.all(
+      selectedBehaviors.map((b) =>
+        Promise.all([
+          updateBehavior({ ...b, pausedUntil: undefined, pausedIndefinitely: true }),
           cancelForBehavior(b.id),
         ])
       )
@@ -153,6 +163,7 @@ export default function DashboardScreen() {
         { text: '1 day', onPress: () => bulkPauseUntil(Date.now() + DAY_MS) },
         { text: '3 days', onPress: () => bulkPauseUntil(Date.now() + 3 * DAY_MS) },
         { text: '1 week', onPress: () => bulkPauseUntil(Date.now() + 7 * DAY_MS) },
+        { text: 'Until I turn it back on', onPress: () => bulkPauseIndefinitely() },
       ]
     );
   };
@@ -161,8 +172,8 @@ export default function DashboardScreen() {
     if (selectedIds.size === 0) return;
     await Promise.all(
       selectedBehaviors
-        .filter((b) => b.pausedUntil != null)
-        .map((b) => updateBehavior({ ...b, pausedUntil: undefined }))
+        .filter((b) => b.pausedUntil != null || b.pausedIndefinitely)
+        .map((b) => updateBehavior({ ...b, pausedUntil: undefined, pausedIndefinitely: false }))
     );
     await rescheduleAll({ force: true });
     exitSelectMode();
@@ -233,6 +244,13 @@ export default function DashboardScreen() {
     void updateAppProfile({ lastLapseAcknowledged: true });
   };
 
+  const remindersMuted = isReminderMuteActive(appProfile);
+
+  const handleUnmute = async () => {
+    await updateAppProfile({ remindersMutedUntil: undefined });
+    await rescheduleAll({ force: true });
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top bar: profile · today · add — or, in select mode: cancel · N selected */}
@@ -301,6 +319,34 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.gridScroll}>
+        {remindersMuted ? (
+          <View
+            style={[
+              styles.permissionBanner,
+              { backgroundColor: colors.tintSoft, borderColor: colors.tint },
+            ]}
+          >
+            <View style={styles.permissionBannerBody}>
+              <Text style={[styles.relapseBannerTitle, { color: colors.text }]}>
+                All reminders muted
+              </Text>
+              <Text style={[styles.relapseBannerSub, { color: colors.textMuted }]}>
+                Every ping is paused until you turn it back on.
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleUnmute}
+              style={[styles.permissionBannerCta, { backgroundColor: colors.tint }]}
+              accessibilityLabel="Unmute all reminders"
+            >
+              <Text
+                style={[styles.permissionBannerCtaText, { color: colors.textOnBrand }]}
+              >
+                Unmute
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         {appProfile.notificationsDenied ? (
           <View
             style={[
@@ -548,7 +594,7 @@ function StateTile({
   onPress,
   onLongPress,
 }: TileProps) {
-  const isPaused = behavior.pausedUntil != null && behavior.pausedUntil > Date.now();
+  const isPaused = isBehaviorPaused(behavior);
   const isActiveToday = behavior.activeDays.includes(today);
   const isEnabled = !isPaused && isActiveToday;
   const isEliminate = behavior.kind === 'eliminate';
