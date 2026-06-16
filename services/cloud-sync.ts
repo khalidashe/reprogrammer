@@ -47,6 +47,7 @@ class CloudSync {
         level: b.level,
         lastLevelUpStreak: b.lastLevelUpStreak,
         pausedUntil: b.pausedUntil,
+        pausedIndefinitely: b.pausedIndefinitely,
         createdAt: b.createdAt,
         hidden: b.hidden,
         bookmarked: b.bookmarked,
@@ -108,6 +109,7 @@ class CloudSync {
         lastLapseAcknowledged: p.lastLapseAcknowledged,
         quietHours: p.quietHours,
         notificationsDenied: p.notificationsDenied,
+        remindersMutedUntil: p.remindersMutedUntil,
       })
       .catch((e) => console.warn('[cloud-sync] pushAppProfile', e));
   }
@@ -171,6 +173,7 @@ function toBehavior(d: Doc<'behaviors'>): Behavior {
     level: d.level,
     lastLevelUpStreak: d.lastLevelUpStreak,
     pausedUntil: d.pausedUntil,
+    pausedIndefinitely: d.pausedIndefinitely,
     createdAt: d.createdAt,
     hidden: d.hidden,
     bookmarked: d.bookmarked,
@@ -210,6 +213,7 @@ function toAppProfile(d: Doc<'appProfiles'>): AppProfile {
     lastLapseAcknowledged: d.lastLapseAcknowledged,
     quietHours: d.quietHours,
     notificationsDenied: d.notificationsDenied,
+    remindersMutedUntil: d.remindersMutedUntil,
   };
 }
 

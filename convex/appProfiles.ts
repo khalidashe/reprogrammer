@@ -25,6 +25,9 @@ export const upsert = mutation({
     lastLapseAcknowledged: v.optional(v.boolean()),
     quietHours: v.optional(v.object({ from: v.string(), to: v.string() })),
     notificationsDenied: v.optional(v.boolean()),
+    remindersMutedUntil: v.optional(
+      v.union(v.number(), v.literal("indefinite")),
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);

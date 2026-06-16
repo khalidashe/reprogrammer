@@ -12,6 +12,7 @@ import {
   dateKey,
   hashSeed,
   mulberry32,
+  isReminderMuteActive,
   SCHEDULE_LEAD_MS,
 } from './scheduler-core';
 import {
@@ -97,6 +98,9 @@ function buildCandidatesForBehavior(
   quietHours?: { from: string; to: string }
 ): Candidate[] {
   const results: Candidate[] = [];
+  // Indefinite pause (REP-34): no timestamp to filter against, so skip the
+  // behavior entirely — "always skip" until the user manually resumes.
+  if (behavior.pausedIndefinitely) return results;
   const baseDate = new Date(now);
   const windowFromMin =
     setLocalTimeOnDate(baseDate, behavior.window.from) - startOfDay(baseDate).getTime();
@@ -190,6 +194,10 @@ export async function rescheduleAll(options?: { force?: boolean }): Promise<void
 
   const store = useStore.getState();
   await cancelAllScheduled();
+
+  // Global mute (REP-35): everything is cancelled above; schedule nothing until
+  // un-muted. Honored here so launch + foreground reschedules both stay silent.
+  if (isReminderMuteActive(store.appProfile, now)) return;
 
   const active = store.behaviors.filter((b) => !b.hidden);
   if (active.length === 0) return;

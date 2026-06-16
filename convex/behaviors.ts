@@ -69,6 +69,7 @@ export const upsert = mutation({
     level: v.number(),
     lastLevelUpStreak: v.number(),
     pausedUntil: v.optional(v.number()),
+    pausedIndefinitely: v.optional(v.boolean()),
     createdAt: v.number(),
     hidden: v.boolean(),
     bookmarked: v.boolean(),

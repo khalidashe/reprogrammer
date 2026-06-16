@@ -5,10 +5,38 @@
  * and the Zustand store) so the algorithm can be unit-tested without RN.
  */
 import { effectiveIntervalMinutes } from './levels';
+import type { Behavior, AppProfile } from '../types';
 
 export const JITTER_RATIO = 0.2;
 export const MIN_GAP_RATIO = 0.6;
 export const SCHEDULE_LEAD_MS = 1000;
+
+/**
+ * True when a behavior is currently paused — either indefinitely ("until I turn
+ * it back on", REP-34) or within a timed pause window. Centralizes the check
+ * that used to be copy-pasted across the detail screen, dashboard, and tiles.
+ */
+export function isBehaviorPaused(
+  b: Pick<Behavior, 'pausedUntil' | 'pausedIndefinitely'>,
+  now: number = Date.now()
+): boolean {
+  if (b.pausedIndefinitely) return true;
+  return b.pausedUntil != null && b.pausedUntil > now;
+}
+
+/**
+ * True when global reminders are muted (REP-35) — either indefinitely or within
+ * a timed mute window. While active, the scheduler cancels everything and
+ * schedules nothing until the user un-mutes.
+ */
+export function isReminderMuteActive(
+  p: Pick<AppProfile, 'remindersMutedUntil'>,
+  now: number = Date.now()
+): boolean {
+  const m = p.remindersMutedUntil;
+  if (m === 'indefinite') return true;
+  return typeof m === 'number' && m > now;
+}
 
 export function parseHHmm(time: string): { h: number; m: number } {
   const [h, m] = time.split(':').map((n) => parseInt(n, 10));

@@ -14,7 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState, type ComponentProps } from 'react';
 import { cancelForBehavior, rescheduleAll, sendTestNotification } from '@/services/notifications';
 import type { CheckIn } from '@/types';
-import { endOfLocalDay } from '@/services/scheduler-core';
+import { endOfLocalDay, isBehaviorPaused } from '@/services/scheduler-core';
 import { deriveStage, stageLabel } from '@/services/levels';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -155,31 +155,36 @@ export default function BehaviorDetailScreen() {
     }
   };
 
-  const isPaused = behavior.pausedUntil != null && behavior.pausedUntil > Date.now();
+  const isPaused = isBehaviorPaused(behavior);
 
   const pauseUntil = (resumeAt: number) =>
     Promise.all([
-      updateBehavior({ ...behavior, pausedUntil: resumeAt }),
+      updateBehavior({ ...behavior, pausedUntil: resumeAt, pausedIndefinitely: false }),
+      cancelForBehavior(behavior.id),
+    ]);
+
+  const pauseIndefinitely = () =>
+    Promise.all([
+      updateBehavior({ ...behavior, pausedUntil: undefined, pausedIndefinitely: true }),
       cancelForBehavior(behavior.id),
     ]);
 
   const handlePausePress = () => {
     if (isPaused) {
-      Alert.alert(
-        'Resume now?',
-        `${behavior.title} is paused until ${formatPausedUntil(behavior.pausedUntil!)}.`,
-        [
-          { text: 'Stay paused', style: 'cancel' },
-          {
-            text: 'Resume now',
-            onPress: () =>
-              Promise.all([
-                updateBehavior({ ...behavior, pausedUntil: undefined }),
-                rescheduleAll({ force: true }),
-              ]),
-          },
-        ]
-      );
+      const pausedMsg = behavior.pausedIndefinitely
+        ? `${behavior.title} is paused until you turn it back on.`
+        : `${behavior.title} is paused until ${formatPausedUntil(behavior.pausedUntil!)}.`;
+      Alert.alert('Resume now?', pausedMsg, [
+        { text: 'Stay paused', style: 'cancel' },
+        {
+          text: 'Resume now',
+          onPress: () =>
+            Promise.all([
+              updateBehavior({ ...behavior, pausedUntil: undefined, pausedIndefinitely: false }),
+              rescheduleAll({ force: true }),
+            ]),
+        },
+      ]);
       return;
     }
 
@@ -192,6 +197,7 @@ export default function BehaviorDetailScreen() {
         { text: '1 day', onPress: () => pauseUntil(Date.now() + DAY_MS) },
         { text: '3 days', onPress: () => pauseUntil(Date.now() + 3 * DAY_MS) },
         { text: '1 week', onPress: () => pauseUntil(Date.now() + 7 * DAY_MS) },
+        { text: 'Until I turn it back on', onPress: () => pauseIndefinitely() },
       ]
     );
   };
@@ -220,7 +226,9 @@ export default function BehaviorDetailScreen() {
           >
             <IconSymbol name="pause.fill" size={12} color={colors.warning} />
             <Text style={[styles.pausedChipText, { color: colors.warning }]}>
-              Paused until {formatPausedUntil(behavior.pausedUntil!)}
+              {behavior.pausedIndefinitely
+                ? 'Paused — tap Resume'
+                : `Paused until ${formatPausedUntil(behavior.pausedUntil!)}`}
             </Text>
           </View>
         ) : null}

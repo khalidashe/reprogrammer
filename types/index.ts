@@ -53,6 +53,8 @@ export interface Behavior {
   level: number;
   lastLevelUpStreak: number;
   pausedUntil?: number;
+  /** Paused "until I turn it back on" (REP-34). Takes precedence over `pausedUntil`. */
+  pausedIndefinitely?: boolean;
   createdAt: number;
   hidden: boolean;
   bookmarked: boolean;
@@ -98,4 +100,9 @@ export interface AppProfile {
   quietHours?: { from: string; to: string };
   /** Set if the user declined system notification permissions. */
   notificationsDenied?: boolean;
+  /**
+   * One-tap global mute (REP-35). `'indefinite'` = muted until manually turned
+   * back on; a number = muted until that timestamp. Undefined = not muted.
+   */
+  remindersMutedUntil?: number | 'indefinite';
 }
