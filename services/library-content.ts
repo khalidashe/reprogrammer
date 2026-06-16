@@ -10,14 +10,26 @@ export interface LibraryGuide {
   body: string;
 }
 
+export interface BookRef {
+  title: string;
+  author: string;
+  year: number;
+}
+
 export interface LibraryProgram {
   id: string;
   title: string;
   description: string;
   /** Library category this program/book belongs to (REP-11). */
   category: LibraryCategory;
-  /** Optional source book + author, for book-based programs (REP-33). */
-  book?: { title: string; author: string; year: number };
+  /** Optional source book + author, for single-book programs (REP-33). */
+  book?: BookRef;
+  /**
+   * For cross-book programs (REP-12 / REP-33): the single-book program ids this
+   * one assembles from. Presence marks a program as cross-book; its source books
+   * are derived from these via `sourceBooksFor`.
+   */
+  sourceProgramIds?: string[];
   guideIds: string[];
   body: string;
   sequence?: string[];
@@ -55,6 +67,23 @@ export { LIBRARY_GUIDES, LIBRARY_PROGRAMS, ADOPT_TEMPLATES, ELIMINATE_TEMPLATES 
 
 export function featuredTemplates(): AdoptTemplate[] {
   return ADOPT_TEMPLATES.filter((t) => t.featured);
+}
+
+export function programById(id: string): LibraryProgram | undefined {
+  return LIBRARY_PROGRAMS.find((p) => p.id === id);
+}
+
+/** A cross-book program assembles from several single-book programs (REP-12). */
+export function isCrossBook(p: LibraryProgram): boolean {
+  return (p.sourceProgramIds?.length ?? 0) > 0;
+}
+
+/** The source books behind a cross-book program, derived from its source programs. */
+export function sourceBooksFor(p: LibraryProgram): BookRef[] {
+  if (!p.sourceProgramIds) return [];
+  return p.sourceProgramIds
+    .map((id) => programById(id)?.book)
+    .filter((b): b is BookRef => b != null);
 }
 
 /* ---------------------------------------------------------------------------

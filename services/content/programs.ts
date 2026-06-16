@@ -446,4 +446,138 @@ Creativity is not a rare gift but a natural function that gets blocked — by pe
 
 ~28 days (the four foundation weeks of Cameron's 12-week course). The two daily/weekly practices are the whole engine — protect them.`,
   },
+
+  // ── Cross-book programs (REP-12 / REP-33) ───────────────────────────────────
+  // Assembled from the single-book programs above; each links back to its
+  // sources. Source books are derived from `sourceProgramIds`.
+  {
+    id: 'pkg-social-confidence',
+    title: 'Social Confidence',
+    category: 'social_communication',
+    sourceProgramIds: [
+      'pkg-charisma-myth',
+      'pkg-how-to-win-friends',
+      'pkg-nonviolent-communication',
+    ],
+    description:
+      'Be at ease and genuinely influential in any social setting — presence and warmth, real interest in people, and clean communication when things get tense.',
+    guideIds: [
+      'guide-confidence',
+      'guide-eye-contact',
+      'guide-body-language',
+      'guide-dominant-posture',
+      'guide-small-talk',
+      'guide-empathy-on-command',
+      'guide-communication-process',
+      'guide-let-go-of-rage',
+    ],
+    sequence: [
+      'Presence & inner state',
+      'Power and warmth signals',
+      'Genuine interest',
+      'Clean communication under friction',
+      'Integration',
+    ],
+    body: `## The Thesis
+
+Social confidence is not a trait you're born with — it's three learnable layers stacked together. Olivia Fox Cabane shows that charisma is presence, power, and warmth, produced by managing your internal state so your body language follows. Dale Carnegie shows that influence comes from honoring the other person's craving to feel important — genuine interest, not technique. Marshall Rosenberg shows that when things get tense, stripping speech down to observation–feeling–need–request keeps connection intact. Train the inner state, then outward interest, then the language for friction.
+
+---
+
+## The Method
+
+1. **Presence first** — bring your full attention back to the person in front of you; people feel the difference before you say anything ([[The Charisma Myth]]).
+2. **Manage the inner state** — neutralize anxiety and self-criticism before they leak into posture and face; project power (posture, stillness) and warmth (goodwill, gratitude).
+3. **Lead with genuine interest** — ask, listen, remember names and details; never criticize or condemn — it ends the exchange before it starts ([[How to Win Friends and Influence People]]).
+4. **Arouse an eager want** — frame every ask in terms of what the other person already wants.
+5. **Speak clean under friction** — when a conversation heats up, run OFNR: observe without evaluating, name the feeling, identify the need, make a refusable request ([[Nonviolent Communication]]).
+6. **Self-empathy** — run the same four steps inward on your own storm before you respond.
+
+---
+
+## Run It
+
+~30 days, one layer at a time: presence and state, then genuine-interest behaviors, then OFNR for hard moments, then integrate. Built from [[The Charisma Myth]], [[How to Win Friends and Influence People]], and [[Nonviolent Communication]]; pairs with the Confidence, Eye Contact, Body Language, and Empathy on Command guides.`,
+  },
+  {
+    id: 'pkg-learn-anything-faster',
+    title: 'Learn Anything Faster',
+    category: 'performance_productivity',
+    sourceProgramIds: ['pkg-make-it-stick', 'pkg-ultralearning', 'pkg-deep-work'],
+    description:
+      'Acquire any hard skill fast: a deliberate self-directed project, distraction-free practice, and the retrieval–spacing–interleaving engine that makes it stick.',
+    guideIds: [
+      'guide-deep-focus',
+      'guide-digital-discipline',
+      'guide-attention-fragmentation',
+    ],
+    sequence: [
+      'Map the skill',
+      'Protect a daily deep block',
+      'Practice directly',
+      'Drive with retrieval & spacing',
+      'Drill weaknesses',
+    ],
+    body: `## The Thesis
+
+Most learning fails because the methods feel productive but aren't — rereading, cramming, and passive courses produce fluency illusions that evaporate. Three books converge on the fix. Scott Young's ultralearning says to design an aggressive, self-directed project and practice the skill directly. Brown, Roediger & McDaniel show the engine that makes it stick — retrieval, spacing, interleaving. Cal Newport shows the condition all of it needs: distraction-free depth. Design the project, protect the deep block, and drive it with effortful retrieval.
+
+---
+
+## The Method
+
+1. **Map the skill** — before starting, break it into concepts, facts, and procedures, and study how the best learners acquire it ([[Ultralearning]]).
+2. **Practice directly** — train in the context you'll use it (speak the language, write the code, give the talk), not through proxies.
+3. **Protect a daily deep block** — ritualize one distraction-free session; schedule internet use; end with a shutdown ([[Deep Work]]).
+4. **Drive with retrieval** — test yourself instead of rereading; recall before you re-read ([[Make It Stick]]).
+5. **Space and interleave** — let forgetting begin before you revisit; mix problem types within a session.
+6. **Drill weaknesses and seek feedback** — isolate your weakest sub-skill, attack it, and get honest signal fast.
+
+---
+
+## Run It
+
+~30 days. Define one skill project, set a daily deep-work block, and make retrieval + spacing your default study mode. Built from [[Make It Stick]], [[Ultralearning]], and [[Deep Work]]; pairs with the Deep Focus, Digital Discipline, and Attention Fragmentation guides.`,
+  },
+  {
+    id: 'pkg-rebuild-your-habits',
+    title: 'Rebuild Your Habits',
+    category: 'foundation',
+    sourceProgramIds: ['pkg-atomic-habits', 'pkg-tiny-habits', 'pkg-feeling-good'],
+    description:
+      'Overhaul your daily systems end to end: redesign the cues, shrink behaviors until they can’t fail, and rewrite the self-talk that derails them after a slip.',
+    guideIds: [
+      'guide-context-design',
+      'guide-action-over-consumption',
+      'guide-relapse-and-restart',
+      'guide-rumination-interrupt',
+    ],
+    sequence: [
+      'Pick one to build, one to break',
+      'Design the environment',
+      'Shrink and anchor',
+      'Never miss twice',
+      'Rewrite the saboteur thought',
+    ],
+    body: `## The Thesis
+
+A habit overhaul fails when you rely on willpower instead of changing the system. James Clear shows that behavior follows the environment and the loop cue → craving → response → reward — so you engineer the loop. BJ Fogg shows that the reliable lever is shrinking the behavior until it's effortless, anchoring it to something you already do, and celebrating to wire it in. David Burns shows what derails all of it: distorted self-talk after a slip ("I always quit") — caught and rewritten on paper, the spiral stops. Redesign the cues, shrink the behaviors, and rewrite the thoughts that sabotage them.
+
+---
+
+## The Method
+
+1. **Pick one to build, one to break** — make the good one obvious, attractive, easy, and satisfying; invert all four to dismantle the bad one ([[Atomic Habits]]).
+2. **Design the environment** — cues into view for the good habit, friction in front of the bad one.
+3. **Shrink it until it can't fail** — an under-30-second version anchored to an existing routine ("after I ___, I will ___"), then celebrate the instant you finish ([[Tiny Habits]]).
+4. **Never miss twice** — one miss is an accident; protect the chain on the second day.
+5. **Catch the saboteur thought** — when you slip and the mood drops, write the exact automatic thought, name its distortion, and answer it rationally ([[Feeling Good]]).
+6. **Vote for the identity** — treat each rep as evidence of the person you're becoming, not a step toward a far-off goal.
+
+---
+
+## Run It
+
+~30 days. Run one build + one break habit on your dashboard, keep them tiny, and use a thought record on any slip. Built from [[Atomic Habits]], [[Tiny Habits]], and [[Feeling Good]]; pairs with the Context Design, Action over Consumption, Relapse & Restart, and Rumination Interrupt guides.`,
+  },
 ];

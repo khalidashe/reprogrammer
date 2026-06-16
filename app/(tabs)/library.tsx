@@ -11,6 +11,8 @@ import {
   categoryLabel,
   categoryTagline,
   guideCategory,
+  isCrossBook,
+  sourceBooksFor,
   type LibraryGuide,
   type LibraryProgram,
 } from '@/services/library-content';
@@ -48,6 +50,7 @@ export default function LibraryScreen() {
       p.title.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
       (p.book?.author.toLowerCase().includes(q) ?? false) ||
+      sourceBooksFor(p).some((b) => b.author.toLowerCase().includes(q)) ||
       categoryLabel(p.category).toLowerCase().includes(q);
     const matchGuide = (g: LibraryGuide) =>
       !q ||
@@ -214,9 +217,11 @@ function ProgramCard({
   colors: ThemeColors;
   onPress: () => void;
 }) {
-  const meta = program.book
-    ? `Book · ${program.book.author}`
-    : `Program · ${program.guideIds.length} guides`;
+  const meta = isCrossBook(program)
+    ? `Cross-book · ${program.sourceProgramIds!.length} books`
+    : program.book
+      ? `Book · ${program.book.author}`
+      : `Program · ${program.guideIds.length} guides`;
   return (
     <Pressable
       onPress={onPress}

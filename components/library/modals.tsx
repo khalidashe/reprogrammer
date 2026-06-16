@@ -9,6 +9,8 @@ import {
 import Markdown from 'react-native-markdown-display';
 import {
   domainLabel,
+  isCrossBook,
+  programById,
   type LibraryGuide,
   type LibraryProgram,
   type AdoptTemplate,
@@ -319,14 +321,47 @@ export function ProgramView({ program, colors, onOpenTarget }: ProgramViewProps)
   const guides: LibraryGuide[] = program.guideIds
     .map((id) => LIBRARY_GUIDES.find((g) => g.id === id))
     .filter((g): g is LibraryGuide => g !== undefined);
+  const crossBook = isCrossBook(program);
+  const sourcePrograms: LibraryProgram[] = (program.sourceProgramIds ?? [])
+    .map((id) => programById(id))
+    .filter((p): p is LibraryProgram => p !== undefined);
 
   return (
     <ScrollView contentContainerStyle={styles.modalContent}>
       <Text style={[styles.modalTitle, { color: colors.text }]}>{program.title}</Text>
       <Text style={[styles.modalMeta, { color: colors.textMuted }]}>
-        {program.guideIds.length} guides
+        {crossBook
+          ? `Cross-book · ${sourcePrograms.length} books · ${program.guideIds.length} guides`
+          : `${program.guideIds.length} guides`}
       </Text>
       <Text style={[styles.intro, { color: colors.text }]}>{program.description}</Text>
+
+      {crossBook && sourcePrograms.length > 0 ? (
+        <>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+            Built from
+          </Text>
+          {sourcePrograms.map((sp) => (
+            <Pressable
+              key={sp.id}
+              onPress={() => onOpenTarget({ kind: 'program', program: sp })}
+              style={[
+                styles.includedGuide,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+              accessibilityLabel={`${sp.title}${sp.book ? `, by ${sp.book.author}` : ''}`}
+              accessibilityHint="Opens the source program"
+            >
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{sp.title}</Text>
+              {sp.book ? (
+                <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
+                  {sp.book.author} · {sp.book.year}
+                </Text>
+              ) : null}
+            </Pressable>
+          ))}
+        </>
+      ) : null}
 
       <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
         Included guides
