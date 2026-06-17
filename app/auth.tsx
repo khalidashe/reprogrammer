@@ -1,16 +1,18 @@
-import { View, Text, StyleSheet, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius } from '@/constants/theme';
+import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
+import { useFeedback } from '@/components/ui/feedback';
 
 export default function AuthScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { signIn } = useAuthActions();
+  const { showSheet } = useFeedback();
   const [busy, setBusy] = useState<'apple' | 'google' | null>(null);
 
   const handleApple = async () => {
@@ -29,7 +31,11 @@ export default function AuthScreen() {
       router.back();
     } catch (e: any) {
       if (e?.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Sign-in failed', e?.message ?? 'Unknown error');
+        showSheet({
+          title: 'Sign-in failed',
+          message: e?.message ?? 'Something went wrong. Please try again.',
+          actions: [{ label: 'OK' }],
+        });
       }
     } finally {
       setBusy(null);
@@ -42,7 +48,11 @@ export default function AuthScreen() {
       await signIn('google');
       router.back();
     } catch (e: any) {
-      Alert.alert('Sign-in failed', e?.message ?? 'Unknown error');
+      showSheet({
+        title: 'Sign-in failed',
+        message: e?.message ?? 'Something went wrong. Please try again.',
+        actions: [{ label: 'OK' }],
+      });
     } finally {
       setBusy(null);
     }
@@ -53,7 +63,7 @@ export default function AuthScreen() {
       <View style={styles.content}>
         <Text style={[styles.title, { color: colors.text }]}>Sign in</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          Sign in to sync your states across devices and unlock Pro.
+          Sign in to sync your behaviors across devices and unlock Pro.
         </Text>
 
         {Platform.OS === 'ios' && (
@@ -73,11 +83,14 @@ export default function AuthScreen() {
         <Pressable
           onPress={handleGoogle}
           disabled={busy !== null}
-          style={[
+          style={({ pressed }) => [
             styles.googleButton,
             { backgroundColor: colors.surface, borderColor: colors.border },
             busy === 'google' && { opacity: 0.6 },
+            pressed && busy === null && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy !== null, busy: busy === 'google' }}
           accessibilityLabel="Sign in with Google"
         >
           <Text style={[styles.googleButtonText, { color: colors.text }]}>
@@ -85,7 +98,12 @@ export default function AuthScreen() {
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => router.back()} style={styles.cancel}>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.cancel, pressed && { opacity: PRESSED_OPACITY }]}
+          accessibilityRole="button"
+          accessibilityLabel="Maybe later"
+        >
           <Text style={[Type.caption, { color: colors.textMuted }]}>Maybe later</Text>
         </Pressable>
       </View>
@@ -119,5 +137,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   googleButtonText: { ...Type.bodyBold },
-  cancel: { alignItems: 'center', marginTop: Space.md },
+  cancel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    marginTop: Space.md,
+  },
 });

@@ -190,6 +190,33 @@ export type ThemeName = keyof typeof Colors;
 export type ThemeColors = ThemeVariant;
 
 /**
+ * Standard pressed-state opacity for tappable surfaces. Use via Pressable's
+ * function-style: `style={({ pressed }) => [base, pressed && { opacity: PRESSED_OPACITY }]}`.
+ * Keeps touch feedback consistent and calm across the app.
+ */
+export const PRESSED_OPACITY = 0.85;
+
+/**
+ * Canonical "selected / active control" treatment — a soft tint, NEVER a
+ * saturated fill. This is the single source of truth for selected chips, the
+ * active segment of a toggle, on-state switches, open pickers, and any control
+ * the user has chosen. Pair the label/icon with `colors.accentText`.
+ *
+ * The brand green (`tint`) is reserved as a surgical accent for genuinely
+ * affirmative / progress / mastery moments — typically the ONE primary action
+ * on a screen — not for every selectable control. The base style should set
+ * `borderWidth: 1` so the border reads.
+ */
+export function controlSelected(c: ThemeColors): { backgroundColor: string; borderColor: string } {
+  return { backgroundColor: c.tintSoft, borderColor: c.tintMuted };
+}
+
+/** Resting (unselected) counterpart to {@link controlSelected}. */
+export function controlResting(c: ThemeColors): { backgroundColor: string; borderColor: string } {
+  return { backgroundColor: c.surfaceMuted, borderColor: c.border };
+}
+
+/**
  * Typography scale — 5 steps + a reserved display token.
  * Use these as `{ ...Type.body }` spread into style objects, with `color`
  * applied separately at the call site.

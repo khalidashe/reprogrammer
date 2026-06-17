@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useFeedback } from '@/components/ui/feedback';
 import useStore from '@/store/useStore';
 import { deriveStage, stageLabel } from '@/services/levels';
 import { cancelForBehavior, rescheduleAll } from '@/services/notifications';
@@ -20,6 +21,7 @@ export default function ManageBehaviorsScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<Tab>(params.tab === 'archived' ? 'archived' : 'bookmarked');
   const { behaviors, getStreak, updateBehavior, deleteBehavior } = useStore();
+  const { showSheet } = useFeedback();
   const [, setRefresh] = useState({});
 
   useFocusEffect(
@@ -41,21 +43,21 @@ export default function ManageBehaviorsScreen() {
   };
 
   const handleDelete = (b: Behavior) => {
-    Alert.alert(
-      'Delete behavior',
-      `Permanently delete "${b.title}" and all its history? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showSheet({
+      title: 'Delete behavior',
+      message: `Permanently delete "${b.title}" and all its history? This cannot be undone.`,
+      actions: [
         {
-          text: 'Delete',
+          label: 'Delete',
           style: 'destructive',
           onPress: async () => {
             await cancelForBehavior(b.id);
             await deleteBehavior(b.id);
           },
         },
-      ]
-    );
+        { label: 'Cancel', style: 'cancel' },
+      ],
+    });
   };
 
   return (

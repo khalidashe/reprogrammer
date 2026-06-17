@@ -37,6 +37,7 @@ const MAPPING = {
   'play.fill': 'play-arrow',
   'flame.fill': 'local-fire-department',
   'bell.fill': 'notifications',
+  'sparkles': 'auto-awesome',
   // Edit / manage actions
   'pencil': 'edit',
   'bookmark': 'bookmark-border',

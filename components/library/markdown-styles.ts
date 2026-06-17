@@ -67,12 +67,12 @@ export function createMarkdownStyles(colors: ThemeColors) {
       marginBottom: Space.xs,
     },
     bullet_list_icon: {
-      color: colors.tint,
+      color: colors.textMuted,
       marginRight: Space.sm,
       lineHeight: 22,
     },
     ordered_list_icon: {
-      color: colors.tint,
+      color: colors.textMuted,
       marginRight: Space.sm,
       lineHeight: 22,
       fontWeight: '600',

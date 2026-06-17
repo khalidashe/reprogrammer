@@ -16,6 +16,7 @@ import {
   setupNotificationCategory,
 } from '@/services/notifications';
 import { ContentModalsProvider } from '@/components/library/content-modals-provider';
+import { FeedbackProvider } from '@/components/ui/feedback';
 import { convex } from '@/services/convex-client';
 import { authSecureStorage } from '@/services/secure-storage';
 import { useCloudSyncBootstrap } from '@/hooks/useCloudSyncBootstrap';
@@ -113,19 +114,21 @@ function AppShell() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <ContentModalsProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
-          <Stack.Screen name="create" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="behavior/[id]" options={{ title: 'Behavior' }} />
-          <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
-          <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
-          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-          <Stack.Screen name="manage-behaviors" options={{ title: 'Saved & archived' }} />
-        </Stack>
-      </ContentModalsProvider>
+      <FeedbackProvider>
+        <ContentModalsProvider>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
+            <Stack.Screen name="create" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen name="behavior/[id]" options={{ title: 'Behavior' }} />
+            <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
+            <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
+            <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+            <Stack.Screen name="manage-behaviors" options={{ title: 'Saved & archived' }} />
+          </Stack>
+        </ContentModalsProvider>
+      </FeedbackProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
   );

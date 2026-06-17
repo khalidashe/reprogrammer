@@ -2,7 +2,14 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius } from '@/constants/theme';
+import {
+  Colors,
+  Type,
+  Space,
+  Radius,
+  PRESSED_OPACITY,
+  controlSelected,
+} from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { Behavior } from '@/types';
 import { generateUUID } from '@/utils/uuid';
@@ -66,12 +73,18 @@ export default function OnboardingScreen() {
         ]}
       >
         <Text style={[styles.splashTitle, { color: colors.text }]}>Reprogrammer</Text>
-        <Text style={[styles.splashTagline, { color: colors.tint }]}>
-          NOTICE · REPEAT · REPROGRAM
+        <Text style={[styles.splashTagline, { color: colors.accentText }]}>
+          Notice · Repeat · Reprogram
         </Text>
         <Pressable
           onPress={() => setStep('rules')}
-          style={[styles.cta, { backgroundColor: colors.tint }]}
+          style={({ pressed }) => [
+            styles.cta,
+            { backgroundColor: colors.tint },
+            pressed && { opacity: PRESSED_OPACITY },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Begin"
         >
           <Text style={[styles.ctaText, { color: colors.textOnBrand }]}>Begin</Text>
         </Pressable>
@@ -97,8 +110,8 @@ export default function OnboardingScreen() {
               ]}
             >
               <View style={styles.ruleHeader}>
-                <View style={[styles.ruleNumber, { backgroundColor: colors.tint }]}>
-                  <Text style={[styles.ruleNumberText, { color: colors.textOnBrand }]}>
+                <View style={[styles.ruleNumber, controlSelected(colors)]}>
+                  <Text style={[styles.ruleNumberText, { color: colors.accentText }]}>
                     {idx + 1}
                   </Text>
                 </View>
@@ -113,7 +126,13 @@ export default function OnboardingScreen() {
 
           <Pressable
             onPress={() => setStep('templates')}
-            style={[styles.cta, { backgroundColor: colors.tint, marginTop: Space.md }]}
+            style={({ pressed }) => [
+              styles.cta,
+              { backgroundColor: colors.tint, marginTop: Space.md },
+              pressed && { opacity: PRESSED_OPACITY },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="I understand"
           >
             <Text style={[styles.ctaText, { color: colors.textOnBrand }]}>I understand</Text>
           </Pressable>
@@ -127,13 +146,16 @@ export default function OnboardingScreen() {
       <View style={[styles.content, { paddingTop: contentPaddingTop }]}>
         <Pressable
           onPress={startWithFoundation}
-          style={[
+          style={({ pressed }) => [
             styles.foundationCard,
             { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+            pressed && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel="Start with The Foundation"
         >
           <Text style={[styles.foundationLabel, { color: colors.accentText }]}>
-            START HERE
+            Start here
           </Text>
           <Text style={[styles.foundationTitle, { color: colors.text }]}>The Foundation</Text>
           <Text style={[styles.foundationBody, { color: colors.textMuted }]}>
@@ -152,10 +174,13 @@ export default function OnboardingScreen() {
             <Pressable
               key={template.id}
               onPress={() => addTemplate(template)}
-              style={[
+              style={({ pressed }) => [
                 styles.templateCard,
                 { backgroundColor: colors.surface, borderColor: colors.border },
+                pressed && { opacity: PRESSED_OPACITY },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${template.title}`}
             >
               <Text style={[styles.templateTitle, { color: colors.text }]}>
                 {template.title}
@@ -169,7 +194,13 @@ export default function OnboardingScreen() {
 
         <Pressable
           onPress={skipOnboarding}
-          style={[styles.skipButton, { backgroundColor: colors.surfaceMuted }]}
+          style={({ pressed }) => [
+            styles.skipButton,
+            { backgroundColor: colors.surfaceMuted },
+            pressed && { opacity: PRESSED_OPACITY },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Skip and create my own behavior"
         >
           <Text style={[styles.skipButtonText, { color: colors.text }]}>
             Skip — I&apos;ll create my own
@@ -196,8 +227,8 @@ const styles = StyleSheet.create({
   },
   splashTagline: {
     ...Type.caption,
-    fontWeight: '700',
-    letterSpacing: 2, // the tagline's spaced-out branding effect
+    fontWeight: '600',
+    letterSpacing: 1,
     marginBottom: Space.xxl,
   },
   container: {
@@ -221,7 +252,7 @@ const styles = StyleSheet.create({
   },
   ruleCard: {
     borderWidth: 1,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     padding: Space.md + Space.xxs, // = 14; sits between md (12) and lg (16)
     marginBottom: Space.sm + Space.xxs, // = 10
     gap: Space.sm,
@@ -235,6 +266,7 @@ const styles = StyleSheet.create({
     width: Space.xxl,
     height: Space.xxl,
     borderRadius: Radius.pill,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -307,7 +339,9 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     paddingVertical: Space.md,
-    borderRadius: Radius.xs,
+    borderRadius: Radius.md,
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   skipButtonText: {

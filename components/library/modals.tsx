@@ -17,7 +17,7 @@ import {
   type EliminateTemplate,
   LIBRARY_GUIDES,
 } from '@/services/library-content';
-import { Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import { Type, Space, Radius, PRESSED_OPACITY, type ThemeColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   transformWikiLinks,
@@ -40,8 +40,9 @@ function ModalHeader({ canBack, colors, onBack, onClose }: ModalHeaderProps) {
       {canBack ? (
         <Pressable
           onPress={onBack}
-          style={styles.headerButton}
+          style={({ pressed }) => [styles.headerButton, pressed && { opacity: PRESSED_OPACITY }]}
           hitSlop={8}
+          accessibilityRole="button"
           accessibilityLabel="Back to previous"
         >
           <IconSymbol name="chevron.left" size={22} color={colors.textMuted} />
@@ -51,8 +52,9 @@ function ModalHeader({ canBack, colors, onBack, onClose }: ModalHeaderProps) {
       )}
       <Pressable
         onPress={onClose}
-        style={styles.headerButton}
+        style={({ pressed }) => [styles.headerButton, pressed && { opacity: PRESSED_OPACITY }]}
         hitSlop={8}
+        accessibilityRole="button"
         accessibilityLabel="Close"
       >
         <IconSymbol name="xmark" size={20} color={colors.textMuted} />
@@ -103,7 +105,7 @@ export function GuideView({ guide, colors, onOpenTarget }: GuideViewProps) {
       <Text style={[styles.modalMeta, { color: colors.textMuted }]}>
         {domainLabel(guide.domain)} · {guide.estimatedMinutes} min read
       </Text>
-      <View style={{ marginTop: 12 }}>
+      <View style={{ marginTop: Space.md }}>
         <MarkdownBody body={guide.body} colors={colors} onOpenTarget={onOpenTarget} />
       </View>
     </ScrollView>
@@ -184,10 +186,13 @@ export function AdoptView({
         <Pressable
           onPress={onAdd}
           disabled={added}
-          style={[
+          style={({ pressed }) => [
             styles.addButton,
             { backgroundColor: added ? colors.surfaceMuted : colors.tint },
+            pressed && !added && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: added }}
           accessibilityLabel={added ? 'Already added' : 'Add to dashboard'}
         >
           <Text
@@ -291,10 +296,13 @@ export function EliminateView({
         <Pressable
           onPress={onAdd}
           disabled={added}
-          style={[
+          style={({ pressed }) => [
             styles.addButton,
             { backgroundColor: added ? colors.surfaceMuted : colors.tint },
+            pressed && !added && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: added }}
           accessibilityLabel={added ? 'Already added' : 'Add to dashboard'}
         >
           <Text
@@ -345,10 +353,12 @@ export function ProgramView({ program, colors, onOpenTarget }: ProgramViewProps)
             <Pressable
               key={sp.id}
               onPress={() => onOpenTarget({ kind: 'program', program: sp })}
-              style={[
+              style={({ pressed }) => [
                 styles.includedGuide,
                 { backgroundColor: colors.surface, borderColor: colors.border },
+                pressed && { opacity: PRESSED_OPACITY },
               ]}
+              accessibilityRole="button"
               accessibilityLabel={`${sp.title}${sp.book ? `, by ${sp.book.author}` : ''}`}
               accessibilityHint="Opens the source program"
             >
@@ -370,10 +380,12 @@ export function ProgramView({ program, colors, onOpenTarget }: ProgramViewProps)
         <Pressable
           key={guide.id}
           onPress={() => onOpenTarget({ kind: 'guide', guide })}
-          style={[
+          style={({ pressed }) => [
             styles.includedGuide,
-            { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            pressed && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
           accessibilityLabel={`${guide.title} guide, ${guide.estimatedMinutes} minute read`}
           accessibilityHint="Opens the full guide"
         >
@@ -390,7 +402,7 @@ export function ProgramView({ program, colors, onOpenTarget }: ProgramViewProps)
       ))}
 
       {program.body ? (
-        <View style={{ marginTop: 16 }}>
+        <View style={{ marginTop: Space.lg }}>
           <MarkdownBody body={program.body} colors={colors} onOpenTarget={onOpenTarget} />
         </View>
       ) : null}
@@ -501,8 +513,8 @@ const styles = StyleSheet.create({
   modalTitle: { ...Type.h1 },
   modalMeta: { ...Type.caption, marginTop: Space.xs },
   sectionLabel: {
-    ...Type.micro,
-    textTransform: 'uppercase',
+    ...Type.caption,
+    fontWeight: '600',
     marginTop: Space.lg,
     marginBottom: Space.xs,
   },
@@ -548,7 +560,9 @@ const styles = StyleSheet.create({
   addButton: {
     paddingVertical: Space.md,
     borderRadius: Radius.md,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   addButtonText: { ...Type.bodyBold },
 });

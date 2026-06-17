@@ -12,7 +12,15 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import {
+  Type,
+  Space,
+  Radius,
+  PRESSED_OPACITY,
+  controlSelected,
+  type ThemeColors,
+} from '@/constants/theme';
+import { haptics } from '@/services/haptics';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Behavior, BehaviorKind, Domain } from '@/types';
 import {
@@ -123,16 +131,18 @@ function SelectCard({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        haptics.selection();
+        onPress();
+      }}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
-      style={[
+      style={({ pressed }) => [
         styles.selectCard,
-        {
-          backgroundColor: colors.surface,
-          borderColor: selected ? colors.tint : colors.border,
-          borderWidth: selected ? 2 : 1,
-        },
+        selected
+          ? { ...controlSelected(colors), borderWidth: 2 }
+          : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+        pressed && { opacity: PRESSED_OPACITY },
       ]}
     >
       <View style={{ flex: 1 }}>
@@ -144,7 +154,7 @@ function SelectCard({
       {mode === 'nav' ? (
         <IconSymbol name="chevron.right" size={18} color={colors.textMuted} />
       ) : selected ? (
-        <IconSymbol name="checkmark" size={20} color={colors.tint} />
+        <IconSymbol name="checkmark" size={20} color={colors.accentText} />
       ) : null}
     </Pressable>
   );
@@ -165,22 +175,28 @@ function Chip({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        haptics.selection();
+        onPress();
+      }}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      style={[
+      style={({ pressed }) => [
         styles.chip,
-        { backgroundColor: selected ? colors.tint : colors.surfaceMuted },
+        selected
+          ? controlSelected(colors)
+          : { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+        pressed && { opacity: PRESSED_OPACITY },
       ]}
     >
       {icon ? (
         <IconSymbol
           name={icon}
           size={14}
-          color={selected ? colors.textOnBrand : colors.textMuted}
+          color={selected ? colors.accentText : colors.textMuted}
         />
       ) : null}
-      <Text style={[styles.chipText, { color: selected ? colors.textOnBrand : colors.text }]}>
+      <Text style={[styles.chipText, { color: selected ? colors.accentText : colors.text }]}>
         {label}
       </Text>
     </Pressable>
@@ -237,7 +253,7 @@ export function StartStep({
         onPress={onBuildOwn}
         colors={colors}
       />
-      <Text style={[styles.groupLabel, { color: colors.textMuted }]}>POPULAR TO ADOPT</Text>
+      <Text style={[styles.groupLabel, { color: colors.textMuted }]}>Popular to adopt</Text>
       {featuredAdopt.map((t) => (
         <SelectCard
           key={t.id}
@@ -318,7 +334,7 @@ export function WhatStep({
       }
       colors={colors}
     >
-      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>LABEL</Text>
+      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Label</Text>
       <FieldInput
         value={state.title}
         onChangeText={(t) => update({ title: t })}
@@ -328,7 +344,7 @@ export function WhatStep({
         autoFocus
       />
 
-      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>REMINDER (OPTIONAL)</Text>
+      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Reminder (optional)</Text>
       <FieldInput
         value={state.pingMessage}
         onChangeText={(t) => update({ pingMessage: t })}
@@ -340,7 +356,7 @@ export function WhatStep({
 
       {isAdopt ? (
         <>
-          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>TYPE (OPTIONAL)</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Type (optional)</Text>
           <View style={styles.chipRow}>
             {PRACTICE_BASES.map((b) => (
               <Chip
@@ -379,7 +395,7 @@ export function InsteadStep({
       {adoptOptions.length > 0 ? (
         <>
           <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
-            PICK AN EXISTING BEHAVIOR
+            Pick an existing behavior
           </Text>
           <View style={styles.chipRow}>
             {adoptOptions.map((b) => (
@@ -397,7 +413,7 @@ export function InsteadStep({
           <Text style={[styles.orLabel, { color: colors.textMuted }]}>or create a new one</Text>
         </>
       ) : (
-        <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>CREATE THE REPLACEMENT</Text>
+        <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Create the replacement</Text>
       )}
       <FieldInput
         value={state.newReplacementTitle}
@@ -440,21 +456,25 @@ export function WhenStep({
     const display = formatTimeForDisplay(value);
     return (
       <Pressable
-        onPress={() => onOpenPicker(isOpen ? null : which)}
-        style={[
+        onPress={() => {
+          haptics.selection();
+          onOpenPicker(isOpen ? null : which);
+        }}
+        style={({ pressed }) => [
           styles.timeChip,
-          {
-            backgroundColor: isOpen ? colors.tint : colors.surfaceMuted,
-            borderColor: isOpen ? colors.tint : colors.border,
-          },
+          isOpen
+            ? controlSelected(colors)
+            : { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+          pressed && { opacity: PRESSED_OPACITY },
         ]}
+        accessibilityRole="button"
         accessibilityLabel={`${which === 'start' ? 'From' : 'To'} ${display.time} ${display.period}`}
       >
-        <Text style={[styles.timeChipText, { color: isOpen ? colors.textOnBrand : colors.text }]}>
+        <Text style={[styles.timeChipText, { color: isOpen ? colors.accentText : colors.text }]}>
           {display.time}
         </Text>
         <Text
-          style={[styles.timeChipPeriod, { color: isOpen ? colors.textOnBrand : colors.textMuted }]}
+          style={[styles.timeChipPeriod, { color: isOpen ? colors.accentText : colors.textMuted }]}
         >
           {display.period}
         </Text>
@@ -470,12 +490,12 @@ export function WhenStep({
     >
       <View style={styles.timeBlock}>
         <View style={styles.timeColumn}>
-          <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>FROM</Text>
+          <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>From</Text>
           {renderChip('start', state.startTime)}
         </View>
         <Text style={[styles.timeArrow, { color: colors.textMuted }]}>→</Text>
         <View style={styles.timeColumn}>
-          <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>TO</Text>
+          <Text style={[styles.timeColumnLabel, { color: colors.textMuted }]}>To</Text>
           {renderChip('end', state.endTime)}
         </View>
       </View>
@@ -492,7 +512,7 @@ export function WhenStep({
       ) : null}
 
       <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: Space.lg }]}>
-        REPEAT
+        Repeat
       </Text>
       <View style={styles.dayRow}>
         {DAY_LETTERS.map((letter, index) => {
@@ -500,15 +520,22 @@ export function WhenStep({
           return (
             <Pressable
               key={index}
-              onPress={() => toggleDay(index)}
-              style={[
+              onPress={() => {
+                haptics.selection();
+                toggleDay(index);
+              }}
+              style={({ pressed }) => [
                 styles.dayPill,
-                { backgroundColor: active ? colors.tint : colors.surfaceMuted },
+                active
+                  ? controlSelected(colors)
+                  : { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                pressed && { opacity: PRESSED_OPACITY },
               ]}
+              accessibilityRole="button"
               accessibilityLabel={`${DAY_NAMES[index]} ${active ? 'active' : 'inactive'}`}
               accessibilityState={{ selected: active }}
             >
-              <Text style={[styles.dayPillText, { color: active ? colors.textOnBrand : colors.text }]}>
+              <Text style={[styles.dayPillText, { color: active ? colors.accentText : colors.text }]}>
                 {letter}
               </Text>
             </Pressable>
@@ -578,7 +605,12 @@ export function ReviewStep({
   const Row = ({ label, value, step }: { label: string; value: string; step: StepId }) => (
     <Pressable
       onPress={() => onJump(step)}
-      style={[styles.reviewRow, { borderBottomColor: colors.border }]}
+      style={({ pressed }) => [
+        styles.reviewRow,
+        { borderBottomColor: colors.border },
+        pressed && { opacity: PRESSED_OPACITY },
+      ]}
+      accessibilityRole="button"
       accessibilityLabel={`Edit ${label}`}
     >
       <Text style={[styles.reviewLabel, { color: colors.textMuted }]}>{label}</Text>
@@ -635,7 +667,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.md,
     padding: Space.lg,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
   },
   selectCardTitle: { ...Type.bodyBold },
   selectCardDesc: { ...Type.caption, marginTop: 2 },
@@ -644,11 +676,13 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Space.xs,
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
-    minHeight: 40,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    minHeight: 44,
   },
   chipText: { ...Type.caption, fontWeight: '600' },
 
@@ -685,8 +719,9 @@ const styles = StyleSheet.create({
   dayRow: { flexDirection: 'row', gap: Space.xs, justifyContent: 'space-between' },
   dayPill: {
     flex: 1,
-    height: 42,
+    height: 44,
     borderRadius: Radius.sm,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useMemo, useState } from 'react';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius } from '@/constants/theme';
+import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import type { Behavior } from '@/types';
@@ -36,6 +36,7 @@ import {
   intervalForCadence,
 } from '@/services/cadence';
 import { hhmmToMinutes, dateToHHmm } from '@/utils/time';
+import { haptics } from '@/services/haptics';
 import {
   ProgressDots,
   StartStep,
@@ -231,6 +232,7 @@ export default function CreateScreen() {
   };
 
   const goNext = () => {
+    haptics.light();
     if (stepId === 'review') {
       void handleSave();
       return;
@@ -304,7 +306,8 @@ export default function CreateScreen() {
           <Pressable
             onPress={goBack}
             hitSlop={8}
-            style={styles.headerButton}
+            style={({ pressed }) => [styles.headerButton, pressed && { opacity: PRESSED_OPACITY }]}
+            accessibilityRole="button"
             accessibilityLabel="Back"
           >
             <IconSymbol name="chevron.left" size={22} color={colors.textMuted} />
@@ -316,7 +319,8 @@ export default function CreateScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={8}
-          style={styles.headerButton}
+          style={({ pressed }) => [styles.headerButton, pressed && { opacity: PRESSED_OPACITY }]}
+          accessibilityRole="button"
           accessibilityLabel="Close"
         >
           <IconSymbol name="xmark" size={20} color={colors.textMuted} />
@@ -330,7 +334,12 @@ export default function CreateScreen() {
         {wouldExceedFreeCap ? (
           <Pressable
             onPress={() => router.push('/paywall')}
-            style={[styles.capBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={({ pressed }) => [
+              styles.capBanner,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              pressed && { opacity: PRESSED_OPACITY },
+            ]}
+            accessibilityRole="button"
             accessibilityLabel="Free tier limit reached. Upgrade to Pro."
           >
             <Text style={[styles.capTitle, { color: colors.text }]}>
@@ -349,10 +358,12 @@ export default function CreateScreen() {
           <Pressable
             onPress={goNext}
             disabled={!currentValid}
-            style={[
+            style={({ pressed }) => [
               styles.primaryButton,
               { backgroundColor: currentValid ? colors.tint : colors.surfaceMuted },
+              pressed && currentValid && { opacity: PRESSED_OPACITY },
             ]}
+            accessibilityRole="button"
             accessibilityLabel={primaryLabel}
             accessibilityState={{ disabled: !currentValid }}
           >
@@ -405,7 +416,7 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   primaryText: { ...Type.bodyBold },
-  capBanner: { padding: Space.md, borderRadius: Radius.md, borderWidth: 1, gap: 2 },
+  capBanner: { padding: Space.md, borderRadius: Radius.lg, borderWidth: 1, gap: Space.xxs },
   capTitle: { ...Type.bodyBold },
   capSub: { ...Type.caption },
 });

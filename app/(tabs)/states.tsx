@@ -7,6 +7,7 @@ import {
   Type,
   Space,
   Radius,
+  PRESSED_OPACITY,
   type ThemeColors,
 } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -24,6 +25,7 @@ import {
 } from '@/services/library-content';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { SearchBar } from '@/components/library/search-bar';
+import { haptics } from '@/services/haptics';
 
 const CONTENT_MAX_WIDTH = 640;
 type TabName = 'behaviors' | 'programs';
@@ -85,31 +87,43 @@ export default function BehaviorsScreen() {
 
           <View style={[styles.toggle, { backgroundColor: colors.surfaceMuted }]}>
             <Pressable
-              onPress={() => setActiveTab('behaviors')}
-              style={[
+              onPress={() => {
+                haptics.selection();
+                setActiveTab('behaviors');
+              }}
+              style={({ pressed }) => [
                 styles.toggleButton,
-                activeTab === 'behaviors' && { backgroundColor: colors.tint },
+                activeTab === 'behaviors' && { backgroundColor: colors.tintSoft },
+                pressed && { opacity: PRESSED_OPACITY },
               ]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'behaviors' }}
               accessibilityLabel="Behaviors tab"
             >
               <IconSymbol
                 name="square.stack.fill"
                 size={18}
-                color={activeTab === 'behaviors' ? colors.textOnBrand : colors.textMuted}
+                color={activeTab === 'behaviors' ? colors.accentText : colors.textMuted}
               />
             </Pressable>
             <Pressable
-              onPress={() => setActiveTab('programs')}
-              style={[
+              onPress={() => {
+                haptics.selection();
+                setActiveTab('programs');
+              }}
+              style={({ pressed }) => [
                 styles.toggleButton,
-                activeTab === 'programs' && { backgroundColor: colors.tint },
+                activeTab === 'programs' && { backgroundColor: colors.tintSoft },
+                pressed && { opacity: PRESSED_OPACITY },
               ]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'programs' }}
               accessibilityLabel="Programs tab"
             >
               <IconSymbol
                 name="square.grid.2x2.fill"
                 size={18}
-                color={activeTab === 'programs' ? colors.textOnBrand : colors.textMuted}
+                color={activeTab === 'programs' ? colors.accentText : colors.textMuted}
               />
             </Pressable>
           </View>
@@ -275,7 +289,12 @@ function TemplateRow({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={({ pressed }) => [
+        styles.row,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        pressed && { opacity: PRESSED_OPACITY },
+      ]}
+      accessibilityRole="button"
       accessibilityLabel={`${title}, ${isEliminate ? 'Eliminate' : 'Adopt'}, ${meta}`}
       accessibilityHint="Opens details to add this behavior"
     >
@@ -318,7 +337,12 @@ function ProgramsBrowser({ colors, programs, onSelect }: ProgramsBrowserProps) {
         <Pressable
           key={program.id}
           onPress={() => onSelect(program)}
-          style={[styles.programCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          style={({ pressed }) => [
+            styles.programCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            pressed && { opacity: PRESSED_OPACITY },
+          ]}
+          accessibilityRole="button"
           accessibilityLabel={`${program.title} program, ${program.guideIds.length} guides`}
           accessibilityHint="Opens program details"
         >

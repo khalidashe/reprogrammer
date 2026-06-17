@@ -4,7 +4,6 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
@@ -14,7 +13,15 @@ import { useQuery } from 'convex/react';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius } from '@/constants/theme';
+import {
+  Colors,
+  Type,
+  Space,
+  Radius,
+  PRESSED_OPACITY,
+  controlSelected,
+  type ThemeColors,
+} from '@/constants/theme';
 import {
   configureRevenueCat,
   getCurrentOffering,
@@ -23,6 +30,7 @@ import {
   purchasePackage,
   restorePurchases,
 } from '@/services/revenuecat';
+import { useFeedback } from '@/components/ui/feedback';
 
 const BULLETS = [
   'Unlimited behaviors (free is capped at 3)',
@@ -37,6 +45,7 @@ export default function PaywallScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const userId = useQuery(api.users.getCurrentUserId);
   const isSignedIn = userId != null;
+  const { showSheet } = useFeedback();
 
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,14 +73,18 @@ export default function PaywallScreen() {
       } catch (e: any) {
         if (!cancelled) {
           setLoading(false);
-          Alert.alert('Could not load offers', e?.message ?? 'Unknown error');
+          showSheet({
+            title: 'Could not load offers',
+            message: e?.message ?? 'Something went wrong. Please try again.',
+            actions: [{ label: 'OK' }],
+          });
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, showSheet]);
 
   const handlePurchase = async (pkg: PurchasesPackage) => {
     if (!isSignedIn) {
@@ -81,11 +94,18 @@ export default function PaywallScreen() {
     setPurchasing(pkg.identifier);
     try {
       await purchasePackage(pkg);
-      Alert.alert('Welcome to Pro', 'Your subscription is active.');
-      router.back();
+      showSheet({
+        title: 'Welcome to Pro',
+        message: 'Your subscription is active.',
+        actions: [{ label: 'Great', onPress: () => router.back() }],
+      });
     } catch (e: any) {
       if (!e?.userCancelled) {
-        Alert.alert('Purchase failed', e?.message ?? 'Unknown error');
+        showSheet({
+          title: 'Purchase failed',
+          message: e?.message ?? 'Something went wrong. Please try again.',
+          actions: [{ label: 'OK' }],
+        });
       }
     } finally {
       setPurchasing(null);
@@ -95,9 +115,17 @@ export default function PaywallScreen() {
   const handleRestore = async () => {
     try {
       await restorePurchases();
-      Alert.alert('Purchases restored', 'Any active subscription is now applied.');
+      showSheet({
+        title: 'Purchases restored',
+        message: 'Any active subscription is now applied.',
+        actions: [{ label: 'OK' }],
+      });
     } catch (e: any) {
-      Alert.alert('Restore failed', e?.message ?? 'Unknown error');
+      showSheet({
+        title: 'Restore failed',
+        message: e?.message ?? 'Something went wrong. Please try again.',
+        actions: [{ label: 'OK' }],
+      });
     }
   };
 
@@ -115,7 +143,7 @@ export default function PaywallScreen() {
         <View style={[styles.bulletCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {BULLETS.map((b) => (
             <View key={b} style={styles.bulletRow}>
-              <Text style={[styles.bulletDot, { color: colors.tint }]}>•</Text>
+              <Text style={[styles.bulletDot, { color: colors.accentText }]}>•</Text>
               <Text style={[styles.bulletText, { color: colors.text }]}>{b}</Text>
             </View>
           ))}
@@ -170,11 +198,21 @@ export default function PaywallScreen() {
           </Text>
         )}
 
-        <Pressable onPress={handleRestore} style={styles.restoreRow}>
-          <Text style={[Type.caption, { color: colors.tint }]}>Restore purchases</Text>
+        <Pressable
+          onPress={handleRestore}
+          style={({ pressed }) => [styles.restoreRow, pressed && { opacity: PRESSED_OPACITY }]}
+          accessibilityRole="button"
+          accessibilityLabel="Restore purchases"
+        >
+          <Text style={[Type.caption, { color: colors.accentText }]}>Restore purchases</Text>
         </Pressable>
 
-        <Pressable onPress={() => router.back()} style={styles.cancelRow}>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.cancelRow, pressed && { opacity: PRESSED_OPACITY }]}
+          accessibilityRole="button"
+          accessibilityLabel="Not now"
+        >
           <Text style={[Type.caption, { color: colors.textMuted }]}>Not now</Text>
         </Pressable>
       </View>
@@ -198,7 +236,7 @@ function PriceCard({
   period: string;
   badge?: string;
   isPrimary?: boolean;
-  colors: ReturnType<typeof useColorScheme> extends 'light' ? typeof Colors.light : typeof Colors.dark;
+  colors: ThemeColors;
   disabled: boolean;
   loading: boolean;
   onPress: () => void;
@@ -207,57 +245,32 @@ function PriceCard({
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={[
+      style={({ pressed }) => [
         styles.priceCard,
-        {
-          backgroundColor: isPrimary ? colors.tint : colors.surface,
-          borderColor: isPrimary ? colors.tint : colors.border,
-          opacity: disabled && !loading ? 0.6 : 1,
-        },
+        isPrimary
+          ? { ...controlSelected(colors), borderWidth: 2 }
+          : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+        disabled && !loading && { opacity: 0.6 },
+        pressed && { opacity: PRESSED_OPACITY },
       ]}
-      accessibilityLabel={`${title} ${priceLabel}${period}`}
+      accessibilityRole="button"
+      accessibilityState={{ disabled, busy: loading }}
+      accessibilityLabel={`${title} ${priceLabel}${period}${isPrimary ? ', recommended' : ''}`}
     >
       <Text
-        style={[
-          styles.priceTitle,
-          { color: isPrimary ? colors.textOnBrand : colors.text },
-        ]}
+        style={[styles.priceTitle, { color: isPrimary ? colors.accentText : colors.text }]}
       >
         {title}
       </Text>
       <View style={styles.priceRow}>
-        <Text
-          style={[
-            styles.priceAmount,
-            { color: isPrimary ? colors.textOnBrand : colors.text },
-          ]}
-        >
-          {priceLabel}
-        </Text>
-        <Text
-          style={[
-            styles.pricePeriod,
-            { color: isPrimary ? colors.textOnBrand : colors.textMuted },
-          ]}
-        >
-          {period}
-        </Text>
+        <Text style={[styles.priceAmount, { color: colors.text }]}>{priceLabel}</Text>
+        <Text style={[styles.pricePeriod, { color: colors.textMuted }]}>{period}</Text>
       </View>
       {badge && (
-        <Text
-          style={[
-            styles.priceBadge,
-            { color: isPrimary ? colors.textOnBrand : colors.tint },
-          ]}
-        >
-          {badge}
-        </Text>
+        <Text style={[styles.priceBadge, { color: colors.accentText }]}>{badge}</Text>
       )}
       {loading && (
-        <ActivityIndicator
-          style={styles.priceSpinner}
-          color={isPrimary ? colors.textOnBrand : colors.tint}
-        />
+        <ActivityIndicator style={styles.priceSpinner} color={colors.accentText} />
       )}
     </Pressable>
   );
@@ -276,7 +289,7 @@ const styles = StyleSheet.create({
   subtitle: { ...Type.body, textAlign: 'center' },
   bulletCard: {
     padding: Space.lg,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     gap: Space.sm,
   },
@@ -287,8 +300,8 @@ const styles = StyleSheet.create({
   pricing: { gap: Space.md },
   priceCard: {
     padding: Space.lg,
-    borderRadius: Radius.md,
-    borderWidth: 2,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
     gap: Space.xs,
   },
   priceTitle: { ...Type.bodyBold },
@@ -297,6 +310,15 @@ const styles = StyleSheet.create({
   pricePeriod: { ...Type.caption },
   priceBadge: { ...Type.caption, fontWeight: '600' },
   priceSpinner: { position: 'absolute', right: Space.md, top: Space.md },
-  restoreRow: { alignItems: 'center', paddingTop: Space.md },
-  cancelRow: { alignItems: 'center', paddingTop: Space.xs },
+  restoreRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingTop: Space.sm,
+  },
+  cancelRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
 });

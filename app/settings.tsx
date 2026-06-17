@@ -3,7 +3,6 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Alert,
   Linking,
   Platform,
   ScrollView,
@@ -15,13 +14,24 @@ import { useAuthActions } from '@convex-dev/auth/react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import {
+  Colors,
+  Type,
+  Space,
+  Radius,
+  PRESSED_OPACITY,
+  controlSelected,
+  controlResting,
+  type ThemeColors,
+} from '@/constants/theme';
 import { useIsPro } from '@/hooks/useIsPro';
 import {
   restorePurchases,
   logoutRevenueCat,
 } from '@/services/revenuecat';
 import useStore from '@/store/useStore';
+import { useFeedback } from '@/components/ui/feedback';
+import { haptics } from '@/services/haptics';
 import { deriveStage } from '@/services/levels';
 import { rescheduleAll } from '@/services/notifications';
 import { isReminderMuteActive } from '@/services/scheduler-core';
@@ -41,6 +51,7 @@ export default function SettingsScreen() {
   const user = useQuery(api.users.getCurrentUser);
   const { signOut } = useAuthActions();
   const { behaviors, checkIns, appProfile, updateAppProfile, getStreak } = useStore();
+  const { showToast } = useFeedback();
   const [, setRefresh] = useState({});
   const [pickerOpen, setPickerOpen] = useState<'from' | 'to' | null>(null);
 
@@ -83,6 +94,7 @@ export default function SettingsScreen() {
   const remindersMuted = isReminderMuteActive(appProfile);
 
   const handleToggleMute = async () => {
+    haptics.selection();
     await updateAppProfile({
       remindersMutedUntil: remindersMuted ? undefined : 'indefinite',
     });
@@ -92,9 +104,9 @@ export default function SettingsScreen() {
   const handleRestore = async () => {
     try {
       await restorePurchases();
-      Alert.alert('Purchases restored', 'Any active subscription is now applied.');
+      showToast('Purchases restored — any active subscription is now applied.');
     } catch (e: any) {
-      Alert.alert('Restore failed', e?.message ?? 'Unknown error');
+      showToast(`Restore failed — ${e?.message ?? 'please try again.'}`);
     }
   };
 
@@ -112,6 +124,7 @@ export default function SettingsScreen() {
   };
 
   const handleToggleQuietHours = async () => {
+    haptics.selection();
     if (quietHoursEnabled) {
       await updateAppProfile({ quietHours: undefined });
     } else {
@@ -143,19 +156,17 @@ export default function SettingsScreen() {
     return (
       <Pressable
         onPress={() => setPickerOpen(isOpen ? null : which)}
-        style={[
+        style={({ pressed }) => [
           styles.timeChip,
-          {
-            backgroundColor: isOpen ? colors.tint : colors.background,
-            borderColor: colors.tint,
-          },
+          isOpen ? controlSelected(colors) : controlResting(colors),
+          pressed && { opacity: PRESSED_OPACITY },
         ]}
         accessibilityLabel={`Quiet hours ${which} time, currently ${formatTimeForDisplayString(value)}`}
       >
         <Text
           style={[
             styles.timeChipText,
-            { color: isOpen ? colors.textOnBrand : colors.text },
+            { color: isOpen ? colors.accentText : colors.text },
           ]}
         >
           {formatTimeForDisplayString(value)}
@@ -181,7 +192,15 @@ export default function SettingsScreen() {
             <Text
               style={[
                 styles.statValue,
-                { color: stat.isZero ? colors.textMuted : colors.tint },
+                {
+                  // Numbers are neutral data — green is reserved for the one
+                  // genuinely "earned" metric (longest streak).
+                  color: stat.isZero
+                    ? colors.textMuted
+                    : stat.label === 'Longest streak'
+                      ? colors.tint
+                      : colors.text,
+                },
               ]}
             >
               {stat.value}
@@ -294,10 +313,13 @@ export default function SettingsScreen() {
           </Text>
           <Pressable
             onPress={handleToggleMute}
-            style={[
+            style={({ pressed }) => [
               styles.toggle,
-              { backgroundColor: remindersMuted ? colors.tint : colors.surfaceMuted },
+              remindersMuted ? controlSelected(colors) : controlResting(colors),
+              pressed && { opacity: PRESSED_OPACITY },
             ]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: remindersMuted }}
             accessibilityLabel={
               remindersMuted ? 'Unmute all reminders' : 'Mute all reminders'
             }
@@ -305,7 +327,7 @@ export default function SettingsScreen() {
             <Text
               style={[
                 styles.toggleText,
-                { color: remindersMuted ? colors.textOnBrand : colors.text },
+                { color: remindersMuted ? colors.accentText : colors.text },
               ]}
             >
               {remindersMuted ? 'Muted' : 'Off'}
@@ -321,10 +343,13 @@ export default function SettingsScreen() {
           </Text>
           <Pressable
             onPress={handleToggleQuietHours}
-            style={[
+            style={({ pressed }) => [
               styles.toggle,
-              { backgroundColor: quietHoursEnabled ? colors.tint : colors.surfaceMuted },
+              quietHoursEnabled ? controlSelected(colors) : controlResting(colors),
+              pressed && { opacity: PRESSED_OPACITY },
             ]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: quietHoursEnabled }}
             accessibilityLabel={
               quietHoursEnabled ? 'Disable quiet hours' : 'Enable quiet hours'
             }
@@ -332,7 +357,7 @@ export default function SettingsScreen() {
             <Text
               style={[
                 styles.toggleText,
-                { color: quietHoursEnabled ? colors.textOnBrand : colors.text },
+                { color: quietHoursEnabled ? colors.accentText : colors.text },
               ]}
             >
               {quietHoursEnabled ? 'On' : 'Off'}
@@ -364,7 +389,7 @@ export default function SettingsScreen() {
           Reprogrammer uses spaced repetition to help you become aware of automatic
           behaviors and practice changing them.
         </Text>
-        <Text style={[styles.tagline, { color: colors.tint }]}>
+        <Text style={[styles.tagline, { color: colors.textMuted }]}>
           Notice · Repeat · Reprogram
         </Text>
       </Section>
@@ -386,7 +411,7 @@ function Section({
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-        {title.toUpperCase()}
+        {title}
       </Text>
       <View style={[styles.sectionBody, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {children}
@@ -438,7 +463,12 @@ function ActionButton({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.button, { backgroundColor: bg }]}
+      style={({ pressed }) => [
+        styles.button,
+        { backgroundColor: bg },
+        pressed && { opacity: PRESSED_OPACITY },
+      ]}
+      accessibilityRole="button"
       accessibilityLabel={label}
     >
       <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
@@ -472,9 +502,9 @@ const styles = StyleSheet.create({
   statValue: { ...Type.display2, fontWeight: '700' },
   statLabel: { ...Type.caption, textAlign: 'center' },
   section: { padding: Space.lg, gap: Space.sm },
-  sectionTitle: { ...Type.micro, letterSpacing: 1, marginLeft: Space.sm },
+  sectionTitle: { ...Type.caption, fontWeight: '600', marginLeft: Space.sm },
   sectionBody: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     padding: Space.md,
     gap: Space.sm,
@@ -485,7 +515,7 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   sectionSub: { ...Type.caption },
-  row: { gap: 2 },
+  row: { gap: Space.xxs },
   rowLabel: { ...Type.bodyBold },
   rowValue: { ...Type.caption },
   button: {
@@ -499,9 +529,14 @@ const styles = StyleSheet.create({
   },
   buttonText: { ...Type.bodyBold },
   toggle: {
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + Space.xxs,
-    borderRadius: Radius.sm,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    minHeight: 44,
+    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleText: { ...Type.bodyBold },
   timeRow: {
@@ -513,8 +548,11 @@ const styles = StyleSheet.create({
   timeChip: {
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     borderWidth: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   timeChipText: { ...Type.bodyBold },
   descriptionText: { ...Type.body },
