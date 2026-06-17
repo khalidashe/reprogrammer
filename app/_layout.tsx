@@ -52,8 +52,12 @@ function AppShell() {
   useEffect(() => {
     const setup = async () => {
       await useStore.getState().hydrate();
-      const granted = await requestNotificationPermission();
-      await useStore.getState().updateAppProfile({ notificationsDenied: !granted });
+      // New users grant notifications inside onboarding, after the priming step
+      // explains why. Only returning (onboarded) users get the prompt at launch.
+      if (useStore.getState().appProfile.hasOnboarded) {
+        const granted = await requestNotificationPermission();
+        await useStore.getState().updateAppProfile({ notificationsDenied: !granted });
+      }
       await setupNotificationCategory();
 
       notificationListener.current = Notifications.addNotificationReceivedListener(
