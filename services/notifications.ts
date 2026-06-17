@@ -47,6 +47,9 @@ Notifications.setNotificationHandler({
 });
 
 export async function setupNotificationCategory(): Promise<void> {
+  // Notification categories/channels are native-only; the underlying APIs
+  // throw on web. Skip cleanly so the web build (and dev preview) don't crash.
+  if (Platform.OS === 'web') return;
   if (!categoryRegistered) {
     await Notifications.setNotificationCategoryAsync(CHECKIN_CATEGORY, [
       {

@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -16,6 +15,8 @@ import { cancelForBehavior, rescheduleAll, sendTestNotification } from '@/servic
 import type { CheckIn } from '@/types';
 import { endOfLocalDay, isBehaviorPaused } from '@/services/scheduler-core';
 import { deriveStage, stageLabel } from '@/services/levels';
+import { lastNDaysStatus } from '@/services/consistency';
+import { useFeedback } from '@/components/ui/feedback';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -34,8 +35,6 @@ function formatPausedUntil(ms: number): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-type DayStatus = 'yes' | 'tried' | 'no' | 'none';
-
 export default function BehaviorDetailScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -51,6 +50,7 @@ export default function BehaviorDetailScreen() {
     deleteCheckIn,
   } = useStore();
   const { openGuide } = useContentModals();
+  const { showSheet, showToast } = useFeedback();
   const [, setRefresh] = useState({});
 
   useFocusEffect(
@@ -79,35 +79,29 @@ export default function BehaviorDetailScreen() {
   const isEliminate = behavior.kind === 'eliminate';
 
   // Last 14 days of consistency (oldest → today).
-  const allCheckIns = checkIns.filter((c) => c.behaviorId === behavior.id);
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const last14: DayStatus[] = Array.from({ length: 14 }, (_, i) => {
-    const dayStart = todayStart.getTime() - (13 - i) * DAY_MS;
-    const day = allCheckIns.filter((c) => c.at >= dayStart && c.at < dayStart + DAY_MS);
-    if (day.some((c) => c.result === 'yes')) return 'yes';
-    if (day.some((c) => c.result === 'tried')) return 'tried';
-    if (day.length > 0) return 'no';
-    return 'none';
-  });
+  const last14 = lastNDaysStatus(checkIns, behavior.id, 14);
 
   const handleEdit = () => {
     router.push({ pathname: '/create', params: { id: behavior.id } });
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete behavior', 'Are you sure? This cannot be undone.', [
-      { text: 'Cancel' },
-      {
-        text: 'Delete',
-        onPress: async () => {
-          await cancelForBehavior(behavior.id);
-          await deleteBehavior(behavior.id);
-          router.back();
+    showSheet({
+      title: 'Delete behavior',
+      message: 'Are you sure? This cannot be undone.',
+      actions: [
+        { label: 'Cancel', style: 'cancel' },
+        {
+          label: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await cancelForBehavior(behavior.id);
+            await deleteBehavior(behavior.id);
+            router.back();
+          },
         },
-        style: 'destructive',
-      },
-    ]);
+      ],
+    });
   };
 
   const handleToggleBookmark = async () => {
@@ -133,25 +127,28 @@ export default function BehaviorDetailScreen() {
       if (next === item.result) return;
       void updateCheckIn({ ...item, result: next });
     };
-    Alert.alert('Change this check-in', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      ...(item.result !== 'yes' ? [{ text: yesLabel, onPress: () => change('yes') }] : []),
-      ...(item.result !== 'tried' ? [{ text: triedLabel, onPress: () => change('tried') }] : []),
-      ...(item.result !== 'no' ? [{ text: noLabel, onPress: () => change('no') }] : []),
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => void deleteCheckIn(item.id),
-      },
-    ]);
+    showSheet({
+      title: 'Change this check-in',
+      actions: [
+        ...(item.result !== 'yes' ? [{ label: yesLabel, onPress: () => change('yes') }] : []),
+        ...(item.result !== 'tried' ? [{ label: triedLabel, onPress: () => change('tried') }] : []),
+        ...(item.result !== 'no' ? [{ label: noLabel, onPress: () => change('no') }] : []),
+        {
+          label: 'Delete',
+          style: 'destructive' as const,
+          onPress: () => void deleteCheckIn(item.id),
+        },
+        { label: 'Cancel', style: 'cancel' as const },
+      ],
+    });
   };
 
   const handleTestNotification = async () => {
     try {
       await sendTestNotification(behavior);
-      Alert.alert('Test notification sent', 'Check your notifications in 1 second');
+      showToast('Test notification sent — check in 1 second');
     } catch {
-      Alert.alert('Error', 'Failed to send test notification');
+      showToast('Failed to send test notification');
     }
   };
 
@@ -174,32 +171,37 @@ export default function BehaviorDetailScreen() {
       const pausedMsg = behavior.pausedIndefinitely
         ? `${behavior.title} is paused until you turn it back on.`
         : `${behavior.title} is paused until ${formatPausedUntil(behavior.pausedUntil!)}.`;
-      Alert.alert('Resume now?', pausedMsg, [
-        { text: 'Stay paused', style: 'cancel' },
-        {
-          text: 'Resume now',
-          onPress: () =>
-            Promise.all([
-              updateBehavior({ ...behavior, pausedUntil: undefined, pausedIndefinitely: false }),
-              rescheduleAll({ force: true }),
-            ]),
-        },
-      ]);
+      showSheet({
+        title: 'Resume now?',
+        message: pausedMsg,
+        actions: [
+          {
+            label: 'Resume now',
+            onPress: () =>
+              Promise.all([
+                updateBehavior({ ...behavior, pausedUntil: undefined, pausedIndefinitely: false }),
+                rescheduleAll({ force: true }),
+              ]),
+          },
+          { label: 'Stay paused', style: 'cancel' },
+        ],
+      });
       return;
     }
 
-    Alert.alert(
-      'Pause this behavior',
-      'Reminders stop; your streak and history stay. Pick a length — you can resume any time.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Until tonight', onPress: () => pauseUntil(endOfLocalDay()) },
-        { text: '1 day', onPress: () => pauseUntil(Date.now() + DAY_MS) },
-        { text: '3 days', onPress: () => pauseUntil(Date.now() + 3 * DAY_MS) },
-        { text: '1 week', onPress: () => pauseUntil(Date.now() + 7 * DAY_MS) },
-        { text: 'Until I turn it back on', onPress: () => pauseIndefinitely() },
-      ]
-    );
+    showSheet({
+      title: 'Pause this behavior',
+      message:
+        'Reminders stop; your streak and history stay. Pick a length — you can resume any time.',
+      actions: [
+        { label: 'Until tonight', onPress: () => pauseUntil(endOfLocalDay()) },
+        { label: '1 day', onPress: () => pauseUntil(Date.now() + DAY_MS) },
+        { label: '3 days', onPress: () => pauseUntil(Date.now() + 3 * DAY_MS) },
+        { label: '1 week', onPress: () => pauseUntil(Date.now() + 7 * DAY_MS) },
+        { label: 'Until I turn it back on', onPress: () => pauseIndefinitely() },
+        { label: 'Cancel', style: 'cancel' },
+      ],
+    });
   };
 
   const windowLabel =
@@ -328,11 +330,14 @@ export default function BehaviorDetailScreen() {
 
       <Pressable
         onPress={handleEdit}
-        style={[styles.editButton, { backgroundColor: colors.tint }]}
+        style={[
+          styles.editButton,
+          { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+        ]}
         accessibilityLabel="Edit behavior"
       >
-        <IconSymbol name="pencil" size={17} color={colors.textOnBrand} />
-        <Text style={[styles.editButtonText, { color: colors.textOnBrand }]}>
+        <IconSymbol name="pencil" size={16} color={colors.accentText} />
+        <Text style={[styles.editButtonText, { color: colors.accentText }]}>
           Edit behavior
         </Text>
       </Pressable>
@@ -513,8 +518,8 @@ const styles = StyleSheet.create({
     marginTop: Space.xl,
   },
   sectionTitle: {
-    ...Type.micro,
-    textTransform: 'uppercase',
+    ...Type.caption,
+    fontWeight: '600',
     marginBottom: Space.sm,
   },
   row: {
@@ -568,6 +573,7 @@ const styles = StyleSheet.create({
     marginTop: Space.md,
     paddingVertical: Space.lg,
     borderRadius: Radius.md,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,

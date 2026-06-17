@@ -6,8 +6,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Alert } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFeedback } from '@/components/ui/feedback';
+import { haptics } from '@/services/haptics';
 import { Colors } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { scheduleForBehavior } from '@/services/notifications';
@@ -50,6 +51,7 @@ export function useContentModals(): ContentModalsApi {
 export function ContentModalsProvider({ children }: { children: ReactNode }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { showSheet, showToast } = useFeedback();
   const { behaviors, addBehavior } = useStore();
   const [stack, setStack] = useState<NonNullable<ContentTarget>[]>([]);
 
@@ -110,9 +112,10 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
       await addBehavior(behavior);
       await scheduleForBehavior(behavior);
       close();
-      Alert.alert('Added', `"${template.title}" is now on your dashboard.`);
+      haptics.success();
+      showToast(`"${template.title}" is now on your dashboard.`);
     },
-    [addBehavior, close]
+    [addBehavior, close, showToast]
   );
 
   const handleAddEliminate = useCallback(
@@ -127,19 +130,18 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
             b.title === adoptTemplate?.title)
       );
       if (!replacement) {
-        Alert.alert(
-          'Add replacement first',
-          `"${template.title}" needs the Adopt behavior "${adoptTemplate?.title ?? 'replacement'}" to be active.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
+        showSheet({
+          title: 'Add replacement first',
+          message: `"${template.title}" needs the Adopt behavior "${adoptTemplate?.title ?? 'replacement'}" to be active.`,
+          actions: [
             ...(adoptTemplate
               ? [
                   {
-                    text: 'View Adopt',
+                    label: 'View Adopt',
                     onPress: () => openAdopt(adoptTemplate.id),
                   },
                   {
-                    text: 'Add it',
+                    label: 'Add it',
                     onPress: async () => {
                       const adoptBehavior = buildBehavior(
                         draftFromAdoptTemplate(adoptTemplate)
@@ -152,16 +154,17 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
                       await addBehavior(elimBehavior);
                       await scheduleForBehavior(elimBehavior);
                       close();
-                      Alert.alert(
-                        'Added',
+                      haptics.success();
+                      showToast(
                         `Both "${adoptTemplate.title}" and "${template.title}" are on your dashboard.`
                       );
                     },
                   },
                 ]
               : []),
-          ]
-        );
+            { label: 'Cancel', style: 'cancel' as const },
+          ],
+        });
         return;
       }
       const behavior = buildBehavior(
@@ -170,9 +173,10 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
       await addBehavior(behavior);
       await scheduleForBehavior(behavior);
       close();
-      Alert.alert('Added', `"${template.title}" is now on your dashboard.`);
+      haptics.success();
+      showToast(`"${template.title}" is now on your dashboard.`);
     },
-    [addBehavior, behaviors, close, openAdopt]
+    [addBehavior, behaviors, close, openAdopt, showSheet, showToast]
   );
 
   const onAdd = useCallback(() => {

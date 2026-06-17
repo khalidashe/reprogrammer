@@ -10,13 +10,14 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius } from '@/constants/theme';
+import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import { CheckIn } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { handleCheckInResponse } from '@/services/notifications';
 import { practiceTypeLabel } from '@/services/library-content';
+import { haptics } from '@/services/haptics';
 import { useEffect, useState, useMemo, useRef } from 'react';
 
 function draftKey(attemptId: string): string {
@@ -28,10 +29,12 @@ export default function CheckInScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { behaviorId, attemptId } = useLocalSearchParams();
-  const { behaviors, addCheckIn } = useStore();
+  const { behaviors, addCheckIn, getStreak } = useStore();
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [done, setDone] = useState<{ result: 'yes' | 'tried'; streak: number } | null>(null);
   const draftWriteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const behavior = useMemo(
     () => behaviors.find((b) => b.id === (behaviorId as string)),
@@ -70,6 +73,14 @@ export default function CheckInScreen() {
     };
   }, [note, attemptId]);
 
+  // Clear the pending auto-dismiss if the screen unmounts (e.g. tap-to-skip).
+  useEffect(
+    () => () => {
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    },
+    []
+  );
+
   const handleResponse = async (result: 'yes' | 'tried' | 'no') => {
     if (!behavior || !behaviorId || !attemptId) return;
 
@@ -91,10 +102,16 @@ export default function CheckInScreen() {
         await AsyncStorage.removeItem(draftKey(attemptId));
       }
 
-      router.back();
+      // Snooze/skip just closes; a real check-in earns a brief affirmation.
+      if (result === 'no') {
+        router.back();
+        return;
+      }
+      haptics.success();
+      setDone({ result, streak: getStreak(behavior.id) });
+      dismissTimer.current = setTimeout(() => router.back(), 1300);
     } catch (error) {
       console.error('Failed to record check-in:', error);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -115,6 +132,44 @@ export default function CheckInScreen() {
   const kindText =
     (isEliminate ? 'Eliminate' : 'Adopt') +
     (behavior.practiceType ? ` · ${practiceTypeLabel(behavior.practiceType)}` : '');
+
+  if (done) {
+    const isYes = done.result === 'yes';
+    const accent = isYes ? colors.tintCelebrate : colors.warning;
+    const accentSoft = isYes ? colors.tintSoft : colors.warningSoft;
+    const headline = isYes
+      ? isEliminate
+        ? 'You caught it.'
+        : 'Done.'
+      : isEliminate
+        ? 'Noticing is the work.'
+        : 'Showing up counts.';
+    return (
+      <Pressable
+        style={[styles.container, styles.successContainer, { backgroundColor: colors.background }]}
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel={`${headline}${
+          done.streak > 0 ? `, ${done.streak} day streak` : ''
+        }. Tap to continue.`}
+      >
+        <View style={[styles.successIcon, { backgroundColor: accentSoft }]}>
+          <IconSymbol name="checkmark" size={44} color={accent} />
+        </View>
+        <Text style={[styles.successHeadline, { color: colors.text }]}>{headline}</Text>
+        {done.streak > 0 ? (
+          <View style={styles.successStreakRow}>
+            <IconSymbol name="flame.fill" size={18} color={colors.warning} />
+            <Text style={[styles.successStreak, { color: colors.textMuted }]}>
+              {done.streak} day streak
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.successStreak, { color: colors.textMuted }]}>Logged</Text>
+        )}
+      </Pressable>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -144,10 +199,12 @@ export default function CheckInScreen() {
           <Pressable
             onPress={() => handleResponse('yes')}
             disabled={isSubmitting}
-            style={[
+            style={({ pressed }) => [
               styles.button,
               { backgroundColor: colors.tint, opacity: isSubmitting ? 0.5 : 1 },
+              pressed && !isSubmitting && { opacity: PRESSED_OPACITY },
             ]}
+            accessibilityRole="button"
             accessibilityLabel={yesLabel}
           >
             <IconSymbol name="checkmark" size={18} color={colors.textOnBrand} />
@@ -156,7 +213,7 @@ export default function CheckInScreen() {
           <Pressable
             onPress={() => handleResponse('tried')}
             disabled={isSubmitting}
-            style={[
+            style={({ pressed }) => [
               styles.button,
               styles.outlineButton,
               {
@@ -164,7 +221,9 @@ export default function CheckInScreen() {
                 backgroundColor: colors.warningSoft,
                 opacity: isSubmitting ? 0.5 : 1,
               },
+              pressed && !isSubmitting && { opacity: PRESSED_OPACITY },
             ]}
+            accessibilityRole="button"
             accessibilityLabel={triedLabel}
             accessibilityHint="Showing up counts — use when you engaged but didn't fully complete."
           >
@@ -173,7 +232,7 @@ export default function CheckInScreen() {
           <Pressable
             onPress={() => handleResponse('no')}
             disabled={isSubmitting}
-            style={[
+            style={({ pressed }) => [
               styles.button,
               styles.outlineButton,
               {
@@ -181,7 +240,9 @@ export default function CheckInScreen() {
                 backgroundColor: 'transparent',
                 opacity: isSubmitting ? 0.5 : 1,
               },
+              pressed && !isSubmitting && { opacity: PRESSED_OPACITY },
             ]}
+            accessibilityRole="button"
             accessibilityLabel={noLabel}
             accessibilityHint={
               isEliminate
@@ -278,4 +339,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     ...Type.body,
   },
+  successContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+    paddingHorizontal: Space.xl,
+  },
+  successIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Space.sm,
+  },
+  successHeadline: { ...Type.display2, textAlign: 'center' },
+  successStreakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  successStreak: { ...Type.body },
 });
