@@ -292,6 +292,29 @@ export async function sendTestNotification(behavior: Behavior): Promise<void> {
   await store.addReminderAttempt(attempt);
 }
 
+/**
+ * A one-off real notification used only by onboarding (REP-39) so a new user can
+ * feel a ping. It carries no check-in category actions and creates no attempt —
+ * tapping it simply walks the onboarding tour forward (handled in _layout). On
+ * web there are no local banners, so this is a clean no-op.
+ */
+export async function sendOnboardingPing(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const content: Notifications.NotificationContentInput = {
+    title: 'Reprogrammer',
+    body: 'This is a ping. Tap it to continue your setup.',
+    sound: true,
+    data: { onboardingDemo: true },
+  };
+  if (Platform.OS === 'android') {
+    (content as any).channelId = ANDROID_CHANNEL_ID;
+  }
+  await Notifications.scheduleNotificationAsync({
+    content,
+    trigger: { type: 'timeInterval', seconds: 1, repeats: false } as any,
+  });
+}
+
 export async function handleNotificationAction(
   behaviorId: string,
   attemptId: string,

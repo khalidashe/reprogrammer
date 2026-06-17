@@ -1,5 +1,6 @@
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView, Platform } from 'react-native';
+import { useState, useEffect } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -17,12 +18,9 @@ import type { Behavior } from '@/types';
 import {
   scheduleForBehavior,
   requestNotificationPermission,
+  sendOnboardingPing,
 } from '@/services/notifications';
-import {
-  featuredTemplates,
-  practiceTypeLabel,
-  type AdoptTemplate,
-} from '@/services/library-content';
+import { featuredTemplates, type AdoptTemplate } from '@/services/library-content';
 import { buildBehavior, draftFromAdoptTemplate } from '@/services/behavior-factory';
 import { GROUND_RULES } from '@/services/ground-rules';
 import { haptics } from '@/services/haptics';
@@ -33,11 +31,28 @@ import { haptics } from '@/services/haptics';
  * with a reason before the OS prompt, seeds a first behavior, and lets the user
  * feel one ping before landing on the dashboard.
  *
- * Steps: welcome (hero) → model → rules → notifications → pick → demo.
- * The five non-hero steps drive the progress dots.
+ * Steps: welcome (hero) → model → rules → notifications → pick → demo → logging.
+ * The test ping ("demo") and the logging-options explainer share the final
+ * progress dot, so the bar stays a stable five.
  */
-type Step = 'welcome' | 'model' | 'rules' | 'notifications' | 'pick' | 'demo';
-const WIZARD: Step[] = ['model', 'rules', 'notifications', 'pick', 'demo'];
+type Step =
+  | 'welcome'
+  | 'model'
+  | 'rules'
+  | 'notifications'
+  | 'pick'
+  | 'demo'
+  | 'logging';
+
+const STEP_DOT: Partial<Record<Step, number>> = {
+  model: 0,
+  rules: 1,
+  notifications: 2,
+  pick: 3,
+  demo: 4,
+  logging: 4,
+};
+const TOTAL_DOTS = 5;
 
 /** Sensible default quiet window; fully editable later in Settings. */
 const DEFAULT_QUIET_HOURS = { from: '22:00', to: '08:00' };
@@ -80,18 +95,46 @@ const LOOP_ROWS = [
   },
 ];
 
+const LOGGING_OPTIONS = [
+  {
+    icon: 'checkmark' as const,
+    label: 'Check-in',
+    tone: 'tint' as const,
+    text: 'You did it. Logs the rep and grows your streak.',
+  },
+  {
+    icon: 'circle.lefthalf.filled' as const,
+    label: 'Tried',
+    tone: 'warning' as const,
+    text: 'You showed up but did not fully finish. It still counts — showing up is the habit.',
+  },
+  {
+    icon: 'pause.fill' as const,
+    label: 'Snooze',
+    tone: 'muted' as const,
+    text: 'Not now. Reschedules the ping for later; your streak stays safe.',
+  },
+];
+
 export default function OnboardingScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const { addBehavior, setOnboarded, updateAppProfile, appProfile } = useStore();
 
+  const params = useLocalSearchParams<{ demo?: string }>();
   const [step, setStep] = useState<Step>('welcome');
   const [selected, setSelected] = useState<Behavior | null>(null);
   const [notif, setNotif] = useState<'granted' | 'denied' | null>(null);
-  const [demoChecked, setDemoChecked] = useState(false);
+  const [pingSent, setPingSent] = useState(false);
 
-  const index = Math.max(0, WIZARD.indexOf(step));
+  const dot = STEP_DOT[step] ?? 0;
+
+  // Tapping the real demo notification (see _layout) routes back here with
+  // ?demo=logging — jump straight to the logging-options explainer.
+  useEffect(() => {
+    if (params.demo === 'logging') setStep('logging');
+  }, [params.demo]);
 
   // ── Flow control ──────────────────────────────────────────────────────────
   const advance = (next: Step) => {
@@ -100,14 +143,25 @@ export default function OnboardingScreen() {
   };
 
   const goBack = () => {
-    if (step === 'model') {
-      setStep('welcome');
-    } else if (step === 'demo') {
-      setSelected(null);
-      setDemoChecked(false);
-      setStep('pick');
-    } else {
-      setStep(WIZARD[Math.max(0, index - 1)]);
+    switch (step) {
+      case 'model':
+        setStep('welcome');
+        break;
+      case 'rules':
+        setStep('model');
+        break;
+      case 'notifications':
+        setStep('rules');
+        break;
+      case 'pick':
+        setStep('notifications');
+        break;
+      case 'demo':
+        setStep('pick');
+        break;
+      case 'logging':
+        setStep('demo');
+        break;
     }
   };
 
@@ -140,8 +194,15 @@ export default function OnboardingScreen() {
 
   const pickTemplate = (t: AdoptTemplate) => {
     haptics.selection();
+    setPingSent(false);
     setSelected(buildBehavior(draftFromAdoptTemplate(t)));
     setStep('demo');
+  };
+
+  const sendDemoPing = async () => {
+    haptics.light();
+    await sendOnboardingPing();
+    setPingSent(true);
   };
 
   // ── Welcome (hero) ──────────────────────────────────────────────────────────
@@ -269,11 +330,12 @@ export default function OnboardingScreen() {
       case 'notifications':
         return (
           <View style={styles.stepBody}>
-            <Text style={[styles.title, { color: colors.text }]}>Turn on reminders</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Turn on notifications</Text>
             <Text style={[styles.lead, { color: colors.textMuted }]}>
-              The whole method runs on gentle pings. Without them there is nothing to
-              respond to, and the habit never gets its reps. They are calm, randomized,
-              and never arrive during your quiet hours.
+              This part is not optional — Reprogrammer works through notifications. The
+              gentle pings are what prompt each rep; without them the app has nothing to
+              remind you with, and nothing happens. Turn them on so this can actually work.
+              They stay calm, randomized, and never arrive during your quiet hours.
             </Text>
 
             {notif === 'granted' ? (
@@ -370,76 +432,112 @@ export default function OnboardingScreen() {
           </View>
         );
 
-      case 'demo':
+      case 'demo': {
+        const canPing = notif === 'granted' && Platform.OS !== 'web';
         return (
           <View style={styles.stepBody}>
-            <Text style={[styles.title, { color: colors.text }]}>Here is a ping</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Try a real ping</Text>
             <Text style={[styles.lead, { color: colors.textMuted }]}>
-              This is what you will see when a reminder arrives. Try it.
+              {canPing
+                ? 'Send yourself a real notification, then tap the banner when it arrives to keep going.'
+                : 'On your device a real notification appears here, and you tap it to keep going. Reminders are off right now, so continue to see your options.'}
             </Text>
-            {selected ? renderDemoCard(selected) : null}
+
+            {canPing && !pingSent ? (
+              <Pressable
+                onPress={sendDemoPing}
+                style={({ pressed }) => [
+                  styles.inlineCta,
+                  { backgroundColor: colors.tint },
+                  pressed && { opacity: PRESSED_OPACITY },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Send a test notification"
+              >
+                <IconSymbol name="bell.fill" size={18} color={colors.textOnBrand} />
+                <Text style={[styles.inlineCtaText, { color: colors.textOnBrand }]}>
+                  Send a test ping
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {canPing && pingSent ? (
+              <View style={[styles.noticeCard, { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted }]}>
+                <IconSymbol name="bell.fill" size={18} color={colors.accentText} />
+                <Text style={[styles.noticeText, { color: colors.text }]}>
+                  Sent. Tap the banner when it appears to continue — or use the link below.
+                </Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={() => advance('logging')}
+              style={({ pressed }) => [styles.linkRow, pressed && { opacity: PRESSED_OPACITY }]}
+              accessibilityRole="button"
+              accessibilityLabel="Continue to your check-in options"
+            >
+              <Text style={[styles.linkText, { color: colors.accentText }]}>
+                {canPing && !pingSent ? 'Continue without it →' : 'Continue →'}
+              </Text>
+            </Pressable>
+          </View>
+        );
+      }
+
+      case 'logging':
+        return (
+          <View style={styles.stepBody}>
+            <Text style={[styles.title, { color: colors.text }]}>How you respond</Text>
+            <Text style={[styles.lead, { color: colors.textMuted }]}>
+              When a ping arrives, you have three replies:
+            </Text>
+
+            {LOGGING_OPTIONS.map((opt) => (
+              <View
+                key={opt.label}
+                style={[styles.optionRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
+                <View
+                  style={[
+                    styles.optionIcon,
+                    {
+                      backgroundColor:
+                        opt.tone === 'tint'
+                          ? colors.tintSoft
+                          : opt.tone === 'warning'
+                            ? colors.warningSoft
+                            : colors.surfaceMuted,
+                    },
+                  ]}
+                >
+                  <IconSymbol
+                    name={opt.icon}
+                    size={18}
+                    color={
+                      opt.tone === 'tint'
+                        ? colors.accentText
+                        : opt.tone === 'warning'
+                          ? colors.warning
+                          : colors.textMuted
+                    }
+                  />
+                </View>
+                <View style={styles.optionTextWrap}>
+                  <Text style={[styles.optionLabel, { color: colors.text }]}>{opt.label}</Text>
+                  <Text style={[styles.optionText, { color: colors.textMuted }]}>{opt.text}</Text>
+                </View>
+              </View>
+            ))}
+
+            <Text style={[styles.loggingClose, { color: colors.textMuted }]}>
+              That is the whole loop. A few reps a day and it starts to run on its own.
+            </Text>
           </View>
         );
 
       default:
         return null;
     }
-  };
-
-  // The interactive "ping" preview — mirrors the check-in screen, but writes
-  // nothing: it is a demonstration of the loop, not a real check-in.
-  const renderDemoCard = (b: Behavior) => {
-    const kindText =
-      'Adopt' + (b.practiceType ? ` · ${practiceTypeLabel(b.practiceType)}` : '');
-    if (demoChecked) {
-      return (
-        <View style={[styles.demoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.demoSuccessIcon, { backgroundColor: colors.tintSoft }]}>
-            <IconSymbol name="checkmark" size={36} color={colors.tintCelebrate} />
-          </View>
-          <Text style={[styles.demoSuccessHeadline, { color: colors.text }]}>
-            That is the whole loop.
-          </Text>
-          <Text style={[styles.demoSuccessSub, { color: colors.textMuted }]}>
-            Every rep is a vote for the person you are becoming. Do that a few times a
-            day and it starts to run on its own.
-          </Text>
-        </View>
-      );
-    }
-    return (
-      <View style={[styles.demoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={[styles.kindPill, { backgroundColor: colors.tintSoft }]}>
-          <Text style={[styles.kindPillText, { color: colors.accentText }]}>{kindText}</Text>
-        </View>
-        <Text style={[styles.demoTitle, { color: colors.text }]}>{b.title}</Text>
-        <Text style={[styles.demoMessage, { color: colors.textMuted }]}>{b.pingMessage}</Text>
-        <Pressable
-          onPress={() => {
-            haptics.success();
-            setDemoChecked(true);
-          }}
-          style={({ pressed }) => [
-            styles.demoPrimary,
-            { backgroundColor: colors.tint },
-            pressed && { opacity: PRESSED_OPACITY },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Check-in (demo)"
-        >
-          <IconSymbol name="checkmark" size={18} color={colors.textOnBrand} />
-          <Text style={[styles.demoPrimaryText, { color: colors.textOnBrand }]}>Check-in</Text>
-        </Pressable>
-        <View style={styles.demoSecondaryRow}>
-          <View style={[styles.demoSecondary, { borderColor: colors.warning, backgroundColor: colors.warningSoft }]}>
-            <Text style={[styles.demoSecondaryText, { color: colors.warning }]}>Tried</Text>
-          </View>
-          <View style={[styles.demoSecondary, { borderColor: colors.border }]}>
-            <Text style={[styles.demoSecondaryText, { color: colors.textMuted }]}>Snooze</Text>
-          </View>
-        </View>
-      </View>
-    );
   };
 
   // ── Footer ────────────────────────────────────────────────────────────────
@@ -451,10 +549,10 @@ export default function OnboardingScreen() {
         return { label: 'I understand', onPress: () => advance('notifications') };
       case 'notifications':
         return { label: 'Continue', onPress: continueFromNotifications };
-      case 'demo':
+      case 'logging':
         return { label: 'Start using Reprogrammer', onPress: () => finalize(selected) };
       default:
-        return null; // 'pick' has no footer — the cards are the actions.
+        return null; // 'pick' and 'demo' drive themselves from in-body actions.
     }
   })();
 
@@ -470,7 +568,7 @@ export default function OnboardingScreen() {
         >
           <IconSymbol name="chevron.left" size={22} color={colors.textMuted} />
         </Pressable>
-        <ProgressDots total={WIZARD.length} current={index} colors={colors} />
+        <ProgressDots total={TOTAL_DOTS} current={dot} colors={colors} />
         <Pressable
           onPress={() => finalize(null)}
           hitSlop={8}
@@ -704,55 +802,32 @@ const styles = StyleSheet.create({
   templateTitle: { ...Type.bodyBold, fontWeight: '700' },
   templateMessage: { ...Type.caption },
 
-  // Demo ping
-  demoCard: {
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Space.xl,
-    alignItems: 'center',
-    gap: Space.sm,
+  // Demo (test ping) + logging
+  linkRow: {
+    alignSelf: 'center',
+    paddingVertical: Space.sm,
+    minHeight: 44,
+    justifyContent: 'center',
     marginTop: Space.xs,
   },
-  kindPill: {
-    alignSelf: 'center',
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.xs,
-    borderRadius: Radius.sm,
-    marginBottom: Space.xs,
-  },
-  kindPillText: { ...Type.micro, letterSpacing: 0 },
-  demoTitle: { ...Type.display2, textAlign: 'center' },
-  demoMessage: { ...Type.body, textAlign: 'center', marginBottom: Space.md },
-  demoPrimary: {
+  linkText: { ...Type.bodyBold, fontWeight: '600' },
+  optionRow: {
     flexDirection: 'row',
-    gap: Space.sm,
-    paddingVertical: Space.md,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    alignSelf: 'stretch',
-  },
-  demoPrimaryText: { ...Type.h2 },
-  demoSecondaryRow: { flexDirection: 'row', gap: Space.sm, alignSelf: 'stretch' },
-  demoSecondary: {
-    flex: 1,
+    alignItems: 'flex-start',
+    gap: Space.md,
     borderWidth: 1,
-    paddingVertical: Space.sm,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
+    borderRadius: Radius.lg,
+    padding: Space.md + Space.xxs,
   },
-  demoSecondaryText: { ...Type.body, fontWeight: '600' },
-  demoSuccessIcon: {
-    width: 84,
-    height: 84,
+  optionIcon: {
+    width: Space.xxl,
+    height: Space.xxl,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Space.xs,
   },
-  demoSuccessHeadline: { ...Type.display2, textAlign: 'center' },
-  demoSuccessSub: { ...Type.body, textAlign: 'center' },
+  optionTextWrap: { flex: 1, gap: Space.xxs },
+  optionLabel: { ...Type.bodyBold, fontWeight: '700' },
+  optionText: { ...Type.caption, lineHeight: 19 },
+  loggingClose: { ...Type.caption, fontStyle: 'italic', marginTop: Space.sm },
 });
