@@ -142,6 +142,9 @@ export default function LibraryScreen() {
             </View>
           ))
         )}
+        <Text style={[styles.disclaimer, { color: colors.textMuted }]}>
+          Educational, not professional advice.
+        </Text>
       </ScrollView>
     </View>
   );
@@ -349,6 +352,12 @@ const styles = StyleSheet.create({
     ...Type.body,
     textAlign: 'center',
     paddingVertical: Space.xxl,
+  },
+  disclaimer: {
+    ...Type.micro,
+    textAlign: 'center',
+    paddingTop: Space.xl,
+    paddingBottom: Space.lg,
   },
   card: {
     borderRadius: Radius.lg,
