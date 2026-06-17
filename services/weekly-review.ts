@@ -7,7 +7,7 @@
  * No new capture primitives yet — those are later phases. Pure + injectable
  * `now` so it is unit-testable.
  */
-import { Behavior, BehaviorKind, CheckIn } from '../types';
+import { Behavior, BehaviorKind, CaptureEntry, CaptureType, CheckIn } from '../types';
 import type { DayStatus } from './consistency';
 import { calculateStreak } from './streak';
 
@@ -57,8 +57,42 @@ export function windowDayStatuses(
   });
 }
 
+/** Per-day sums of capture values across the window's 7 days, oldest → newest. */
+export function windowDailySums(
+  entries: CaptureEntry[],
+  behaviorId: string,
+  window: WeekWindow
+): number[] {
+  const mine = entries.filter((e) => e.behaviorId === behaviorId);
+  return Array.from({ length: WEEK_DAYS }, (_, i) => {
+    const dayStart = window.start + i * DAY_MS;
+    const dayEnd = dayStart + DAY_MS;
+    return mine
+      .filter((e) => e.at >= dayStart && e.at < dayEnd)
+      .reduce((sum, e) => sum + e.value, 0);
+  });
+}
+
 function countStatus(statuses: DayStatus[], s: DayStatus): number {
   return statuses.filter((x) => x === s).length;
+}
+
+export interface CaptureSummary {
+  type: CaptureType;
+  label: string;
+  unit?: string;
+  direction: 'up' | 'down';
+  /** Daily sums for the window's 7 days, oldest → newest. */
+  daily: number[];
+  total: number;
+  loggedDays: number;
+  /** Average per logged day (0 when nothing logged). */
+  avg: number;
+  prevTotal: number;
+  /** % change in total vs the prior week; null when prior week was 0. */
+  deltaPct: number | null;
+  /** Whether the delta moved in the behavior's good direction; null if no prior. */
+  improved: boolean | null;
 }
 
 /** The note the user wrote on a hard day — a 'tried' reflection beats a 'no'. */
@@ -103,11 +137,44 @@ export interface BehaviorWeek {
   /** Current streak; only computed for the live week (weeksAgo === 0). */
   streak?: number;
   hardestNote?: { at: number; text: string; result: 'tried' | 'no' };
+  /** Present when the behavior has a captureSpec (REP-5 Phase 2). */
+  capture?: CaptureSummary;
+}
+
+function buildCaptureSummary(
+  behavior: Behavior,
+  entries: CaptureEntry[],
+  window: WeekWindow,
+  prevWindow: WeekWindow
+): CaptureSummary | undefined {
+  const spec = behavior.captureSpec;
+  if (!spec) return undefined;
+  const daily = windowDailySums(entries, behavior.id, window);
+  const total = daily.reduce((a, b) => a + b, 0);
+  const loggedDays = daily.filter((v) => v > 0).length;
+  const prevTotal = windowDailySums(entries, behavior.id, prevWindow).reduce((a, b) => a + b, 0);
+  const deltaPct = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
+  const improved =
+    deltaPct === null ? null : spec.direction === 'up' ? total >= prevTotal : total <= prevTotal;
+  return {
+    type: spec.type,
+    label: spec.label,
+    unit: spec.unit,
+    direction: spec.direction,
+    daily,
+    total,
+    loggedDays,
+    avg: loggedDays > 0 ? total / loggedDays : 0,
+    prevTotal,
+    deltaPct,
+    improved,
+  };
 }
 
 export function buildBehaviorWeek(
   behavior: Behavior,
   checkIns: CheckIn[],
+  entries: CaptureEntry[],
   window: WeekWindow,
   prevWindow: WeekWindow,
   includeStreak: boolean
@@ -141,6 +208,7 @@ export function buildBehaviorWeek(
         : null,
     streak: includeStreak ? calculateStreak(behavior.id, checkIns) : undefined,
     hardestNote: pickHardestNote(checkIns, behavior.id, window),
+    capture: buildCaptureSummary(behavior, entries, window, prevWindow),
   };
 }
 
@@ -157,6 +225,7 @@ export interface WeeklyReview {
 export function buildWeeklyReview(
   behaviors: Behavior[],
   checkIns: CheckIn[],
+  entries: CaptureEntry[],
   now: number,
   weeksAgo: number = 0
 ): WeeklyReview {
@@ -164,7 +233,7 @@ export function buildWeeklyReview(
   const prevWindow = weekWindow(now, weeksAgo + 1);
   const rows = behaviors
     .filter((b) => !b.hidden)
-    .map((b) => buildBehaviorWeek(b, checkIns, window, prevWindow, weeksAgo === 0));
+    .map((b) => buildBehaviorWeek(b, checkIns, entries, window, prevWindow, weeksAgo === 0));
 
   const totalReps = rows.reduce((n, r) => n + r.reps, 0);
   const totalSuccessDays = rows.reduce((n, r) => n + r.successDays, 0);

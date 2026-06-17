@@ -7,7 +7,7 @@
  * second-class (no practice type, domain, or guide link). Both paths now go
  * through `buildBehavior`, so a hand-made behavior is as rich as a template one.
  */
-import { Behavior, BehaviorKind, Domain, PracticeType } from '../types';
+import { Behavior, BehaviorKind, CaptureSpec, Domain, PracticeType } from '../types';
 import { generateUUID } from '../utils/uuid';
 import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from './levels';
 import type { AdoptTemplate, EliminateTemplate } from './library-content';
@@ -24,6 +24,8 @@ export interface BehaviorDraft {
   window: { from: string; to: string };
   activeDays: number[];
   intervalMinutes: number;
+  /** Optional typed capture (REP-5 Phase 2). */
+  captureSpec?: CaptureSpec;
 }
 
 /**
@@ -59,6 +61,7 @@ export function buildBehavior(draft: BehaviorDraft, existing?: Behavior): Behavi
     window: draft.window,
     activeDays: draft.activeDays,
     intervalMinutes: draft.intervalMinutes,
+    captureSpec: draft.captureSpec,
   };
 }
 

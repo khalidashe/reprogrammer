@@ -22,7 +22,7 @@ import {
 } from '@/constants/theme';
 import { haptics } from '@/services/haptics';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import type { Behavior, BehaviorKind, Domain } from '@/types';
+import type { Behavior, BehaviorKind, CaptureType, Domain } from '@/types';
 import {
   PRACTICE_BASES,
   practiceBaseLabel,
@@ -42,7 +42,15 @@ const BASE_ICON: Record<PracticeBase, ComponentIconName> = {
 };
 type ComponentIconName = 'brain.head.profile' | 'figure.walk' | 'book.fill';
 
-export type StepId = 'start' | 'kind' | 'what' | 'instead' | 'when' | 'cadence' | 'review';
+export type StepId =
+  | 'start'
+  | 'kind'
+  | 'what'
+  | 'instead'
+  | 'when'
+  | 'cadence'
+  | 'track'
+  | 'review';
 
 export interface WizardState {
   kind: BehaviorKind;
@@ -59,6 +67,11 @@ export interface WizardState {
   replacementStateId?: string;
   /** …or a brand-new Adopt to create inline on save. */
   newReplacementTitle: string;
+  /** Capture authoring (REP-5 Phase 2). */
+  captureType: 'none' | CaptureType;
+  captureLabel: string;
+  captureUnit: string;
+  captureDirection: 'up' | 'down';
 }
 
 type Update = (patch: Partial<WizardState>) => void;
@@ -368,6 +381,92 @@ export function WhatStep({
                 colors={colors}
               />
             ))}
+          </View>
+        </>
+      ) : null}
+    </StepScaffold>
+  );
+}
+
+export function TrackStep({
+  state,
+  update,
+  colors,
+}: {
+  state: WizardState;
+  update: Update;
+  colors: ThemeColors;
+}) {
+  const setType = (t: 'none' | CaptureType) =>
+    update({ captureType: t, ...(t === 'counter' ? { captureUnit: '' } : {}) });
+  return (
+    <StepScaffold
+      title="Track a number"
+      subtitle="Optional. Capture a count or metric at each check-in and watch it trend in your weekly review."
+      colors={colors}
+    >
+      <SelectCard
+        title="No tracking"
+        description="Just check in — yes, tried, or snooze."
+        mode="select"
+        selected={state.captureType === 'none'}
+        onPress={() => setType('none')}
+        colors={colors}
+      />
+      <SelectCard
+        title="Counter"
+        description="Tally something — pickups, urges resisted, drifts."
+        mode="select"
+        selected={state.captureType === 'counter'}
+        onPress={() => setType('counter')}
+        colors={colors}
+      />
+      <SelectCard
+        title="Metric"
+        description="Log a number — minutes, reps, words."
+        mode="select"
+        selected={state.captureType === 'metric'}
+        onPress={() => setType('metric')}
+        colors={colors}
+      />
+      {state.captureType !== 'none' ? (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+            What are you tracking?
+          </Text>
+          <FieldInput
+            value={state.captureLabel}
+            onChangeText={(t) => update({ captureLabel: t })}
+            placeholder={state.captureType === 'counter' ? 'e.g. Pickups' : 'e.g. Deep minutes'}
+            colors={colors}
+            accessibilityLabel="What you are tracking"
+          />
+          {state.captureType === 'metric' ? (
+            <>
+              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Unit (optional)</Text>
+              <FieldInput
+                value={state.captureUnit}
+                onChangeText={(t) => update({ captureUnit: t })}
+                placeholder="e.g. min, reps, words"
+                colors={colors}
+                accessibilityLabel="Unit"
+              />
+            </>
+          ) : null}
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Better when it goes</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label="Up"
+              selected={state.captureDirection === 'up'}
+              onPress={() => update({ captureDirection: 'up' })}
+              colors={colors}
+            />
+            <Chip
+              label="Down"
+              selected={state.captureDirection === 'down'}
+              onPress={() => update({ captureDirection: 'down' })}
+              colors={colors}
+            />
           </View>
         </>
       ) : null}

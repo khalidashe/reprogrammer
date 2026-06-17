@@ -12,7 +12,7 @@ import {
   windowDayStatuses,
   WEEK_DAYS,
 } from '../weekly-review';
-import { Behavior, CheckIn } from '../../types';
+import { Behavior, CaptureEntry, CheckIn } from '../../types';
 
 let failures = 0;
 function expect(cond: boolean, msg: string) {
@@ -59,6 +59,8 @@ const ci = (
   note,
 });
 
+const at = (daysAgo: number) => todayStart - daysAgo * DAY + 12 * 60 * 60 * 1000;
+
 // Window math: a 7-day, day-aligned window; today is the last day.
 const w0 = weekWindow(NOW, 0);
 expect(w0.end - w0.start === WEEK_DAYS * DAY, 'window spans exactly 7 days');
@@ -85,7 +87,7 @@ const dayStatuses = windowDayStatuses(checkIns, 'a', w0);
 expect(dayStatuses.length === WEEK_DAYS, 'day statuses has 7 entries');
 expect(dayStatuses[WEEK_DAYS - 1] === 'yes', 'today (last entry) is yes');
 
-const review = buildWeeklyReview([a, hidden], checkIns, NOW, 0);
+const review = buildWeeklyReview([a, hidden], checkIns, [], NOW, 0);
 expect(review.behaviors.length === 1, 'hidden behaviors are excluded');
 
 const row = review.behaviors[0];
@@ -107,7 +109,7 @@ expect(review.totalSuccessDays === 3 && review.totalPrevSuccessDays === 2, 'tota
 expect(review.regressed === false, 'not regressed when success days rose');
 
 // A past week view computes that window and omits the live streak.
-const past = buildWeeklyReview([a], checkIns, NOW, 1);
+const past = buildWeeklyReview([a], checkIns, [], NOW, 1);
 expect(past.behaviors[0].successDays === 2, 'past-week view counts that window');
 expect(past.behaviors[0].streak === undefined, 'streak only computed for the live week');
 
@@ -119,9 +121,30 @@ const regCheckIns: CheckIn[] = [
   ci('r', 9, 'yes'),
   ci('r', 0, 'yes'),
 ];
-const reg = buildWeeklyReview([r], regCheckIns, NOW, 0);
+const reg = buildWeeklyReview([r], regCheckIns, [], NOW, 0);
 expect(reg.regressed === true, 'regressed when success days drop vs prior week');
 expect(reg.behaviors[0].deltaPct === Math.round(((1 - 3) / 3) * 100), 'delta is negative on regression');
+
+// Capture summary (counter, direction down): 5 this week, 2 last week.
+const cb = mk('cb', {
+  captureSpec: { type: 'counter', label: 'Pickups', direction: 'down' },
+});
+const cbEntries: CaptureEntry[] = [
+  { id: 'e1', behaviorId: 'cb', at: at(0), value: 2 },
+  { id: 'e2', behaviorId: 'cb', at: at(1), value: 3 },
+  { id: 'e3', behaviorId: 'cb', at: at(8), value: 2 },
+];
+const cap = buildWeeklyReview([cb], [], cbEntries, NOW, 0).behaviors[0].capture;
+expect(!!cap, 'capture summary present when behavior has a captureSpec');
+expect(cap!.total === 5, 'counter total sums this week (2 + 3)');
+expect(cap!.prevTotal === 2, 'counter prior-week total');
+expect(cap!.deltaPct === Math.round(((5 - 2) / 2) * 100), 'capture delta is +150%');
+expect(cap!.improved === false, 'a down-direction counter that rose is not improved');
+expect(cap!.loggedDays === 2, 'logged days counts days with entries');
+expect(
+  cap!.daily.length === 7 && cap!.daily[6] === 2 && cap!.daily[5] === 3,
+  'daily sums land on the right days'
+);
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed.`);

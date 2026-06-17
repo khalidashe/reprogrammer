@@ -45,6 +45,7 @@ import {
   InsteadStep,
   WhenStep,
   CadenceStep,
+  TrackStep,
   ReviewStep,
   type StepId,
   type WizardState,
@@ -65,6 +66,10 @@ function initialState(b: Behavior | null | undefined): WizardState {
       cadenceId: cadenceForInterval(b.intervalMinutes),
       replacementStateId: b.replacementStateId,
       newReplacementTitle: '',
+      captureType: b.captureSpec?.type ?? 'none',
+      captureLabel: b.captureSpec?.label ?? '',
+      captureUnit: b.captureSpec?.unit ?? '',
+      captureDirection: b.captureSpec?.direction ?? 'up',
     };
   }
   return {
@@ -80,13 +85,17 @@ function initialState(b: Behavior | null | undefined): WizardState {
     cadenceId: DEFAULT_CADENCE,
     replacementStateId: undefined,
     newReplacementTitle: '',
+    captureType: 'none',
+    captureLabel: '',
+    captureUnit: '',
+    captureDirection: 'up',
   };
 }
 
 function buildSteps(kind: WizardState['kind'], editing: boolean): StepId[] {
   const arr: StepId[] = editing ? ['kind', 'what'] : ['start', 'kind', 'what'];
   if (kind === 'eliminate') arr.push('instead');
-  arr.push('when', 'cadence', 'review');
+  arr.push('when', 'cadence', 'track', 'review');
   return arr;
 }
 
@@ -97,6 +106,9 @@ function isStepValid(stepId: StepId, s: WizardState): boolean {
   }
   if (stepId === 'when') {
     return hhmmToMinutes(s.endTime) > hhmmToMinutes(s.startTime) && s.activeDays.length > 0;
+  }
+  if (stepId === 'track') {
+    return s.captureType === 'none' || s.captureLabel.trim().length > 0;
   }
   return true;
 }
@@ -179,6 +191,10 @@ export default function CreateScreen() {
       cadenceId: cadenceForInterval(t.intervalMinutes),
       replacementStateId: undefined,
       newReplacementTitle: '',
+      captureType: 'none',
+      captureLabel: '',
+      captureUnit: '',
+      captureDirection: 'up',
     }));
     setStepId('review');
   };
@@ -205,6 +221,19 @@ export default function CreateScreen() {
       replacementStateId = adopt.id;
     }
 
+    const captureSpec =
+      state.captureType === 'none'
+        ? undefined
+        : {
+            type: state.captureType,
+            label: state.captureLabel.trim(),
+            unit:
+              state.captureType === 'metric' && state.captureUnit.trim()
+                ? state.captureUnit.trim()
+                : undefined,
+            direction: state.captureDirection,
+          };
+
     const draft: BehaviorDraft = {
       kind: state.kind,
       title: state.title,
@@ -216,6 +245,7 @@ export default function CreateScreen() {
       window,
       activeDays: state.activeDays,
       intervalMinutes,
+      captureSpec,
     };
 
     if (editingBehavior) {
@@ -281,6 +311,8 @@ export default function CreateScreen() {
         return (
           <CadenceStep state={state} update={update} previewText={previewText} colors={colors} />
         );
+      case 'track':
+        return <TrackStep state={state} update={update} colors={colors} />;
       case 'review':
         return (
           <ReviewStep
