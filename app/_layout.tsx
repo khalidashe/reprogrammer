@@ -52,8 +52,12 @@ function AppShell() {
   useEffect(() => {
     const setup = async () => {
       await useStore.getState().hydrate();
-      const granted = await requestNotificationPermission();
-      await useStore.getState().updateAppProfile({ notificationsDenied: !granted });
+      // New users grant notifications inside onboarding, after the priming step
+      // explains why. Only returning (onboarded) users get the prompt at launch.
+      if (useStore.getState().appProfile.hasOnboarded) {
+        const granted = await requestNotificationPermission();
+        await useStore.getState().updateAppProfile({ notificationsDenied: !granted });
+      }
       await setupNotificationCategory();
 
       notificationListener.current = Notifications.addNotificationReceivedListener(
@@ -65,11 +69,21 @@ function AppShell() {
 
       responseListener.current = Notifications.addNotificationResponseReceivedListener(
         (response) => {
-          const { behaviorId, attemptId, phase } = response.notification.request.content.data as {
+          const data = response.notification.request.content.data as {
             behaviorId?: string;
             attemptId?: string;
             phase?: string;
+            onboardingDemo?: boolean;
           };
+
+          // Onboarding's demo ping just walks the first-run tour forward (REP-39):
+          // route back into onboarding and jump to the logging-options step.
+          if (data.onboardingDemo) {
+            router.navigate({ pathname: '/onboarding', params: { demo: 'logging' } });
+            return;
+          }
+
+          const { behaviorId, attemptId, phase } = data;
           const actionId = response.actionIdentifier;
 
           if (!behaviorId || !attemptId) return;
