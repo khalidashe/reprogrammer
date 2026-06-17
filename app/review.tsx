@@ -26,6 +26,12 @@ const FREE_WEEKS_BACK = 1;
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10));
 
+const firstField = (fields?: Record<string, string>) => {
+  if (!fields) return '';
+  const v = Object.values(fields).find((x) => x && x.trim().length > 0);
+  return v ? v.trim() : '';
+};
+
 export default function ReviewScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -290,8 +296,15 @@ function BehaviorReviewCard({
           <Text style={[styles.captureMeta, { color: colors.textMuted }]}>
             {row.capture.type === 'metric'
               ? `${fmt(row.capture.total)}${row.capture.unit ? ' ' + row.capture.unit : ''} · avg ${fmt(row.capture.avg)}/logged day`
-              : `${fmt(row.capture.total)} total this week`}
+              : row.capture.type === 'template'
+                ? `${row.capture.count} ${row.capture.count === 1 ? 'entry' : 'entries'} this week`
+                : `${fmt(row.capture.total)} total this week`}
           </Text>
+          {row.capture.type === 'template' && firstField(row.capture.last?.fields) ? (
+            <Text style={[styles.captureEntry, { color: colors.text }]} numberOfLines={2}>
+              “{firstField(row.capture.last?.fields)}”
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -413,6 +426,7 @@ const styles = StyleSheet.create({
   captureTitle: { ...Type.caption, fontWeight: '700' },
   captureDelta: { ...Type.caption, fontWeight: '700' },
   captureMeta: { ...Type.micro },
+  captureEntry: { ...Type.caption, fontStyle: 'italic' },
   bars: { flexDirection: 'row', alignItems: 'flex-end', gap: Space.xs, height: 36 },
   barTrack: { flex: 1, height: '100%', justifyContent: 'flex-end' },
   bar: { width: '100%', borderRadius: Radius.sm, minHeight: 3 },

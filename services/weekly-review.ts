@@ -93,6 +93,10 @@ export interface CaptureSummary {
   deltaPct: number | null;
   /** Whether the delta moved in the behavior's good direction; null if no prior. */
   improved: boolean | null;
+  /** Number of entries logged this window (= completions for templates). */
+  count: number;
+  /** Most recent entry this window — used to surface a template's latest fields. */
+  last?: { at: number; fields?: Record<string, string> };
 }
 
 /** The note the user wrote on a hard day — a 'tried' reflection beats a 'no'. */
@@ -156,6 +160,12 @@ function buildCaptureSummary(
   const deltaPct = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
   const improved =
     deltaPct === null ? null : spec.direction === 'up' ? total >= prevTotal : total <= prevTotal;
+  const windowEntries = entries
+    .filter((e) => e.behaviorId === behavior.id && e.at >= window.start && e.at < window.end)
+    .sort((a, b) => b.at - a.at);
+  const last = windowEntries[0]
+    ? { at: windowEntries[0].at, fields: windowEntries[0].fields }
+    : undefined;
   return {
     type: spec.type,
     label: spec.label,
@@ -168,6 +178,8 @@ function buildCaptureSummary(
     prevTotal,
     deltaPct,
     improved,
+    count: windowEntries.length,
+    last,
   };
 }
 
