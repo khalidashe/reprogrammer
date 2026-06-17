@@ -98,6 +98,7 @@ export default function DashboardScreen() {
 
   const handleCreate = () => router.push('/create');
   const handleOpenProfile = () => router.push('/settings');
+  const handleOpenReview = () => router.push('/review');
 
   // --- Select-mode handlers ---
 
@@ -289,7 +290,12 @@ export default function DashboardScreen() {
             >
               <IconSymbol name="person.fill" size={20} color={colors.textMuted} />
             </Pressable>
-            <View style={styles.headerCenter}>
+            <Pressable
+              style={styles.headerCenter}
+              onPress={handleOpenReview}
+              accessibilityRole="button"
+              accessibilityLabel="Open weekly review"
+            >
               <Text style={[styles.dateText, { color: colors.text }]}>{formatToday()}</Text>
               {todaysAttemptsCount > 0 ? (
                 <>
@@ -311,7 +317,7 @@ export default function DashboardScreen() {
                   {activeBehaviors.length === 1 ? 'behavior' : 'behaviors'}
                 </Text>
               )}
-            </View>
+            </Pressable>
             <Pressable
               onPress={handleCreate}
               style={[styles.addButton, { backgroundColor: colors.tint }]}
