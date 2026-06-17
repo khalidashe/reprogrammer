@@ -17,6 +17,7 @@ import { CheckIn } from '@/types';
 import { generateUUID } from '@/utils/uuid';
 import { handleCheckInResponse } from '@/services/notifications';
 import { practiceTypeLabel } from '@/services/library-content';
+import { getCaptureTemplate } from '@/services/capture-templates';
 import { haptics } from '@/services/haptics';
 import { useEffect, useState, useMemo, useRef } from 'react';
 
@@ -33,6 +34,7 @@ export default function CheckInScreen() {
   const [note, setNote] = useState('');
   const [counterValue, setCounterValue] = useState(0);
   const [metricValue, setMetricValue] = useState('');
+  const [templateFields, setTemplateFields] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState<{ result: 'yes' | 'tried'; streak: number } | null>(null);
   const draftWriteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,15 +104,30 @@ export default function CheckInScreen() {
       // Log the typed capture value alongside the rep (REP-5 Phase 2). Only on a
       // real rep (yes/tried), and only when a positive value was entered.
       if (behavior.captureSpec && result !== 'no') {
-        const raw =
-          behavior.captureSpec.type === 'counter' ? counterValue : parseFloat(metricValue);
-        if (Number.isFinite(raw) && raw > 0) {
-          await addEntry({
-            id: generateUUID(),
-            behaviorId: behavior.id,
-            at: Date.now(),
-            value: raw,
-          });
+        const spec = behavior.captureSpec;
+        if (spec.type === 'template') {
+          const fields = Object.fromEntries(
+            Object.entries(templateFields).filter(([, v]) => v.trim().length > 0)
+          );
+          if (Object.keys(fields).length > 0) {
+            await addEntry({
+              id: generateUUID(),
+              behaviorId: behavior.id,
+              at: Date.now(),
+              value: 1,
+              fields,
+            });
+          }
+        } else {
+          const raw = spec.type === 'counter' ? counterValue : parseFloat(metricValue);
+          if (Number.isFinite(raw) && raw > 0) {
+            await addEntry({
+              id: generateUUID(),
+              behaviorId: behavior.id,
+              at: Date.now(),
+              value: raw,
+            });
+          }
         }
       }
 
@@ -213,7 +230,33 @@ export default function CheckInScreen() {
         <Text style={[styles.behaviorTitle, { color: colors.text }]}>{behavior.title}</Text>
         <Text style={[styles.message, { color: colors.textMuted }]}>{messageBody}</Text>
 
-        {behavior.captureSpec ? (
+        {behavior.captureSpec && behavior.captureSpec.type === 'template' ? (
+          <View style={styles.templateWrap}>
+            {getCaptureTemplate(behavior.captureSpec.templateId ?? 'cbt').fields.map((f) => (
+              <View key={f.key} style={styles.templateField}>
+                <Text style={[styles.templateLabel, { color: colors.textMuted }]}>{f.label}</Text>
+                <TextInput
+                  style={[
+                    styles.templateInput,
+                    f.multiline && styles.templateInputMultiline,
+                    {
+                      color: colors.text,
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  value={templateFields[f.key] ?? ''}
+                  onChangeText={(t) => setTemplateFields((prev) => ({ ...prev, [f.key]: t }))}
+                  placeholder={f.placeholder}
+                  placeholderTextColor={colors.textMuted}
+                  multiline={f.multiline}
+                  editable={!isSubmitting}
+                  accessibilityLabel={f.label}
+                />
+              </View>
+            ))}
+          </View>
+        ) : behavior.captureSpec ? (
           <View style={styles.captureWrap}>
             <Text style={[styles.captureLabel, { color: colors.textMuted }]}>
               {behavior.captureSpec.label}
@@ -395,6 +438,17 @@ const styles = StyleSheet.create({
     paddingVertical: Space.sm,
     paddingHorizontal: Space.lg,
   },
+  templateWrap: { alignSelf: 'stretch', gap: Space.md, marginBottom: Space.xxl },
+  templateField: { gap: Space.xs },
+  templateLabel: { ...Type.micro, textTransform: 'uppercase', letterSpacing: 1 },
+  templateInput: {
+    ...Type.body,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+  },
+  templateInputMultiline: { minHeight: 64, textAlignVertical: 'top' },
   buttonContainer: {
     flexDirection: 'column',
     gap: Space.sm,

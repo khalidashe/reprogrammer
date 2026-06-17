@@ -32,8 +32,11 @@ export type LibraryCategory =
   | 'philosophy_worldview';
 export type Stage = 'starting' | 'in_progress' | 'habitual';
 
-/** Typed capture attached to a behavior (REP-5 Phase 2). */
-export type CaptureType = 'counter' | 'metric';
+/** Typed capture attached to a behavior (REP-5 Phase 2–3). */
+export type CaptureType = 'counter' | 'metric' | 'template';
+
+/** Built-in structured-entry templates (REP-5 Phase 3). */
+export type CaptureTemplateId = 'cbt' | 'ofnr' | 'three_good_things';
 
 export interface CaptureSpec {
   type: CaptureType;
@@ -43,6 +46,8 @@ export interface CaptureSpec {
   unit?: string;
   /** Which direction is improvement. Pickups → 'down'; reps → 'up'. */
   direction: 'up' | 'down';
+  /** For `type: 'template'` — which structured form to use. */
+  templateId?: CaptureTemplateId;
 }
 
 export interface Behavior {
@@ -96,8 +101,10 @@ export interface CaptureEntry {
   id: string;
   behaviorId: string;
   at: number;
-  /** Counter: the count logged. Metric: the measured value. */
+  /** Counter: the count logged. Metric: the value. Template: 1 (one completion). */
   value: number;
+  /** Template entries store their structured field values here (REP-5 Phase 3). */
+  fields?: Record<string, string>;
 }
 
 export interface ReminderAttempt {

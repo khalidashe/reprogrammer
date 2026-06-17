@@ -22,7 +22,8 @@ import {
 } from '@/constants/theme';
 import { haptics } from '@/services/haptics';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import type { Behavior, BehaviorKind, CaptureType, Domain } from '@/types';
+import type { Behavior, BehaviorKind, CaptureTemplateId, CaptureType, Domain } from '@/types';
+import { CAPTURE_TEMPLATES } from '@/services/capture-templates';
 import {
   PRACTICE_BASES,
   practiceBaseLabel,
@@ -67,11 +68,12 @@ export interface WizardState {
   replacementStateId?: string;
   /** …or a brand-new Adopt to create inline on save. */
   newReplacementTitle: string;
-  /** Capture authoring (REP-5 Phase 2). */
+  /** Capture authoring (REP-5 Phase 2–3). */
   captureType: 'none' | CaptureType;
   captureLabel: string;
   captureUnit: string;
   captureDirection: 'up' | 'down';
+  captureTemplateId: CaptureTemplateId;
 }
 
 type Update = (patch: Partial<WizardState>) => void;
@@ -429,7 +431,30 @@ export function TrackStep({
         onPress={() => setType('metric')}
         colors={colors}
       />
-      {state.captureType !== 'none' ? (
+      <SelectCard
+        title="Guided entry"
+        description="Fill a short structured form — CBT, OFNR, Three good things."
+        mode="select"
+        selected={state.captureType === 'template'}
+        onPress={() => setType('template')}
+        colors={colors}
+      />
+      {state.captureType === 'template' ? (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Which form?</Text>
+          {CAPTURE_TEMPLATES.map((t) => (
+            <SelectCard
+              key={t.id}
+              title={t.title}
+              description={t.blurb}
+              mode="select"
+              selected={state.captureTemplateId === t.id}
+              onPress={() => update({ captureTemplateId: t.id })}
+              colors={colors}
+            />
+          ))}
+        </>
+      ) : state.captureType !== 'none' ? (
         <>
           <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
             What are you tracking?

@@ -146,6 +146,26 @@ expect(
   'daily sums land on the right days'
 );
 
+// Template capture: 2 completions this week, 1 last week (more = better).
+const tb = mk('tb', {
+  captureSpec: { type: 'template', label: 'Thought record', direction: 'up', templateId: 'cbt' },
+});
+const tEntries: CaptureEntry[] = [
+  { id: 't1', behaviorId: 'tb', at: at(0), value: 1, fields: { thought: 'They hate my work' } },
+  { id: 't2', behaviorId: 'tb', at: at(2), value: 1, fields: { thought: 'Missed the gym' } },
+  { id: 't3', behaviorId: 'tb', at: at(9), value: 1, fields: { thought: 'Old one' } },
+];
+const tcap = buildWeeklyReview([tb], [], tEntries, NOW, 0).behaviors[0].capture;
+expect(!!tcap && tcap!.type === 'template', 'template capture summary present');
+expect(tcap!.count === 2, 'template counts completions this week (2)');
+expect(tcap!.total === 2, 'template total equals completions (value 1 each)');
+expect(tcap!.deltaPct === Math.round(((2 - 1) / 1) * 100), 'template delta is +100% vs last week');
+expect(tcap!.improved === true, 'more completions is improvement (direction up)');
+expect(
+  !!tcap!.last && tcap!.last!.at === at(0) && tcap!.last!.fields?.thought === 'They hate my work',
+  'last entry is the most recent, with its fields'
+);
+
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed.`);
   process.exit(1);

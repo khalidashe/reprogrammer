@@ -15,7 +15,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
-import type { Behavior } from '@/types';
+import type { Behavior, CaptureSpec } from '@/types';
 import { useIsPro } from '@/hooks/useIsPro';
 import { FREE_TIER_STATE_CAP } from '@/constants/limits';
 import { cancelForBehavior, scheduleForBehavior } from '@/services/notifications';
@@ -24,6 +24,7 @@ import {
   buildBehavior,
   type BehaviorDraft,
 } from '@/services/behavior-factory';
+import { getCaptureTemplate } from '@/services/capture-templates';
 import {
   composePracticeType,
   decomposePracticeType,
@@ -70,6 +71,7 @@ function initialState(b: Behavior | null | undefined): WizardState {
       captureLabel: b.captureSpec?.label ?? '',
       captureUnit: b.captureSpec?.unit ?? '',
       captureDirection: b.captureSpec?.direction ?? 'up',
+      captureTemplateId: b.captureSpec?.templateId ?? 'cbt',
     };
   }
   return {
@@ -89,6 +91,7 @@ function initialState(b: Behavior | null | undefined): WizardState {
     captureLabel: '',
     captureUnit: '',
     captureDirection: 'up',
+    captureTemplateId: 'cbt',
   };
 }
 
@@ -108,7 +111,11 @@ function isStepValid(stepId: StepId, s: WizardState): boolean {
     return hhmmToMinutes(s.endTime) > hhmmToMinutes(s.startTime) && s.activeDays.length > 0;
   }
   if (stepId === 'track') {
-    return s.captureType === 'none' || s.captureLabel.trim().length > 0;
+    return (
+      s.captureType === 'none' ||
+      s.captureType === 'template' ||
+      s.captureLabel.trim().length > 0
+    );
   }
   return true;
 }
@@ -195,6 +202,7 @@ export default function CreateScreen() {
       captureLabel: '',
       captureUnit: '',
       captureDirection: 'up',
+      captureTemplateId: 'cbt',
     }));
     setStepId('review');
   };
@@ -221,18 +229,26 @@ export default function CreateScreen() {
       replacementStateId = adopt.id;
     }
 
-    const captureSpec =
-      state.captureType === 'none'
-        ? undefined
-        : {
-            type: state.captureType,
-            label: state.captureLabel.trim(),
-            unit:
-              state.captureType === 'metric' && state.captureUnit.trim()
-                ? state.captureUnit.trim()
-                : undefined,
-            direction: state.captureDirection,
-          };
+    let captureSpec: CaptureSpec | undefined;
+    if (state.captureType === 'template') {
+      const tpl = getCaptureTemplate(state.captureTemplateId);
+      captureSpec = {
+        type: 'template',
+        label: tpl.title,
+        direction: 'up',
+        templateId: state.captureTemplateId,
+      };
+    } else if (state.captureType !== 'none') {
+      captureSpec = {
+        type: state.captureType,
+        label: state.captureLabel.trim(),
+        unit:
+          state.captureType === 'metric' && state.captureUnit.trim()
+            ? state.captureUnit.trim()
+            : undefined,
+        direction: state.captureDirection,
+      };
+    }
 
     const draft: BehaviorDraft = {
       kind: state.kind,
