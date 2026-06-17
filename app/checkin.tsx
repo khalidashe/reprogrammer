@@ -29,8 +29,10 @@ export default function CheckInScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { behaviorId, attemptId } = useLocalSearchParams();
-  const { behaviors, addCheckIn, getStreak } = useStore();
+  const { behaviors, addCheckIn, addEntry, getStreak } = useStore();
   const [note, setNote] = useState('');
+  const [counterValue, setCounterValue] = useState(0);
+  const [metricValue, setMetricValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState<{ result: 'yes' | 'tried'; streak: number } | null>(null);
   const draftWriteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,6 +98,22 @@ export default function CheckInScreen() {
       };
 
       await addCheckIn(checkIn);
+
+      // Log the typed capture value alongside the rep (REP-5 Phase 2). Only on a
+      // real rep (yes/tried), and only when a positive value was entered.
+      if (behavior.captureSpec && result !== 'no') {
+        const raw =
+          behavior.captureSpec.type === 'counter' ? counterValue : parseFloat(metricValue);
+        if (Number.isFinite(raw) && raw > 0) {
+          await addEntry({
+            id: generateUUID(),
+            behaviorId: behavior.id,
+            at: Date.now(),
+            value: raw,
+          });
+        }
+      }
+
       await handleCheckInResponse(behavior.id, attemptId as string, result);
 
       if (typeof attemptId === 'string') {
@@ -194,6 +212,66 @@ export default function CheckInScreen() {
         </View>
         <Text style={[styles.behaviorTitle, { color: colors.text }]}>{behavior.title}</Text>
         <Text style={[styles.message, { color: colors.textMuted }]}>{messageBody}</Text>
+
+        {behavior.captureSpec ? (
+          <View style={styles.captureWrap}>
+            <Text style={[styles.captureLabel, { color: colors.textMuted }]}>
+              {behavior.captureSpec.label}
+              {behavior.captureSpec.type === 'metric' && behavior.captureSpec.unit
+                ? ` (${behavior.captureSpec.unit})`
+                : ''}
+            </Text>
+            {behavior.captureSpec.type === 'counter' ? (
+              <View style={styles.stepperRow}>
+                <Pressable
+                  onPress={() => {
+                    haptics.selection();
+                    setCounterValue((v) => Math.max(0, v - 1));
+                  }}
+                  disabled={isSubmitting}
+                  style={({ pressed }) => [
+                    styles.stepperBtn,
+                    pressed && { opacity: PRESSED_OPACITY },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease"
+                >
+                  <IconSymbol name="minus.circle" size={30} color={colors.textMuted} />
+                </Pressable>
+                <Text style={[styles.stepperValue, { color: colors.text }]}>{counterValue}</Text>
+                <Pressable
+                  onPress={() => {
+                    haptics.selection();
+                    setCounterValue((v) => v + 1);
+                  }}
+                  disabled={isSubmitting}
+                  style={({ pressed }) => [
+                    styles.stepperBtn,
+                    pressed && { opacity: PRESSED_OPACITY },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase"
+                >
+                  <IconSymbol name="plus.circle.fill" size={30} color={colors.accentText} />
+                </Pressable>
+              </View>
+            ) : (
+              <TextInput
+                style={[
+                  styles.metricInput,
+                  { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+                value={metricValue}
+                onChangeText={setMetricValue}
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+                editable={!isSubmitting}
+                accessibilityLabel={behavior.captureSpec.label}
+              />
+            )}
+          </View>
+        ) : null}
 
         <View style={styles.buttonContainer}>
           <Pressable
@@ -302,6 +380,20 @@ const styles = StyleSheet.create({
     ...Type.body,
     textAlign: 'center',
     marginBottom: Space.xxxl + Space.sm,
+  },
+  captureWrap: { alignItems: 'center', gap: Space.sm, marginBottom: Space.xxl },
+  captureLabel: { ...Type.caption, textTransform: 'uppercase', letterSpacing: 1 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: Space.xl },
+  stepperBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  stepperValue: { ...Type.display2, minWidth: 56, textAlign: 'center' },
+  metricInput: {
+    ...Type.display2,
+    textAlign: 'center',
+    minWidth: 140,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingVertical: Space.sm,
+    paddingHorizontal: Space.lg,
   },
   buttonContainer: {
     flexDirection: 'column',

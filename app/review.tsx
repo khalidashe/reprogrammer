@@ -24,18 +24,20 @@ import {
  */
 const FREE_WEEKS_BACK = 1;
 
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10));
+
 export default function ReviewScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { behaviors, checkIns } = useStore();
+  const { behaviors, checkIns, entries } = useStore();
   const { isPro } = useIsPro();
   const { openGuide } = useContentModals();
   const [weeksAgo, setWeeksAgo] = useState(0);
 
   const review = useMemo(
-    () => buildWeeklyReview(behaviors, checkIns, Date.now(), weeksAgo),
-    [behaviors, checkIns, weeksAgo]
+    () => buildWeeklyReview(behaviors, checkIns, entries, Date.now(), weeksAgo),
+    [behaviors, checkIns, entries, weeksAgo]
   );
 
   const atFreeEdge = !isPro && weeksAgo >= FREE_WEEKS_BACK;
@@ -268,12 +270,58 @@ function BehaviorReviewCard({
         </View>
       </View>
 
+      {row.capture ? (
+        <View style={[styles.captureBlock, { borderTopColor: colors.border }]}>
+          <View style={styles.captureHeader}>
+            <Text style={[styles.captureTitle, { color: colors.text }]}>{row.capture.label}</Text>
+            {row.capture.deltaPct !== null ? (
+              <Text
+                style={[
+                  styles.captureDelta,
+                  { color: row.capture.improved ? colors.accentText : colors.textMuted },
+                ]}
+              >
+                {row.capture.deltaPct >= 0 ? '+' : ''}
+                {row.capture.deltaPct}%
+              </Text>
+            ) : null}
+          </View>
+          <CaptureBars daily={row.capture.daily} colors={colors} />
+          <Text style={[styles.captureMeta, { color: colors.textMuted }]}>
+            {row.capture.type === 'metric'
+              ? `${fmt(row.capture.total)}${row.capture.unit ? ' ' + row.capture.unit : ''} · avg ${fmt(row.capture.avg)}/logged day`
+              : `${fmt(row.capture.total)} total this week`}
+          </Text>
+        </View>
+      ) : null}
+
       {row.hardestNote ? (
         <View style={[styles.noteCard, { borderColor: colors.border }]}>
           <Text style={[styles.noteLabel, { color: colors.textMuted }]}>When it was hard, you wrote</Text>
           <Text style={[styles.noteText, { color: colors.text }]}>“{row.hardestNote.text}”</Text>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function CaptureBars({ daily, colors }: { daily: number[]; colors: typeof Colors.dark }) {
+  const max = Math.max(1, ...daily);
+  return (
+    <View style={styles.bars}>
+      {daily.map((v, i) => (
+        <View key={i} style={styles.barTrack}>
+          <View
+            style={[
+              styles.bar,
+              {
+                height: `${Math.max(4, (v / max) * 100)}%`,
+                backgroundColor: v > 0 ? colors.tint : colors.surfaceMuted,
+              },
+            ]}
+          />
+        </View>
+      ))}
     </View>
   );
 }
@@ -359,6 +407,15 @@ const styles = StyleSheet.create({
   },
   noteLabel: { ...Type.micro, textTransform: 'uppercase', letterSpacing: 1 },
   noteText: { ...Type.body, fontStyle: 'italic' },
+
+  captureBlock: { borderTopWidth: 1, paddingTop: Space.sm, gap: Space.xs, marginTop: Space.xxs },
+  captureHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  captureTitle: { ...Type.caption, fontWeight: '700' },
+  captureDelta: { ...Type.caption, fontWeight: '700' },
+  captureMeta: { ...Type.micro },
+  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: Space.xs, height: 36 },
+  barTrack: { flex: 1, height: '100%', justifyContent: 'flex-end' },
+  bar: { width: '100%', borderRadius: Radius.sm, minHeight: 3 },
 
   regressCard: {
     borderWidth: 1,

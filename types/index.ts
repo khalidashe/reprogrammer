@@ -32,6 +32,19 @@ export type LibraryCategory =
   | 'philosophy_worldview';
 export type Stage = 'starting' | 'in_progress' | 'habitual';
 
+/** Typed capture attached to a behavior (REP-5 Phase 2). */
+export type CaptureType = 'counter' | 'metric';
+
+export interface CaptureSpec {
+  type: CaptureType;
+  /** Short noun for what's tracked, e.g. "Pickups" or "Deep minutes". */
+  label: string;
+  /** Optional unit shown after metric values, e.g. "min", "reps". */
+  unit?: string;
+  /** Which direction is improvement. Pickups → 'down'; reps → 'up'. */
+  direction: 'up' | 'down';
+}
+
 export interface Behavior {
   id: string;
   kind: BehaviorKind;
@@ -58,6 +71,8 @@ export interface Behavior {
   createdAt: number;
   hidden: boolean;
   bookmarked: boolean;
+  /** Optional typed capture (Counter / Metric) logged at check-in (REP-5 Phase 2). */
+  captureSpec?: CaptureSpec;
   /** @deprecated v1 rollback only */
   frequency?: { pingsPerHour: number };
   /** @deprecated v1 rollback only — replaced by `level` */
@@ -74,6 +89,15 @@ export interface CheckIn {
   at: number;
   result: 'yes' | 'tried' | 'no';
   note?: string;
+}
+
+/** A single logged capture value (REP-5 Phase 2). Local-only until REP-30. */
+export interface CaptureEntry {
+  id: string;
+  behaviorId: string;
+  at: number;
+  /** Counter: the count logged. Metric: the measured value. */
+  value: number;
 }
 
 export interface ReminderAttempt {

@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Behavior, CheckIn, ReminderAttempt, AppProfile, BehaviorKind } from '../types';
+import {
+  Behavior,
+  CheckIn,
+  ReminderAttempt,
+  AppProfile,
+  BehaviorKind,
+  CaptureEntry,
+} from '../types';
 import { calculateStreak } from '../services/streak';
 import {
   INITIAL_LEVEL,
@@ -13,6 +20,7 @@ import { cloudSync } from '../services/cloud-sync';
 const BEHAVIORS_KEY = 'rpg.behaviors.v3';
 const BEHAVIORS_V2_KEY = 'rpg.behaviors.v2';
 const BEHAVIORS_V1_KEY = 'rpg.behaviors.v1';
+const ENTRIES_KEY = 'rpg.entries.v1';
 
 const LEGACY_STABILITY_TO_LEVEL: Array<[number, number]> = [
   [6, 1],
@@ -97,6 +105,7 @@ interface StoreState {
   behaviors: Behavior[];
   checkIns: CheckIn[];
   reminderAttempts: ReminderAttempt[];
+  entries: CaptureEntry[];
   appProfile: AppProfile;
   isHydrated: boolean;
 
@@ -113,26 +122,37 @@ interface StoreState {
   addReminderAttempt: (attempt: ReminderAttempt) => Promise<void>;
   updateReminderAttempt: (attempt: ReminderAttempt) => Promise<void>;
   getReminderAttempts: (behaviorId: string) => ReminderAttempt[];
+  addEntry: (entry: CaptureEntry) => Promise<void>;
+  getEntries: (behaviorId: string) => CaptureEntry[];
 }
 
 const useStore = create<StoreState>((set, get) => ({
   behaviors: [],
   checkIns: [],
   reminderAttempts: [],
+  entries: [],
   appProfile: { hasOnboarded: false },
   isHydrated: false,
 
   hydrate: async () => {
     try {
-      const [v3Data, v2Data, v1Data, checkInsData, reminderAttemptsData, appProfileData] =
-        await Promise.all([
-          AsyncStorage.getItem(BEHAVIORS_KEY),
-          AsyncStorage.getItem(BEHAVIORS_V2_KEY),
-          AsyncStorage.getItem(BEHAVIORS_V1_KEY),
-          AsyncStorage.getItem('rpg.checkins.v1'),
-          AsyncStorage.getItem('rpg.reminderAttempts.v1'),
-          AsyncStorage.getItem('rpg.app.v1'),
-        ]);
+      const [
+        v3Data,
+        v2Data,
+        v1Data,
+        checkInsData,
+        reminderAttemptsData,
+        appProfileData,
+        entriesData,
+      ] = await Promise.all([
+        AsyncStorage.getItem(BEHAVIORS_KEY),
+        AsyncStorage.getItem(BEHAVIORS_V2_KEY),
+        AsyncStorage.getItem(BEHAVIORS_V1_KEY),
+        AsyncStorage.getItem('rpg.checkins.v1'),
+        AsyncStorage.getItem('rpg.reminderAttempts.v1'),
+        AsyncStorage.getItem('rpg.app.v1'),
+        AsyncStorage.getItem(ENTRIES_KEY),
+      ]);
 
       let behaviors: Behavior[];
       if (v3Data) {
@@ -149,6 +169,7 @@ const useStore = create<StoreState>((set, get) => ({
         behaviors,
         checkIns: checkInsData ? JSON.parse(checkInsData) : [],
         reminderAttempts: reminderAttemptsData ? JSON.parse(reminderAttemptsData) : [],
+        entries: entriesData ? JSON.parse(entriesData) : [],
         appProfile: appProfileData ? JSON.parse(appProfileData) : { hasOnboarded: false },
         isHydrated: true,
       });
@@ -180,14 +201,17 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = state.behaviors.filter((b) => b.id !== id);
     const checkInsUpdated = state.checkIns.filter((c) => c.behaviorId !== id);
     const attemptsUpdated = state.reminderAttempts.filter((a) => a.behaviorId !== id);
+    const entriesUpdated = state.entries.filter((e) => e.behaviorId !== id);
     set({
       behaviors: updated,
       checkIns: checkInsUpdated,
       reminderAttempts: attemptsUpdated,
+      entries: entriesUpdated,
     });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(checkInsUpdated));
     await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(attemptsUpdated));
+    await AsyncStorage.setItem(ENTRIES_KEY, JSON.stringify(entriesUpdated));
     cloudSync.deleteBehavior(id);
     for (const c of removedCheckIns) cloudSync.deleteCheckIn(c.id);
   },
@@ -258,6 +282,19 @@ const useStore = create<StoreState>((set, get) => ({
   getReminderAttempts: (behaviorId: string) => {
     const state = get();
     return state.reminderAttempts.filter((ra) => ra.behaviorId === behaviorId);
+  },
+
+  // Capture entries (REP-5 Phase 2). Local-only for now — sync is REP-30.
+  addEntry: async (entry: CaptureEntry) => {
+    const state = get();
+    const updated = [...state.entries, entry];
+    set({ entries: updated });
+    await AsyncStorage.setItem(ENTRIES_KEY, JSON.stringify(updated));
+  },
+
+  getEntries: (behaviorId: string) => {
+    const state = get();
+    return state.entries.filter((e) => e.behaviorId === behaviorId);
   },
 }));
 
