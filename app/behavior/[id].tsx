@@ -19,6 +19,7 @@ import { lastNDaysStatus } from '@/services/consistency';
 import { useFeedback } from '@/components/ui/feedback';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { countReflections } from '@/services/reflections';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -43,6 +44,7 @@ export default function BehaviorDetailScreen() {
   const {
     behaviors,
     checkIns,
+    entries,
     getStreak,
     deleteBehavior,
     updateBehavior,
@@ -77,6 +79,10 @@ export default function BehaviorDetailScreen() {
 
   const streak = getStreak(behavior.id);
   const isEliminate = behavior.kind === 'eliminate';
+  const reflectionCount =
+    behavior.captureSpec?.type === 'reflection'
+      ? countReflections(behaviors, entries, behavior.id)
+      : 0;
 
   // Last 14 days of consistency (oldest → today).
   const last14 = lastNDaysStatus(checkIns, behavior.id, 14);
@@ -352,6 +358,26 @@ export default function BehaviorDetailScreen() {
         <Text style={[styles.deleteLinkText, { color: colors.danger }]}>Delete behavior</Text>
       </Pressable>
 
+      {reflectionCount > 0 ? (
+        <Pressable
+          onPress={() =>
+            router.push({ pathname: '/reflections', params: { behaviorId: behavior.id } })
+          }
+          style={[
+            styles.reflectionsLink,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${reflectionCount} reflections`}
+        >
+          <IconSymbol name="note.text" size={16} color={colors.accentText} />
+          <Text style={[styles.reflectionsLinkText, { color: colors.text }]}>
+            {reflectionCount} {reflectionCount === 1 ? 'reflection' : 'reflections'}
+          </Text>
+          <IconSymbol name="chevron.right" size={16} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
           Recent check-ins
@@ -579,6 +605,19 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   editButtonText: { ...Type.bodyBold },
+  reflectionsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    marginHorizontal: Space.xl,
+    marginTop: Space.xl,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    minHeight: 52,
+  },
+  reflectionsLinkText: { ...Type.bodyBold, flex: 1 },
   deleteLink: {
     flexDirection: 'row',
     gap: Space.xs,

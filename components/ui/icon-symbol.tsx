@@ -31,6 +31,7 @@ const MAPPING = {
   'plus': 'add',
   'plus.circle.fill': 'add-circle',
   'magnifyingglass': 'search',
+  'note.text': 'notes',
   'xmark': 'close',
   'checkmark': 'check',
   'pause.fill': 'pause',

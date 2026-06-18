@@ -403,8 +403,8 @@ export function TrackStep({
     update({ captureType: t, ...(t === 'counter' ? { captureUnit: '' } : {}) });
   return (
     <StepScaffold
-      title="Track a number"
-      subtitle="Optional. Capture a count or metric at each check-in and watch it trend in your weekly review."
+      title="Capture at check-in"
+      subtitle="Optional. Track a number, fill a quick form, or write a reflection each time — and see it in your weekly review."
       colors={colors}
     >
       <SelectCard
@@ -439,7 +439,31 @@ export function TrackStep({
         onPress={() => setType('template')}
         colors={colors}
       />
-      {state.captureType === 'template' ? (
+      <SelectCard
+        title="Reflection"
+        description="Write a few free-form lines — searchable later."
+        mode="select"
+        selected={state.captureType === 'reflection'}
+        onPress={() => setType('reflection')}
+        colors={colors}
+      />
+      {state.captureType === 'reflection' ? (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+            What to call it (optional)
+          </Text>
+          <FieldInput
+            value={state.captureLabel}
+            onChangeText={(t) => update({ captureLabel: t })}
+            placeholder="e.g. Evening journal"
+            colors={colors}
+            accessibilityLabel="What to call this reflection"
+          />
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            You’ll get a space to write at each check-in. Find and search them all later.
+          </Text>
+        </>
+      ) : state.captureType === 'template' ? (
         <>
           <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Which form?</Text>
           {CAPTURE_TEMPLATES.map((t) => (
