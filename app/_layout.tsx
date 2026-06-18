@@ -141,6 +141,7 @@ function AppShell() {
             <Stack.Screen name="settings" options={{ title: 'Settings' }} />
             <Stack.Screen name="manage-behaviors" options={{ title: 'Saved & archived' }} />
             <Stack.Screen name="review" options={{ title: 'Weekly review' }} />
+            <Stack.Screen name="reflections" options={{ title: 'Reflections' }} />
           </Stack>
         </ContentModalsProvider>
       </FeedbackProvider>

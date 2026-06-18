@@ -114,6 +114,7 @@ function isStepValid(stepId: StepId, s: WizardState): boolean {
     return (
       s.captureType === 'none' ||
       s.captureType === 'template' ||
+      s.captureType === 'reflection' ||
       s.captureLabel.trim().length > 0
     );
   }
@@ -237,6 +238,12 @@ export default function CreateScreen() {
         label: tpl.title,
         direction: 'up',
         templateId: state.captureTemplateId,
+      };
+    } else if (state.captureType === 'reflection') {
+      captureSpec = {
+        type: 'reflection',
+        label: state.captureLabel.trim() || 'Reflection',
+        direction: 'up',
       };
     } else if (state.captureType !== 'none') {
       captureSpec = {

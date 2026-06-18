@@ -166,6 +166,25 @@ expect(
   'last entry is the most recent, with its fields'
 );
 
+// Reflection capture: free text reuses the template treatment (count + last).
+// 2 reflections this week, 1 last week (more = better).
+const rb = mk('rb', {
+  captureSpec: { type: 'reflection', label: 'Reflection', direction: 'up' },
+});
+const rEntries: CaptureEntry[] = [
+  { id: 'rf1', behaviorId: 'rb', at: at(0), value: 1, fields: { text: 'Calmer than yesterday' } },
+  { id: 'rf2', behaviorId: 'rb', at: at(3), value: 1, fields: { text: 'Caught the spiral early' } },
+  { id: 'rf3', behaviorId: 'rb', at: at(8), value: 1, fields: { text: 'Old reflection' } },
+];
+const rcap = buildWeeklyReview([rb], [], rEntries, NOW, 0).behaviors[0].capture;
+expect(!!rcap && rcap!.type === 'reflection', 'reflection capture summary present');
+expect(rcap!.count === 2, 'reflection counts entries this week (2)');
+expect(rcap!.improved === true, 'more reflections is improvement (direction up)');
+expect(
+  !!rcap!.last && rcap!.last!.fields?.text === 'Calmer than yesterday',
+  'reflection last entry is the most recent, with its text'
+);
+
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed.`);
   process.exit(1);

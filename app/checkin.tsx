@@ -118,6 +118,18 @@ export default function CheckInScreen() {
               fields,
             });
           }
+        } else if (spec.type === 'reflection') {
+          // The reflection reuses the note field — store it as a searchable entry.
+          const text = note.trim();
+          if (text.length > 0) {
+            await addEntry({
+              id: generateUUID(),
+              behaviorId: behavior.id,
+              at: Date.now(),
+              value: 1,
+              fields: { text },
+            });
+          }
         } else {
           const raw = spec.type === 'counter' ? counterValue : parseFloat(metricValue);
           if (Number.isFinite(raw) && raw > 0) {
@@ -256,6 +268,29 @@ export default function CheckInScreen() {
               </View>
             ))}
           </View>
+        ) : behavior.captureSpec && behavior.captureSpec.type === 'reflection' ? (
+          <View style={styles.reflectionWrap}>
+            <Text style={[styles.captureLabel, { color: colors.textMuted }]}>
+              {behavior.captureSpec.label}
+            </Text>
+            <TextInput
+              style={[
+                styles.reflectionInput,
+                {
+                  color: colors.text,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={note}
+              onChangeText={setNote}
+              placeholder="Write a few lines…"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              editable={!isSubmitting}
+              accessibilityLabel={behavior.captureSpec.label}
+            />
+          </View>
         ) : behavior.captureSpec ? (
           <View style={styles.captureWrap}>
             <Text style={[styles.captureLabel, { color: colors.textMuted }]}>
@@ -375,20 +410,25 @@ export default function CheckInScreen() {
           </Pressable>
         </View>
 
-        <View
-          style={[styles.noteWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}
-        >
-          <TextInput
-            style={[styles.noteInput, { color: colors.text }]}
-            placeholder="How did it go? (optional)"
-            placeholderTextColor={colors.textMuted}
-            value={note}
-            onChangeText={setNote}
-            multiline
-            editable={!isSubmitting}
-            accessibilityLabel="Optional note about this check-in"
-          />
-        </View>
+        {behavior.captureSpec?.type !== 'reflection' ? (
+          <View
+            style={[
+              styles.noteWrap,
+              { borderColor: colors.border, backgroundColor: colors.surface },
+            ]}
+          >
+            <TextInput
+              style={[styles.noteInput, { color: colors.text }]}
+              placeholder="How did it go? (optional)"
+              placeholderTextColor={colors.textMuted}
+              value={note}
+              onChangeText={setNote}
+              multiline
+              editable={!isSubmitting}
+              accessibilityLabel="Optional note about this check-in"
+            />
+          </View>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -449,6 +489,16 @@ const styles = StyleSheet.create({
     paddingVertical: Space.sm,
   },
   templateInputMultiline: { minHeight: 64, textAlignVertical: 'top' },
+  reflectionWrap: { alignSelf: 'stretch', gap: Space.sm, marginBottom: Space.xxl },
+  reflectionInput: {
+    ...Type.body,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    minHeight: 96,
+    textAlignVertical: 'top',
+  },
   buttonContainer: {
     flexDirection: 'column',
     gap: Space.sm,

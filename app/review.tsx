@@ -15,6 +15,7 @@ import {
   WEEK_DAYS,
   type BehaviorWeek,
 } from '@/services/weekly-review';
+import { countReflections } from '@/services/reflections';
 
 /**
  * Weekly Review — REP-5 Phase 1. The pillar's centerpiece, built from existing
@@ -82,6 +83,10 @@ export default function ReviewScreen() {
       : null;
 
   const hasBehaviors = review.behaviors.length > 0;
+  const reflectionCount = useMemo(
+    () => countReflections(behaviors, entries),
+    [behaviors, entries]
+  );
 
   return (
     <ScrollView
@@ -198,6 +203,31 @@ export default function ReviewScreen() {
             </Pressable>
           ) : null}
 
+          {reflectionCount > 0 ? (
+            <Pressable
+              onPress={() => {
+                haptics.selection();
+                router.push('/reflections');
+              }}
+              style={({ pressed }) => [
+                styles.reflectionsLink,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                pressed && { opacity: PRESSED_OPACITY },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Search your reflections, ${reflectionCount} total`}
+            >
+              <IconSymbol name="note.text" size={16} color={colors.accentText} />
+              <Text style={[styles.reflectionsLinkText, { color: colors.text }]}>
+                Your reflections
+              </Text>
+              <Text style={[styles.reflectionsLinkCount, { color: colors.textMuted }]}>
+                {reflectionCount}
+              </Text>
+              <IconSymbol name="chevron.right" size={16} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+
           {atFreeEdge ? (
             <View style={styles.proHintRow}>
               <IconSymbol name="lock.fill" size={12} color={colors.textMuted} />
@@ -298,9 +328,12 @@ function BehaviorReviewCard({
               ? `${fmt(row.capture.total)}${row.capture.unit ? ' ' + row.capture.unit : ''} · avg ${fmt(row.capture.avg)}/logged day`
               : row.capture.type === 'template'
                 ? `${row.capture.count} ${row.capture.count === 1 ? 'entry' : 'entries'} this week`
-                : `${fmt(row.capture.total)} total this week`}
+                : row.capture.type === 'reflection'
+                  ? `${row.capture.count} ${row.capture.count === 1 ? 'reflection' : 'reflections'} this week`
+                  : `${fmt(row.capture.total)} total this week`}
           </Text>
-          {row.capture.type === 'template' && firstField(row.capture.last?.fields) ? (
+          {(row.capture.type === 'template' || row.capture.type === 'reflection') &&
+          firstField(row.capture.last?.fields) ? (
             <Text style={[styles.captureEntry, { color: colors.text }]} numberOfLines={2}>
               “{firstField(row.capture.last?.fields)}”
             </Text>
@@ -439,6 +472,19 @@ const styles = StyleSheet.create({
   },
   regressText: { ...Type.body },
   regressLink: { ...Type.caption, fontWeight: '600' },
+
+  reflectionsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    minHeight: 52,
+  },
+  reflectionsLinkText: { ...Type.bodyBold, flex: 1 },
+  reflectionsLinkCount: { ...Type.body },
 
   proHintRow: {
     flexDirection: 'row',

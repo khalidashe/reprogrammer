@@ -32,8 +32,8 @@ export type LibraryCategory =
   | 'philosophy_worldview';
 export type Stage = 'starting' | 'in_progress' | 'habitual';
 
-/** Typed capture attached to a behavior (REP-5 Phase 2–3). */
-export type CaptureType = 'counter' | 'metric' | 'template';
+/** Typed capture attached to a behavior (REP-5 Phase 2–4). */
+export type CaptureType = 'counter' | 'metric' | 'template' | 'reflection';
 
 /** Built-in structured-entry templates (REP-5 Phase 3). */
 export type CaptureTemplateId = 'cbt' | 'ofnr' | 'three_good_things';
@@ -101,9 +101,12 @@ export interface CaptureEntry {
   id: string;
   behaviorId: string;
   at: number;
-  /** Counter: the count logged. Metric: the value. Template: 1 (one completion). */
+  /** Counter: the count logged. Metric: the value. Template/Reflection: 1 (one completion). */
   value: number;
-  /** Template entries store their structured field values here (REP-5 Phase 3). */
+  /**
+   * Structured field values. Templates store their form fields here (REP-5
+   * Phase 3); reflections store their free text under `text` (REP-5 Phase 4).
+   */
   fields?: Record<string, string>;
 }
 
