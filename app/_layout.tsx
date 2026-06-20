@@ -135,6 +135,10 @@ function AppShell() {
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
             <Stack.Screen name="create" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen
+              name="focus"
+              options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }}
+            />
             <Stack.Screen name="behavior/[id]" options={{ title: 'Behavior' }} />
             <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
             <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />

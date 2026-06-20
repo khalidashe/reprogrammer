@@ -5,11 +5,31 @@
  * and the Zustand store) so the algorithm can be unit-tested without RN.
  */
 import { effectiveIntervalMinutes } from './levels';
-import type { Behavior, AppProfile } from '../types';
+import type { Behavior, AppProfile, FocusSession } from '../types';
 
 export const JITTER_RATIO = 0.2;
 export const MIN_GAP_RATIO = 0.6;
 export const SCHEDULE_LEAD_MS = 1000;
+
+/**
+ * A focus session counts as "live" (and so mutes reminders, REP-7) only within
+ * this cap. So a session that was started and never ended — e.g. the app was
+ * killed mid-session — can't silence reminders forever; muting self-heals once
+ * the cap elapses.
+ */
+export const MAX_FOCUS_SESSION_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * True when a Pull-mode focus session is currently running (REP-7). While one
+ * is live the scheduler stays silent — a posture ping mid-deep-work is the exact
+ * distraction the session is measuring.
+ */
+export function hasActiveFocusSession(
+  sessions: Pick<FocusSession, 'startedAt' | 'endedAt'>[],
+  now: number = Date.now()
+): boolean {
+  return sessions.some((s) => s.endedAt == null && now - s.startedAt < MAX_FOCUS_SESSION_MS);
+}
 
 /**
  * True when a behavior is currently paused — either indefinitely ("until I turn

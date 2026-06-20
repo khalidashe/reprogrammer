@@ -36,6 +36,7 @@ const MAPPING = {
   'checkmark': 'check',
   'pause.fill': 'pause',
   'play.fill': 'play-arrow',
+  'timer': 'timer',
   'flame.fill': 'local-fire-department',
   'bell.fill': 'notifications',
   'sparkles': 'auto-awesome',
