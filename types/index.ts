@@ -141,6 +141,11 @@ export interface AppProfile {
   hasOnboarded: boolean;
   userName?: string;
   userBio?: string;
+  /**
+   * Free-text goals — what the user wants to change or become (REP-41).
+   * Local-only; the Coach / AI program-search (REP-40, REP-6) will read these.
+   */
+  goals?: string;
   /** Timestamp of the most recent lapse (3-no auto-pause). */
   lastLapseAt?: number;
   /** Whether the user has dismissed the compassionate restart banner for the last lapse. */

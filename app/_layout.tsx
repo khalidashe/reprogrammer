@@ -154,6 +154,7 @@ function AppShell() {
             <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
             <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
             <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+            <Stack.Screen name="goals" options={{ presentation: 'modal', title: 'Your goals' }} />
             <Stack.Screen name="manage-behaviors" options={{ title: 'Saved & archived' }} />
             <Stack.Screen name="review" options={{ title: 'Weekly review' }} />
             <Stack.Screen name="reflections" options={{ title: 'Reflections' }} />
