@@ -212,6 +212,17 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      <Section title="You" colors={colors}>
+        {appProfile.goals ? (
+          <Row label="Your goals" value={appProfile.goals} colors={colors} />
+        ) : null}
+        <ActionButton
+          label={appProfile.goals ? 'Edit your goals' : 'Set your goals'}
+          onPress={() => router.push('/goals')}
+          colors={colors}
+        />
+      </Section>
+
       <Section title="Your behaviors" colors={colors}>
         <ActionButton
           label={`Bookmarked${bookmarkedCount ? ` (${bookmarkedCount})` : ''}`}
