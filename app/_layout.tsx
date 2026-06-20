@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
@@ -15,11 +16,16 @@ import {
   rescheduleAll,
   setupNotificationCategory,
 } from '@/services/notifications';
+import { AnimatedSplash } from '@/components/animated-splash';
 import { ContentModalsProvider } from '@/components/library/content-modals-provider';
 import { FeedbackProvider } from '@/components/ui/feedback';
 import { convex } from '@/services/convex-client';
 import { authSecureStorage } from '@/services/secure-storage';
 import { useCloudSyncBootstrap } from '@/hooks/useCloudSyncBootstrap';
+
+// Hold the native splash until the JS splash has painted, so the >R_ mark hands
+// off seamlessly into the blinking-cursor AnimatedSplash (REP-43).
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   return (
@@ -39,6 +45,11 @@ function AppShell() {
   const responseListener = useRef<any>(null);
 
   useCloudSyncBootstrap();
+
+  // Reveal the JS tree (AnimatedSplash, then the app) once it has mounted.
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -123,7 +134,7 @@ function AppShell() {
   }, [router]);
 
   if (!isHydrated) {
-    return null;
+    return <AnimatedSplash />;
   }
 
   return (
