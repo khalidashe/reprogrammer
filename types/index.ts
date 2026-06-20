@@ -110,6 +110,21 @@ export interface CaptureEntry {
   fields?: Record<string, string>;
 }
 
+/**
+ * Pull Mode (REP-7): a self-logged "focus session". The app stays silent and
+ * the user taps +1 each time they catch the eliminated behavior drifting — a
+ * meta-awareness rep, never a demerit. Local-only until REP-30.
+ */
+export interface FocusSession {
+  id: string;
+  behaviorId: string;
+  startedAt: number;
+  /** Undefined while the session is live. */
+  endedAt?: number;
+  /** "Caught it" taps logged during the session. */
+  catches: number;
+}
+
 export interface ReminderAttempt {
   id: string;
   behaviorId: string;

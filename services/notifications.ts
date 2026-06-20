@@ -13,6 +13,7 @@ import {
   hashSeed,
   mulberry32,
   isReminderMuteActive,
+  hasActiveFocusSession,
   SCHEDULE_LEAD_MS,
 } from './scheduler-core';
 import {
@@ -201,6 +202,11 @@ export async function rescheduleAll(options?: { force?: boolean }): Promise<void
   // Global mute (REP-35): everything is cancelled above; schedule nothing until
   // un-muted. Honored here so launch + foreground reschedules both stay silent.
   if (isReminderMuteActive(store.appProfile, now)) return;
+
+  // A live Pull-mode focus session (REP-7) is a self-imposed DND — a posture
+  // ping mid-deep-work is the exact distraction being measured. Stay silent
+  // until the session ends (or the safety cap elapses).
+  if (hasActiveFocusSession(store.focusSessions, now)) return;
 
   const active = store.behaviors.filter((b) => !b.hidden);
   if (active.length === 0) return;

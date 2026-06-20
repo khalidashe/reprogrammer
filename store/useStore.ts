@@ -7,7 +7,10 @@ import {
   AppProfile,
   BehaviorKind,
   CaptureEntry,
+  FocusSession,
 } from '../types';
+import { generateUUID } from '../utils/uuid';
+import { MAX_FOCUS_SESSION_MS } from '../services/scheduler-core';
 import { calculateStreak } from '../services/streak';
 import {
   INITIAL_LEVEL,
@@ -21,6 +24,7 @@ const BEHAVIORS_KEY = 'rpg.behaviors.v3';
 const BEHAVIORS_V2_KEY = 'rpg.behaviors.v2';
 const BEHAVIORS_V1_KEY = 'rpg.behaviors.v1';
 const ENTRIES_KEY = 'rpg.entries.v1';
+const FOCUS_SESSIONS_KEY = 'rpg.focusSessions.v1';
 
 const LEGACY_STABILITY_TO_LEVEL: Array<[number, number]> = [
   [6, 1],
@@ -106,6 +110,7 @@ interface StoreState {
   checkIns: CheckIn[];
   reminderAttempts: ReminderAttempt[];
   entries: CaptureEntry[];
+  focusSessions: FocusSession[];
   appProfile: AppProfile;
   isHydrated: boolean;
 
@@ -124,6 +129,11 @@ interface StoreState {
   getReminderAttempts: (behaviorId: string) => ReminderAttempt[];
   addEntry: (entry: CaptureEntry) => Promise<void>;
   getEntries: (behaviorId: string) => CaptureEntry[];
+  startFocusSession: (behaviorId: string) => Promise<FocusSession>;
+  addFocusCatch: (sessionId: string) => Promise<void>;
+  endFocusSession: (sessionId: string) => Promise<void>;
+  getActiveFocusSession: () => FocusSession | undefined;
+  getFocusSessions: (behaviorId: string) => FocusSession[];
 }
 
 const useStore = create<StoreState>((set, get) => ({
@@ -131,6 +141,7 @@ const useStore = create<StoreState>((set, get) => ({
   checkIns: [],
   reminderAttempts: [],
   entries: [],
+  focusSessions: [],
   appProfile: { hasOnboarded: false },
   isHydrated: false,
 
@@ -144,6 +155,7 @@ const useStore = create<StoreState>((set, get) => ({
         reminderAttemptsData,
         appProfileData,
         entriesData,
+        focusSessionsData,
       ] = await Promise.all([
         AsyncStorage.getItem(BEHAVIORS_KEY),
         AsyncStorage.getItem(BEHAVIORS_V2_KEY),
@@ -152,6 +164,7 @@ const useStore = create<StoreState>((set, get) => ({
         AsyncStorage.getItem('rpg.reminderAttempts.v1'),
         AsyncStorage.getItem('rpg.app.v1'),
         AsyncStorage.getItem(ENTRIES_KEY),
+        AsyncStorage.getItem(FOCUS_SESSIONS_KEY),
       ]);
 
       let behaviors: Behavior[];
@@ -170,6 +183,7 @@ const useStore = create<StoreState>((set, get) => ({
         checkIns: checkInsData ? JSON.parse(checkInsData) : [],
         reminderAttempts: reminderAttemptsData ? JSON.parse(reminderAttemptsData) : [],
         entries: entriesData ? JSON.parse(entriesData) : [],
+        focusSessions: focusSessionsData ? JSON.parse(focusSessionsData) : [],
         appProfile: appProfileData ? JSON.parse(appProfileData) : { hasOnboarded: false },
         isHydrated: true,
       });
@@ -202,16 +216,19 @@ const useStore = create<StoreState>((set, get) => ({
     const checkInsUpdated = state.checkIns.filter((c) => c.behaviorId !== id);
     const attemptsUpdated = state.reminderAttempts.filter((a) => a.behaviorId !== id);
     const entriesUpdated = state.entries.filter((e) => e.behaviorId !== id);
+    const focusSessionsUpdated = state.focusSessions.filter((s) => s.behaviorId !== id);
     set({
       behaviors: updated,
       checkIns: checkInsUpdated,
       reminderAttempts: attemptsUpdated,
       entries: entriesUpdated,
+      focusSessions: focusSessionsUpdated,
     });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(checkInsUpdated));
     await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(attemptsUpdated));
     await AsyncStorage.setItem(ENTRIES_KEY, JSON.stringify(entriesUpdated));
+    await AsyncStorage.setItem(FOCUS_SESSIONS_KEY, JSON.stringify(focusSessionsUpdated));
     cloudSync.deleteBehavior(id);
     for (const c of removedCheckIns) cloudSync.deleteCheckIn(c.id);
   },
@@ -295,6 +312,56 @@ const useStore = create<StoreState>((set, get) => ({
   getEntries: (behaviorId: string) => {
     const state = get();
     return state.entries.filter((e) => e.behaviorId === behaviorId);
+  },
+
+  // Pull Mode focus sessions (REP-7). Local-only for now — sync is REP-30.
+  startFocusSession: async (behaviorId: string) => {
+    const state = get();
+    const now = Date.now();
+    // Only one session runs at a time; close any that were left open.
+    const closed = state.focusSessions.map((s) =>
+      s.endedAt == null ? { ...s, endedAt: now } : s
+    );
+    const session: FocusSession = {
+      id: generateUUID(),
+      behaviorId,
+      startedAt: now,
+      catches: 0,
+    };
+    const updated = [...closed, session];
+    set({ focusSessions: updated });
+    await AsyncStorage.setItem(FOCUS_SESSIONS_KEY, JSON.stringify(updated));
+    return session;
+  },
+
+  addFocusCatch: async (sessionId: string) => {
+    const state = get();
+    const updated = state.focusSessions.map((s) =>
+      s.id === sessionId ? { ...s, catches: s.catches + 1 } : s
+    );
+    set({ focusSessions: updated });
+    await AsyncStorage.setItem(FOCUS_SESSIONS_KEY, JSON.stringify(updated));
+  },
+
+  endFocusSession: async (sessionId: string) => {
+    const state = get();
+    const now = Date.now();
+    const updated = state.focusSessions.map((s) =>
+      s.id === sessionId && s.endedAt == null ? { ...s, endedAt: now } : s
+    );
+    set({ focusSessions: updated });
+    await AsyncStorage.setItem(FOCUS_SESSIONS_KEY, JSON.stringify(updated));
+  },
+
+  getActiveFocusSession: () => {
+    const now = Date.now();
+    return get().focusSessions.find(
+      (s) => s.endedAt == null && now - s.startedAt < MAX_FOCUS_SESSION_MS
+    );
+  },
+
+  getFocusSessions: (behaviorId: string) => {
+    return get().focusSessions.filter((s) => s.behaviorId === behaviorId);
   },
 }));
 

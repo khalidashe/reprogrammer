@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import { Colors, Type, Space, Radius, PRESSED_OPACITY, type ThemeColors } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState, type ComponentProps } from 'react';
@@ -16,6 +16,7 @@ import type { CheckIn } from '@/types';
 import { endOfLocalDay, isBehaviorPaused } from '@/services/scheduler-core';
 import { deriveStage, stageLabel } from '@/services/levels';
 import { lastNDaysStatus } from '@/services/consistency';
+import { completedSessions, driftsPer30Min } from '@/services/focus';
 import { useFeedback } from '@/components/ui/feedback';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -46,6 +47,7 @@ export default function BehaviorDetailScreen() {
     checkIns,
     entries,
     getStreak,
+    getFocusSessions,
     deleteBehavior,
     updateBehavior,
     updateCheckIn,
@@ -86,6 +88,10 @@ export default function BehaviorDetailScreen() {
 
   // Last 14 days of consistency (oldest → today).
   const last14 = lastNDaysStatus(checkIns, behavior.id, 14);
+
+  // Pull Mode (REP-7): focus sessions are offered for eliminate behaviors.
+  const focusDone = isEliminate ? completedSessions(getFocusSessions(behavior.id)) : [];
+  const lastFocusRate = focusDone[0] ? driftsPer30Min(focusDone[0]) : null;
 
   const handleEdit = () => {
     router.push({ pathname: '/create', params: { id: behavior.id } });
@@ -301,6 +307,32 @@ export default function BehaviorDetailScreen() {
           </Text>
         </View>
       </View>
+
+      {isEliminate ? (
+        <>
+          <Pressable
+            onPress={() => router.push({ pathname: '/focus', params: { behaviorId: behavior.id } })}
+            style={({ pressed }) => [
+              styles.focusButton,
+              { backgroundColor: colors.tint },
+              pressed && { opacity: PRESSED_OPACITY },
+            ]}
+            accessibilityLabel="Start focus session"
+            accessibilityHint="Silences reminders and counts the drifts you catch"
+          >
+            <IconSymbol name="timer" size={18} color={colors.textOnBrand} />
+            <Text style={[styles.focusButtonText, { color: colors.textOnBrand }]}>
+              Start focus session
+            </Text>
+          </Pressable>
+          {focusDone.length > 0 ? (
+            <Text style={[styles.focusSummary, { color: colors.textMuted }]}>
+              {focusDone.length} session{focusDone.length === 1 ? '' : 's'}
+              {lastFocusRate != null ? ` · last ${lastFocusRate.toFixed(1)} drifts/30m` : ''}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
 
       {/* Actions sit above the check-in log so they're reachable without
           scrolling past a long history. */}
@@ -605,6 +637,19 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   editButtonText: { ...Type.bodyBold },
+  focusButton: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    marginHorizontal: Space.xl,
+    marginTop: Space.xl,
+    paddingVertical: Space.lg,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  focusButtonText: { ...Type.bodyBold },
+  focusSummary: { ...Type.caption, textAlign: 'center', marginTop: Space.sm, marginHorizontal: Space.xl },
   reflectionsLink: {
     flexDirection: 'row',
     alignItems: 'center',
