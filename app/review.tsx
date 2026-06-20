@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ComponentProps } from 'react';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
@@ -16,6 +16,7 @@ import {
   type BehaviorWeek,
 } from '@/services/weekly-review';
 import { countReflections } from '@/services/reflections';
+import { buildCoachInsights, type CoachInsight, type CoachTone } from '@/services/coach';
 
 /**
  * Weekly Review — REP-5 Phase 1. The pillar's centerpiece, built from existing
@@ -87,6 +88,7 @@ export default function ReviewScreen() {
     () => countReflections(behaviors, entries),
     [behaviors, entries]
   );
+  const insights = useMemo(() => buildCoachInsights(review), [review]);
 
   return (
     <ScrollView
@@ -179,29 +181,13 @@ export default function ReviewScreen() {
             )}
           </View>
 
+          {insights.length > 0 ? (
+            <CoachCard insights={insights} colors={colors} onOpenGuide={openGuide} />
+          ) : null}
+
           {review.behaviors.map((row) => (
             <BehaviorReviewCard key={row.behaviorId} row={row} colors={colors} dotColor={dotColor} />
           ))}
-
-          {review.regressed ? (
-            <Pressable
-              onPress={() => openGuide('guide-relapse-and-restart')}
-              style={({ pressed }) => [
-                styles.regressCard,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                pressed && { opacity: PRESSED_OPACITY },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Read: When you slip, how to come back"
-            >
-              <Text style={[styles.regressText, { color: colors.text }]}>
-                Tougher week than last? That is data, not failure.
-              </Text>
-              <Text style={[styles.regressLink, { color: colors.accentText }]}>
-                Read: When you slip, how to come back →
-              </Text>
-            </Pressable>
-          ) : null}
 
           {reflectionCount > 0 ? (
             <Pressable
@@ -239,6 +225,74 @@ export default function ReviewScreen() {
         </>
       )}
     </ScrollView>
+  );
+}
+
+function coachIconFor(kind: CoachInsight['kind']): ComponentProps<typeof IconSymbol>['name'] {
+  switch (kind) {
+    case 'momentum':
+      return 'flame.fill';
+    case 'showed_up':
+      return 'checkmark';
+    case 'regression':
+      return 'book.fill';
+    default:
+      return 'sparkles';
+  }
+}
+
+function coachTone(tone: CoachTone, colors: typeof Colors.dark) {
+  return tone === 'support'
+    ? { fg: colors.warning, bg: colors.warningSoft }
+    : { fg: colors.accentText, bg: colors.tintSoft };
+}
+
+function CoachCard({
+  insights,
+  colors,
+  onOpenGuide,
+}: {
+  insights: CoachInsight[];
+  colors: typeof Colors.dark;
+  onOpenGuide: (guideId: string) => void;
+}) {
+  return (
+    <View style={[styles.coachCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.coachHeader}>
+        <IconSymbol name="sparkles" size={14} color={colors.accentText} />
+        <Text style={[styles.coachHeaderText, { color: colors.textMuted }]}>Coach</Text>
+      </View>
+      {insights.map((ins, i) => {
+        const tone = coachTone(ins.tone, colors);
+        const tappable = !!ins.guideId;
+        return (
+          <Pressable
+            key={ins.id}
+            onPress={tappable ? () => onOpenGuide(ins.guideId!) : undefined}
+            accessibilityRole={tappable ? 'button' : undefined}
+            accessibilityLabel={
+              tappable ? `${ins.title}. ${ins.body} Tap to read more.` : `${ins.title}. ${ins.body}`
+            }
+            style={({ pressed }) => [
+              styles.coachRow,
+              i > 0 && { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth },
+              tappable && pressed && { opacity: PRESSED_OPACITY },
+            ]}
+          >
+            <View style={[styles.coachIcon, { backgroundColor: tone.bg }]}>
+              <IconSymbol name={coachIconFor(ins.kind)} size={15} color={tone.fg} />
+            </View>
+            <View style={styles.coachBody}>
+              <Text style={[styles.coachTitle, { color: colors.text }]}>{ins.title}</Text>
+              <Text style={[styles.coachText, { color: colors.textMuted }]}>{ins.body}</Text>
+            </View>
+            {tappable ? (
+              <IconSymbol name="chevron.right" size={15} color={colors.textMuted} />
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -464,14 +518,25 @@ const styles = StyleSheet.create({
   barTrack: { flex: 1, height: '100%', justifyContent: 'flex-end' },
   bar: { width: '100%', borderRadius: Radius.sm, minHeight: 3 },
 
-  regressCard: {
+  coachCard: {
     borderWidth: 1,
     borderRadius: Radius.lg,
     padding: Space.lg,
     gap: Space.xs,
   },
-  regressText: { ...Type.body },
-  regressLink: { ...Type.caption, fontWeight: '600' },
+  coachHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, marginBottom: Space.xxs },
+  coachHeaderText: { ...Type.micro, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' },
+  coachRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.sm },
+  coachIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coachBody: { flex: 1, gap: 2 },
+  coachTitle: { ...Type.bodyBold, fontWeight: '700' },
+  coachText: { ...Type.caption },
 
   reflectionsLink: {
     flexDirection: 'row',
