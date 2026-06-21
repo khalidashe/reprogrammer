@@ -408,6 +408,11 @@ export default function SettingsScreen() {
           onPress={() => router.push('/how-it-works')}
           colors={colors}
         />
+        <ActionButton
+          label="Common questions"
+          onPress={() => router.push('/faq')}
+          colors={colors}
+        />
       </Section>
 
       <View style={styles.spacing} />
