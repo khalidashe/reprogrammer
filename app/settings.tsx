@@ -403,6 +403,11 @@ export default function SettingsScreen() {
         <Text style={[styles.tagline, { color: colors.textMuted }]}>
           Notice · Repeat · Reprogram
         </Text>
+        <ActionButton
+          label="How it works"
+          onPress={() => router.push('/how-it-works')}
+          colors={colors}
+        />
       </Section>
 
       <View style={styles.spacing} />

@@ -9,10 +9,14 @@ import {
   Space,
   Radius,
   PRESSED_OPACITY,
-  controlSelected,
 } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ProgressDots } from '@/components/create/steps';
+import {
+  ModelTeaching,
+  GroundRulesTeaching,
+  LoggingTeaching,
+} from '@/components/onboarding/teaching';
 import useStore from '@/store/useStore';
 import type { Behavior } from '@/types';
 import {
@@ -22,7 +26,6 @@ import {
 } from '@/services/notifications';
 import { featuredTemplates, type AdoptTemplate } from '@/services/library-content';
 import { buildBehavior, draftFromAdoptTemplate } from '@/services/behavior-factory';
-import { GROUND_RULES } from '@/services/ground-rules';
 import { haptics } from '@/services/haptics';
 
 /**
@@ -58,63 +61,6 @@ const TOTAL_DOTS = 5;
 const DEFAULT_QUIET_HOURS = { from: '22:00', to: '08:00' };
 
 const templates = featuredTemplates();
-
-const KIND_ROWS = [
-  {
-    icon: 'checkmark' as const,
-    label: 'Adopt',
-    text: 'Build a good behavior until it runs on its own.',
-  },
-  {
-    icon: 'minus.circle' as const,
-    label: 'Eliminate',
-    text: 'Catch an automatic bad one in the act.',
-  },
-];
-
-const LOOP_ROWS = [
-  {
-    icon: 'bell.fill' as const,
-    label: 'A gentle ping',
-    text: 'arrives at random times inside the window you choose.',
-  },
-  {
-    icon: 'checkmark' as const,
-    label: 'You respond',
-    text: 'check in if you did it, or snooze it for later.',
-  },
-  {
-    icon: 'flame.fill' as const,
-    label: 'A streak grows',
-    text: 'each time you show up — a missed day is data, not failure.',
-  },
-  {
-    icon: 'sparkles' as const,
-    label: 'You level up',
-    text: 'streaks raise your level, and pings space out as the habit sets.',
-  },
-];
-
-const LOGGING_OPTIONS = [
-  {
-    icon: 'checkmark' as const,
-    label: 'Check-in',
-    tone: 'tint' as const,
-    text: 'You did it. Logs the rep and grows your streak.',
-  },
-  {
-    icon: 'circle.lefthalf.filled' as const,
-    label: 'Tried',
-    tone: 'warning' as const,
-    text: 'You showed up but did not fully finish. It still counts — showing up is the habit.',
-  },
-  {
-    icon: 'pause.fill' as const,
-    label: 'Snooze',
-    tone: 'muted' as const,
-    text: 'Not now. Reschedules the ping for later; your streak stays safe.',
-  },
-];
 
 export default function OnboardingScreen() {
   const colorScheme = useColorScheme();
@@ -243,58 +189,7 @@ export default function OnboardingScreen() {
             <Text style={[styles.lead, { color: colors.textMuted }]}>
               You train one behavior at a time. Each is one of two kinds:
             </Text>
-            <View style={styles.kindRow}>
-              {KIND_ROWS.map((r) => (
-                <View
-                  key={r.label}
-                  style={[
-                    styles.kindCard,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.kindIcon,
-                      {
-                        backgroundColor:
-                          r.label === 'Adopt' ? colors.tintSoft : colors.dangerSoft,
-                      },
-                    ]}
-                  >
-                    <IconSymbol
-                      name={r.icon}
-                      size={20}
-                      color={r.label === 'Adopt' ? colors.accentText : colors.danger}
-                    />
-                  </View>
-                  <Text style={[styles.kindLabel, { color: colors.text }]}>{r.label}</Text>
-                  <Text style={[styles.kindText, { color: colors.textMuted }]}>{r.text}</Text>
-                </View>
-              ))}
-            </View>
-
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>The loop</Text>
-            <View style={[styles.loopCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {LOOP_ROWS.map((r, i) => (
-                <View
-                  key={r.label}
-                  style={[
-                    styles.loopRow,
-                    i < LOOP_ROWS.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border,
-                    },
-                  ]}
-                >
-                  <View style={[styles.loopIcon, controlSelected(colors)]}>
-                    <IconSymbol name={r.icon} size={16} color={colors.accentText} />
-                  </View>
-                  <Text style={[styles.loopText, { color: colors.text }]}>
-                    <Text style={{ fontWeight: '700' }}>{r.label}</Text> — {r.text}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <ModelTeaching colors={colors} />
           </View>
         );
 
@@ -305,25 +200,7 @@ export default function OnboardingScreen() {
             <Text style={[styles.lead, { color: colors.textMuted }]}>
               Five rules that decide whether this works for you.
             </Text>
-            {GROUND_RULES.map((rule, idx) => (
-              <View
-                key={rule.id}
-                style={[styles.ruleCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <View style={styles.ruleHeader}>
-                  <View style={[styles.ruleNumber, controlSelected(colors)]}>
-                    <Text style={[styles.ruleNumberText, { color: colors.accentText }]}>
-                      {idx + 1}
-                    </Text>
-                  </View>
-                  <Text style={[styles.ruleTitle, { color: colors.text }]}>{rule.title}</Text>
-                </View>
-                <Text style={[styles.ruleBody, { color: colors.text }]}>{rule.body}</Text>
-                <Text style={[styles.ruleCitation, { color: colors.textMuted }]}>
-                  {rule.citation}
-                </Text>
-              </View>
-            ))}
+            <GroundRulesTeaching colors={colors} />
           </View>
         );
 
@@ -491,47 +368,7 @@ export default function OnboardingScreen() {
             <Text style={[styles.lead, { color: colors.textMuted }]}>
               When a ping arrives, you have three replies:
             </Text>
-
-            {LOGGING_OPTIONS.map((opt) => (
-              <View
-                key={opt.label}
-                style={[styles.optionRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <View
-                  style={[
-                    styles.optionIcon,
-                    {
-                      backgroundColor:
-                        opt.tone === 'tint'
-                          ? colors.tintSoft
-                          : opt.tone === 'warning'
-                            ? colors.warningSoft
-                            : colors.surfaceMuted,
-                    },
-                  ]}
-                >
-                  <IconSymbol
-                    name={opt.icon}
-                    size={18}
-                    color={
-                      opt.tone === 'tint'
-                        ? colors.accentText
-                        : opt.tone === 'warning'
-                          ? colors.warning
-                          : colors.textMuted
-                    }
-                  />
-                </View>
-                <View style={styles.optionTextWrap}>
-                  <Text style={[styles.optionLabel, { color: colors.text }]}>{opt.label}</Text>
-                  <Text style={[styles.optionText, { color: colors.textMuted }]}>{opt.text}</Text>
-                </View>
-              </View>
-            ))}
-
-            <Text style={[styles.loggingClose, { color: colors.textMuted }]}>
-              That is the whole loop. A few reps a day and it starts to run on its own.
-            </Text>
+            <LoggingTeaching colors={colors} />
           </View>
         );
 
@@ -676,79 +513,6 @@ const styles = StyleSheet.create({
   // Shared headings
   title: { ...Type.display2 },
   lead: { ...Type.body, marginBottom: Space.xs },
-  sectionLabel: {
-    ...Type.micro,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginTop: Space.sm,
-  },
-
-  // Model — kind cards
-  kindRow: { flexDirection: 'row', gap: Space.sm },
-  kindCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Space.md + Space.xxs,
-    gap: Space.xs,
-  },
-  kindIcon: {
-    width: Space.xxl,
-    height: Space.xxl,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Space.xxs,
-  },
-  kindLabel: { ...Type.bodyBold, fontWeight: '700' },
-  kindText: { ...Type.caption },
-
-  // Model — the loop
-  loopCard: {
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
-  loopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm + Space.xxs,
-    padding: Space.md + Space.xxs,
-  },
-  loopIcon: {
-    width: Space.xl + Space.xs,
-    height: Space.xl + Space.xs,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loopText: { ...Type.caption, flex: 1, lineHeight: 19 },
-
-  // Rules
-  ruleCard: {
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Space.md + Space.xxs,
-    gap: Space.sm,
-  },
-  ruleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm + Space.xxs,
-  },
-  ruleNumber: {
-    width: Space.xxl,
-    height: Space.xxl,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ruleNumberText: { ...Type.caption, fontSize: 12, fontWeight: '700' },
-  ruleTitle: { ...Type.bodyBold, fontWeight: '700', flex: 1 },
-  ruleBody: { ...Type.body },
-  ruleCitation: { ...Type.micro, fontWeight: '400', fontStyle: 'italic' },
 
   // Notifications
   inlineCta: {
@@ -802,7 +566,7 @@ const styles = StyleSheet.create({
   templateTitle: { ...Type.bodyBold, fontWeight: '700' },
   templateMessage: { ...Type.caption },
 
-  // Demo (test ping) + logging
+  // Demo (test ping)
   linkRow: {
     alignSelf: 'center',
     paddingVertical: Space.sm,
@@ -811,23 +575,4 @@ const styles = StyleSheet.create({
     marginTop: Space.xs,
   },
   linkText: { ...Type.bodyBold, fontWeight: '600' },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.md,
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Space.md + Space.xxs,
-  },
-  optionIcon: {
-    width: Space.xxl,
-    height: Space.xxl,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionTextWrap: { flex: 1, gap: Space.xxs },
-  optionLabel: { ...Type.bodyBold, fontWeight: '700' },
-  optionText: { ...Type.caption, lineHeight: 19 },
-  loggingClose: { ...Type.caption, fontStyle: 'italic', marginTop: Space.sm },
 });
