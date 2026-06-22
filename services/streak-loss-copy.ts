@@ -7,10 +7,10 @@
  * (title + body), so each line stays short enough for a lock-screen banner.
  *
  * Brand-voice note: the REP-15 brief floated a blunt "if you won't practice you
- * might as well uninstall" tone. That energy belongs on the *paywall* — a
- * confident value pitch — not on a slip. Reprogrammer deliberately de-shames
- * lapses (see guide-relapse-and-restart, "without making it bigger than it
- * is"), so these candidates are honest but compassionate, never punishing.
+ * might as well uninstall" tone. We softened that everywhere — warm and
+ * inviting on the paywall, and gentle on a slip especially, since Reprogrammer
+ * deliberately de-shames lapses (see guide-relapse-and-restart, "without making
+ * it bigger than it is"). So these candidates stay encouraging, never punishing.
  *
  * Pure and dependency-free so it unit-tests with plain `tsx` like its service
  * peers (streak.ts, levels.ts, checkin-policy.ts).
@@ -38,8 +38,8 @@ export const STREAK_LOSS_COPY: readonly StreakLossCopy[] = [
     body: "One off day doesn't undo the work. Pick the thread back up today.",
   },
   {
-    title: "The streak broke. The skill didn't.",
-    body: "Resets happen. Here's how to restart without the spiral.",
+    title: 'A clean reset.',
+    body: 'The streak starts over, but the skill stays. Here is a gentle way back.',
   },
   {
     title: 'Back to it, no drama.',
