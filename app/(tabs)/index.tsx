@@ -22,6 +22,7 @@ import { lastNDaysStatus, type DayStatus } from '@/services/consistency';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { cancelForBehavior, rescheduleAll } from '@/services/notifications';
 import { endOfLocalDay, isBehaviorPaused, isReminderMuteActive } from '@/services/scheduler-core';
+import { pickStreakLossCopy } from '@/services/streak-loss-copy';
 import { useFeedback } from '@/components/ui/feedback';
 
 const RELAPSE_BANNER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -250,6 +251,9 @@ export default function DashboardScreen() {
     void updateAppProfile({ lastLapseAcknowledged: true });
   };
 
+  // Stable for a given lapse (seeded by its timestamp), varied across lapses.
+  const relapseCopy = pickStreakLossCopy(appProfile.lastLapseAt ?? 0);
+
   const remindersMuted = isReminderMuteActive(appProfile);
 
   const handleUnmute = async () => {
@@ -422,12 +426,12 @@ export default function DashboardScreen() {
               accessibilityHint="Compassionate restart practice after a missed day"
             >
               <Text style={[styles.relapseBannerTitle, { color: colors.text }]}>
-                Yesterday was hard.
+                {relapseCopy.title}
               </Text>
               <Text
                 style={[styles.relapseBannerSub, { color: colors.textMuted }]}
               >
-                A short read on how to come back without making it bigger than it is.
+                {relapseCopy.body}
               </Text>
             </Pressable>
             <Pressable

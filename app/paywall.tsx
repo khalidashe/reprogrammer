@@ -33,10 +33,10 @@ import {
 import { useFeedback } from '@/components/ui/feedback';
 
 const BULLETS = [
-  'Unlimited behaviors (free is capped at 3)',
-  'Cloud sync across all your devices',
-  'AI assistant for refining behaviors',
-  'Full library — every guide and program',
+  'Unlimited behaviors — free stops at 3',
+  'Sync across every device you own',
+  'AI assistant that refines your behaviors',
+  'The full library — every guide and program',
 ];
 
 export default function PaywallScreen() {
@@ -137,7 +137,7 @@ export default function PaywallScreen() {
       <View style={styles.content}>
         <Text style={[styles.title, { color: colors.text }]}>Reprogrammer Pro</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          Go deeper. Sync everywhere. Use the assistant.
+          Free Reprogrammer is the real thing. Pro removes the limits.
         </Text>
 
         <View style={[styles.bulletCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -195,6 +195,12 @@ export default function PaywallScreen() {
         {!isSignedIn && !unsupported && (
           <Text style={[Type.caption, { color: colors.textMuted, textAlign: 'center' }]}>
             You&apos;ll be asked to sign in before purchasing.
+          </Text>
+        )}
+
+        {!unsupported && (
+          <Text style={[Type.caption, { color: colors.textMuted, textAlign: 'center' }]}>
+            About a cheeseburger a month. It keeps Reprogrammer independent — no ads, nothing sold.
           </Text>
         )}
 
