@@ -26,6 +26,7 @@ import {
   type ContentTarget,
 } from './content-link-resolver';
 import { createMarkdownStyles } from './markdown-styles';
+import { FeedbackButton } from '@/components/feedback-button';
 
 interface ModalHeaderProps {
   canBack: boolean;
@@ -108,6 +109,10 @@ export function GuideView({ guide, colors, onOpenTarget }: GuideViewProps) {
       <View style={{ marginTop: Space.md }}>
         <MarkdownBody body={guide.body} colors={colors} onOpenTarget={onOpenTarget} />
       </View>
+      <FeedbackButton
+        context={{ kind: 'guide', id: guide.id, title: guide.title }}
+        colors={colors}
+      />
     </ScrollView>
   );
 }
@@ -175,6 +180,10 @@ export function AdoptView({
             />
           </>
         ) : null}
+        <FeedbackButton
+          context={{ kind: 'adopt', id: template.id, title: template.title }}
+          colors={colors}
+        />
       </ScrollView>
 
       <View
@@ -285,6 +294,10 @@ export function EliminateView({
             />
           </>
         ) : null}
+        <FeedbackButton
+          context={{ kind: 'eliminate', id: template.id, title: template.title }}
+          colors={colors}
+        />
       </ScrollView>
 
       <View
@@ -406,6 +419,10 @@ export function ProgramView({ program, colors, onOpenTarget }: ProgramViewProps)
           <MarkdownBody body={program.body} colors={colors} onOpenTarget={onOpenTarget} />
         </View>
       ) : null}
+      <FeedbackButton
+        context={{ kind: 'program', id: program.id, title: program.title }}
+        colors={colors}
+      />
     </ScrollView>
   );
 }

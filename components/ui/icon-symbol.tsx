@@ -40,6 +40,7 @@ const MAPPING = {
   'flame.fill': 'local-fire-department',
   'bell.fill': 'notifications',
   'sparkles': 'auto-awesome',
+  'exclamationmark.bubble': 'feedback',
   // Edit / manage actions
   'pencil': 'edit',
   'bookmark': 'bookmark-border',
