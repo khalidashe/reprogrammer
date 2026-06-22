@@ -21,6 +21,7 @@ import { useFeedback } from '@/components/ui/feedback';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { countReflections } from '@/services/reflections';
+import { FeedbackButton } from '@/components/feedback-button';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -409,6 +410,11 @@ export default function BehaviorDetailScreen() {
           <IconSymbol name="chevron.right" size={16} color={colors.textMuted} />
         </Pressable>
       ) : null}
+
+      <FeedbackButton
+        context={{ kind: 'behavior', id: behavior.id, title: behavior.title }}
+        colors={colors}
+      />
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
