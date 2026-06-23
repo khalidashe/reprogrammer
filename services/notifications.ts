@@ -345,6 +345,7 @@ export async function handleNotificationAction(
     behaviorId,
     at: Date.now(),
     result,
+    updatedAt: Date.now(),
   };
   await store.addCheckIn(checkIn);
   await handleCheckInResponse(behaviorId, attemptId, result);
