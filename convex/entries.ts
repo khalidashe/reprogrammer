@@ -28,10 +28,12 @@ export const listMine = query({
   handler: async (ctx): Promise<Doc<"entries">[]> => {
     const userId = await auth.getUserId(ctx);
     if (!userId) return [];
+    // Cap raised for long-term users (REP-48). Switch to cursor pagination if
+    // anyone approaches it.
     const rows = await ctx.db
       .query("entries")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .take(5000);
+      .take(10000);
     return rows.filter((e) => e.deletedAt === undefined);
   },
 });

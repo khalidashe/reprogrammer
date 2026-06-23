@@ -6,10 +6,12 @@ import {
   Linking,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { useAuthActions } from '@convex-dev/auth/react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { api } from '@/convex/_generated/api';
@@ -49,6 +51,7 @@ export default function SettingsScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { isPro, isSignedIn } = useIsPro();
   const user = useQuery(api.users.getCurrentUser);
+  const deleteAccount = useMutation(api.account.deleteAccount);
   const { signOut } = useAuthActions();
   const { behaviors, checkIns, appProfile, updateAppProfile, getStreak } = useStore();
   const { showToast } = useFeedback();
@@ -122,6 +125,56 @@ export default function SettingsScreen() {
       // ignore — RC may not be configured
     }
     await signOut();
+  };
+
+  const resetLocalData = async () => {
+    await AsyncStorage.multiRemove([
+      'rpg.behaviors.v3',
+      'rpg.behaviors.v2',
+      'rpg.behaviors.v1',
+      'rpg.checkins.v1',
+      'rpg.reminderAttempts.v1',
+      'rpg.app.v1',
+      'rpg.entries.v1',
+      'rpg.focusSessions.v1',
+    ]);
+    useStore.setState({
+      behaviors: [],
+      checkIns: [],
+      reminderAttempts: [],
+      entries: [],
+      focusSessions: [],
+      appProfile: { hasOnboarded: false },
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently erases your account and all data from our servers — your behaviors, check-ins, reflections, and settings. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount({});
+            } catch (e: any) {
+              showToast(`Couldn't delete account — ${e?.message ?? 'please try again.'}`);
+              return;
+            }
+            try {
+              await logoutRevenueCat();
+            } catch {
+              // ignore — RC may not be configured
+            }
+            await signOut();
+            await resetLocalData();
+          },
+        },
+      ]
+    );
   };
 
   const handleToggleQuietHours = async () => {
@@ -294,6 +347,12 @@ export default function SettingsScreen() {
             <ActionButton
               label="Sign out"
               onPress={handleSignOut}
+              colors={colors}
+              destructive
+            />
+            <ActionButton
+              label="Delete account"
+              onPress={handleDeleteAccount}
               colors={colors}
               destructive
             />

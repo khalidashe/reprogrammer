@@ -22,10 +22,12 @@ export const listMine = query({
   handler: async (ctx): Promise<Doc<"reminderAttempts">[]> => {
     const userId = await auth.getUserId(ctx);
     if (!userId) return [];
+    // Cap raised for long-term users (REP-48). Switch to cursor pagination if
+    // anyone approaches it.
     return await ctx.db
       .query("reminderAttempts")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .take(5000);
+      .take(10000);
   },
 });
 
