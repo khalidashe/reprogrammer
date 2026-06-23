@@ -1,6 +1,7 @@
 import { View, Text, Pressable, StyleSheet, ScrollView, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
+import { useConvexAuth } from 'convex/react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -27,6 +28,7 @@ import {
 import { featuredTemplates, type AdoptTemplate } from '@/services/library-content';
 import { buildBehavior, draftFromAdoptTemplate } from '@/services/behavior-factory';
 import { haptics } from '@/services/haptics';
+import { SignInPanel } from '@/components/auth/sign-in-panel';
 
 /**
  * First-run experience (REP-39). A short, calm wizard that *teaches the model*
@@ -34,9 +36,13 @@ import { haptics } from '@/services/haptics';
  * with a reason before the OS prompt, seeds a first behavior, and lets the user
  * feel one ping before landing on the dashboard.
  *
- * Steps: welcome (hero) → model → rules → notifications → pick → demo → logging.
- * The test ping ("demo") and the logging-options explainer share the final
- * progress dot, so the bar stays a stable five.
+ * Steps: welcome (hero) → model → rules → notifications → pick → demo → logging
+ * → account. The test ping ("demo") and the logging-options explainer share a
+ * progress dot, so the teaching bar stays a stable five.
+ *
+ * The final `account` step is the mandatory sign-up wall (REP-46): onboarding
+ * can't finish without an account, so `setOnboarded(true)` only runs once the
+ * user is signed in.
  */
 type Step =
   | 'welcome'
@@ -45,7 +51,8 @@ type Step =
   | 'notifications'
   | 'pick'
   | 'demo'
-  | 'logging';
+  | 'logging'
+  | 'account';
 
 const STEP_DOT: Partial<Record<Step, number>> = {
   model: 0,
@@ -54,6 +61,7 @@ const STEP_DOT: Partial<Record<Step, number>> = {
   pick: 3,
   demo: 4,
   logging: 4,
+  account: 4,
 };
 const TOTAL_DOTS = 5;
 
@@ -67,12 +75,14 @@ export default function OnboardingScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const { addBehavior, setOnboarded, updateAppProfile, appProfile } = useStore();
+  const { isAuthenticated } = useConvexAuth();
 
   const params = useLocalSearchParams<{ demo?: string }>();
   const [step, setStep] = useState<Step>('welcome');
   const [selected, setSelected] = useState<Behavior | null>(null);
   const [notif, setNotif] = useState<'granted' | 'denied' | null>(null);
   const [pingSent, setPingSent] = useState(false);
+  const [pendingBehavior, setPendingBehavior] = useState<Behavior | null>(null);
 
   const dot = STEP_DOT[step] ?? 0;
 
@@ -108,6 +118,9 @@ export default function OnboardingScreen() {
       case 'logging':
         setStep('demo');
         break;
+      case 'account':
+        setStep('logging');
+        break;
     }
   };
 
@@ -119,6 +132,18 @@ export default function OnboardingScreen() {
     }
     // The root layout redirects to the tabs once hasOnboarded flips true.
     await setOnboarded(true);
+  };
+
+  // Every "finish onboarding" path funnels through here so the account wall
+  // (REP-46) can't be skipped. Already signed in → finish; otherwise stash the
+  // chosen behavior and route to the sign-up step, which finalizes on success.
+  const completeOnboarding = (behavior: Behavior | null) => {
+    if (isAuthenticated) {
+      void finalize(behavior);
+      return;
+    }
+    setPendingBehavior(behavior);
+    advance('account');
   };
 
   const enableReminders = async () => {
@@ -262,7 +287,7 @@ export default function OnboardingScreen() {
         return (
           <View style={styles.stepBody}>
             <Pressable
-              onPress={() => finalize(null)}
+              onPress={() => completeOnboarding(null)}
               style={({ pressed }) => [
                 styles.foundationCard,
                 { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
@@ -372,6 +397,27 @@ export default function OnboardingScreen() {
           </View>
         );
 
+      case 'account':
+        return (
+          <View style={styles.stepBody}>
+            <Text style={[styles.title, { color: colors.text }]}>Save your progress</Text>
+            <Text style={[styles.lead, { color: colors.textMuted }]}>
+              One quick step to finish. Your account keeps a safe backup of your
+              streaks and behaviors, and lets you sync across devices with Pro.
+            </Text>
+
+            <SignInPanel onSignedIn={() => void finalize(pendingBehavior)} />
+
+            <View style={[styles.noticeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <IconSymbol name="envelope.fill" size={18} color={colors.textMuted} />
+              <Text style={[styles.noticeText, { color: colors.textMuted }]}>
+                We use your email for your account and a gentle weekly digest —
+                never spam, and you can turn it off anytime in Settings.
+              </Text>
+            </View>
+          </View>
+        );
+
       default:
         return null;
     }
@@ -387,9 +433,9 @@ export default function OnboardingScreen() {
       case 'notifications':
         return { label: 'Continue', onPress: continueFromNotifications };
       case 'logging':
-        return { label: 'Start using Reprogrammer', onPress: () => finalize(selected) };
+        return { label: 'Start using Reprogrammer', onPress: () => completeOnboarding(selected) };
       default:
-        return null; // 'pick' and 'demo' drive themselves from in-body actions.
+        return null; // 'pick', 'demo' and 'account' drive themselves from in-body actions.
     }
   })();
 
@@ -406,15 +452,20 @@ export default function OnboardingScreen() {
           <IconSymbol name="chevron.left" size={22} color={colors.textMuted} />
         </Pressable>
         <ProgressDots total={TOTAL_DOTS} current={dot} colors={colors} />
-        <Pressable
-          onPress={() => finalize(null)}
-          hitSlop={8}
-          style={({ pressed }) => [styles.headerSkip, pressed && { opacity: PRESSED_OPACITY }]}
-          accessibilityRole="button"
-          accessibilityLabel="Skip onboarding"
-        >
-          <Text style={[styles.headerSkipText, { color: colors.textMuted }]}>Skip</Text>
-        </Pressable>
+        {step === 'account' ? (
+          // The account wall can't be skipped — keep the header balanced.
+          <View style={styles.headerSkip} />
+        ) : (
+          <Pressable
+            onPress={() => completeOnboarding(null)}
+            hitSlop={8}
+            style={({ pressed }) => [styles.headerSkip, pressed && { opacity: PRESSED_OPACITY }]}
+            accessibilityRole="button"
+            accessibilityLabel="Skip onboarding"
+          >
+            <Text style={[styles.headerSkipText, { color: colors.textMuted }]}>Skip</Text>
+          </Pressable>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">

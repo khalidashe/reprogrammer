@@ -39,6 +39,7 @@ const MAPPING = {
   'timer': 'timer',
   'flame.fill': 'local-fire-department',
   'bell.fill': 'notifications',
+  'envelope.fill': 'mail-outline',
   'sparkles': 'auto-awesome',
   'exclamationmark.bubble': 'feedback',
   // Edit / manage actions
