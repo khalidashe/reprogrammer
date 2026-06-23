@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
+import { useConvexAuth } from 'convex/react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import useStore from '@/store/useStore';
@@ -41,6 +42,7 @@ function AppShell() {
   const pathname = usePathname();
   const isHydrated = useStore((state) => state.isHydrated);
   const appProfile = useStore((state) => state.appProfile);
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
 
@@ -51,14 +53,24 @@ function AppShell() {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
 
+  // Launch gate (REP-46). The account is a hard wall: every user signs up
+  // before reaching the app. `useConvexAuth` reads the cached token, so a
+  // signed-in user still passes this gate offline.
   useEffect(() => {
-    if (!isHydrated) return;
-    if (!appProfile.hasOnboarded && pathname !== '/onboarding') {
-      router.replace('/onboarding');
-    } else if (appProfile.hasOnboarded && pathname === '/onboarding') {
+    if (!isHydrated || authLoading) return;
+
+    if (!appProfile.hasOnboarded) {
+      // New users run the teaching flow; the sign-up wall sits at its end.
+      if (pathname !== '/onboarding') router.replace('/onboarding');
+    } else if (!isAuthenticated) {
+      // Onboarded but signed out (signed out in Settings, or an expired
+      // session): the account is mandatory, so re-gate at the sign-in wall.
+      if (pathname !== '/auth') router.replace('/auth');
+    } else if (pathname === '/onboarding' || pathname === '/auth') {
+      // Signed in and onboarded: leave the gate screens for the app.
       router.replace('/(tabs)');
     }
-  }, [isHydrated, appProfile.hasOnboarded, pathname, router]);
+  }, [isHydrated, authLoading, appProfile.hasOnboarded, isAuthenticated, pathname, router]);
 
   useEffect(() => {
     const setup = async () => {
