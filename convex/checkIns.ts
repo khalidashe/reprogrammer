@@ -15,10 +15,12 @@ export const listMine = query({
   handler: async (ctx): Promise<Doc<"checkIns">[]> => {
     const userId = await auth.getUserId(ctx);
     if (!userId) return [];
+    // Cap raised for long-term users (REP-48); ~years of daily check-ins.
+    // Switch to cursor pagination if anyone approaches it.
     const rows = await ctx.db
       .query("checkIns")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .take(5000);
+      .take(10000);
     return rows.filter((c) => c.deletedAt === undefined);
   },
 });

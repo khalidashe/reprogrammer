@@ -4,6 +4,27 @@ import type { Doc } from '@/convex/_generated/dataModel';
 import { convex } from '@/services/convex-client';
 import { requiresPrivacyConsent, type SyncEntity } from '@/services/sync-policy';
 
+const MAX_PUSH_ATTEMPTS = 4;
+
+/**
+ * Fire-and-forget a write-through push, but retry a transient failure a few
+ * times with exponential backoff (REP-48) before giving up, so a brief network
+ * blip doesn't silently drop a write. Re-running is safe: every push is an
+ * idempotent upsert / soft-delete keyed by clientId.
+ */
+function pushWithRetry(label: string, run: () => Promise<unknown>): void {
+  const attempt = (n: number, delayMs: number) => {
+    run().catch((e) => {
+      if (n >= MAX_PUSH_ATTEMPTS) {
+        console.warn(`[cloud-sync] ${label} (gave up after ${n} attempts)`, e);
+        return;
+      }
+      setTimeout(() => attempt(n + 1, delayMs * 2), delayMs);
+    });
+  };
+  attempt(1, 800);
+}
+
 /**
  * Best-effort cross-device sync to Convex.
  *
@@ -50,8 +71,8 @@ class CloudSync {
 
   pushBehavior(b: Behavior): void {
     if (!this.enabled) return;
-    convex
-      .mutation(api.behaviors.upsert, {
+    pushWithRetry('pushBehavior', () =>
+      convex.mutation(api.behaviors.upsert, {
         clientId: b.id,
         kind: b.kind,
         title: b.title,
@@ -73,41 +94,41 @@ class CloudSync {
         createdAt: b.createdAt,
         hidden: b.hidden,
         bookmarked: b.bookmarked,
-      })
-      .catch((e) => console.warn('[cloud-sync] pushBehavior', e));
+      }),
+    );
   }
 
   deleteBehavior(id: string): void {
     if (!this.enabled) return;
-    convex
-      .mutation(api.behaviors.softDelete, { clientId: id })
-      .catch((e) => console.warn('[cloud-sync] deleteBehavior', e));
+    pushWithRetry('deleteBehavior', () =>
+      convex.mutation(api.behaviors.softDelete, { clientId: id }),
+    );
   }
 
   pushCheckIn(c: CheckIn): void {
     if (!this.enabled) return;
-    convex
-      .mutation(api.checkIns.upsert, {
+    pushWithRetry('pushCheckIn', () =>
+      convex.mutation(api.checkIns.upsert, {
         clientId: c.id,
         behaviorClientId: c.behaviorId,
         at: c.at,
         result: c.result,
         note: this.allowField('checkIns', 'note') ? c.note : undefined,
-      })
-      .catch((e) => console.warn('[cloud-sync] pushCheckIn', e));
+      }),
+    );
   }
 
   deleteCheckIn(id: string): void {
     if (!this.enabled) return;
-    convex
-      .mutation(api.checkIns.softDelete, { clientId: id })
-      .catch((e) => console.warn('[cloud-sync] deleteCheckIn', e));
+    pushWithRetry('deleteCheckIn', () =>
+      convex.mutation(api.checkIns.softDelete, { clientId: id }),
+    );
   }
 
   pushReminderAttempt(a: ReminderAttempt): void {
     if (!this.enabled) return;
-    convex
-      .mutation(api.reminderAttempts.upsert, {
+    pushWithRetry('pushReminderAttempt', () =>
+      convex.mutation(api.reminderAttempts.upsert, {
         clientId: a.id,
         behaviorClientId: a.behaviorId,
         scheduledFor: a.scheduledFor,
@@ -116,14 +137,14 @@ class CloudSync {
         noCount: a.noCount,
         createdAt: a.createdAt,
         notificationId: a.notificationId,
-      })
-      .catch((e) => console.warn('[cloud-sync] pushReminderAttempt', e));
+      }),
+    );
   }
 
   pushAppProfile(p: AppProfile): void {
     if (!this.enabled) return;
-    convex
-      .mutation(api.appProfiles.upsert, {
+    pushWithRetry('pushAppProfile', () =>
+      convex.mutation(api.appProfiles.upsert, {
         hasOnboarded: p.hasOnboarded,
         userName: p.userName,
         userBio: this.allowField('appProfiles', 'userBio') ? p.userBio : undefined,
@@ -133,30 +154,30 @@ class CloudSync {
         quietHours: p.quietHours,
         notificationsDenied: p.notificationsDenied,
         remindersMutedUntil: p.remindersMutedUntil,
-      })
-      .catch((e) => console.warn('[cloud-sync] pushAppProfile', e));
+      }),
+    );
   }
 
   pushEntry(e: CaptureEntry): void {
     if (!this.enabled) return;
     // Entries are a wholly-private entity — never push without consent.
     if (requiresPrivacyConsent('entries') && !this.consented) return;
-    convex
-      .mutation(api.entries.upsert, {
+    pushWithRetry('pushEntry', () =>
+      convex.mutation(api.entries.upsert, {
         clientId: e.id,
         behaviorClientId: e.behaviorId,
         at: e.at,
         value: e.value,
         fields: e.fields,
-      })
-      .catch((err) => console.warn('[cloud-sync] pushEntry', err));
+      }),
+    );
   }
 
   deleteEntry(id: string): void {
     if (!this.enabled) return;
-    convex
-      .mutation(api.entries.softDelete, { clientId: id })
-      .catch((e) => console.warn('[cloud-sync] deleteEntry', e));
+    pushWithRetry('deleteEntry', () =>
+      convex.mutation(api.entries.softDelete, { clientId: id }),
+    );
   }
 
   async pullAll(): Promise<{
