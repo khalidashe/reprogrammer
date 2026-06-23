@@ -74,6 +74,8 @@ export interface Behavior {
   /** Paused "until I turn it back on" (REP-34). Takes precedence over `pausedUntil`. */
   pausedIndefinitely?: boolean;
   createdAt: number;
+  /** Last local write time (REP-30). Drives last-write-wins cross-device sync. */
+  updatedAt: number;
   hidden: boolean;
   bookmarked: boolean;
   /** Optional typed capture (Counter / Metric) logged at check-in (REP-5 Phase 2). */
@@ -94,9 +96,14 @@ export interface CheckIn {
   at: number;
   result: 'yes' | 'tried' | 'no';
   note?: string;
+  /** Last local write time (REP-30). Drives last-write-wins cross-device sync. */
+  updatedAt: number;
 }
 
-/** A single logged capture value (REP-5 Phase 2). Local-only until REP-30. */
+/**
+ * A single logged capture value (REP-5 Phase 2). Syncs for consenting Pro users
+ * as a wholly-private entity (REP-30) — `fields` can hold reflection / CBT text.
+ */
 export interface CaptureEntry {
   id: string;
   behaviorId: string;
@@ -108,6 +115,8 @@ export interface CaptureEntry {
    * Phase 3); reflections store their free text under `text` (REP-5 Phase 4).
    */
   fields?: Record<string, string>;
+  /** Last local write time (REP-30). Drives last-write-wins cross-device sync. */
+  updatedAt: number;
 }
 
 /**
@@ -159,4 +168,12 @@ export interface AppProfile {
    * back on; a number = muted until that timestamp. Undefined = not muted.
    */
   remindersMutedUntil?: number | 'indefinite';
+  /**
+   * Privacy-sync consent (REP-30 Phase 2). Set once the user accepts that their
+   * private writing (journals, notes, bios, goals, reflections/CBT) may sync to
+   * the server. Its presence gates the private tier — see services/sync-policy.ts.
+   */
+  privacySyncConsent?: { version: string; acceptedAt: number };
+  /** Last local write time (REP-30). Drives last-write-wins cross-device sync. */
+  updatedAt?: number;
 }

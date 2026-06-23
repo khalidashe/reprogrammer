@@ -92,6 +92,7 @@ export default function SettingsScreen() {
   const quietHours = appProfile.quietHours;
   const quietHoursEnabled = quietHours != null;
   const remindersMuted = isReminderMuteActive(appProfile);
+  const privateSyncOn = appProfile.privacySyncConsent !== undefined;
 
   const handleToggleMute = async () => {
     haptics.selection();
@@ -274,6 +275,20 @@ export default function SettingsScreen() {
             <Row
               label="Signed in"
               value={user?.email ?? user?.name ?? 'Account'}
+              colors={colors}
+            />
+            <Row
+              label="Private sync"
+              value={
+                privateSyncOn
+                  ? 'On — your private writing backs up'
+                  : 'Off — private writing stays on this device'
+              }
+              colors={colors}
+            />
+            <ActionButton
+              label={privateSyncOn ? 'Manage private sync' : 'Turn on private sync'}
+              onPress={() => router.push('/privacy-sync-consent')}
               colors={colors}
             />
             <ActionButton

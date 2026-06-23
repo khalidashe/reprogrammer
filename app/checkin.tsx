@@ -97,6 +97,7 @@ export default function CheckInScreen() {
         at: Date.now(),
         result,
         note: note || undefined,
+        updatedAt: Date.now(),
       };
 
       await addCheckIn(checkIn);
@@ -116,6 +117,7 @@ export default function CheckInScreen() {
               at: Date.now(),
               value: 1,
               fields,
+              updatedAt: Date.now(),
             });
           }
         } else if (spec.type === 'reflection') {
@@ -128,6 +130,7 @@ export default function CheckInScreen() {
               at: Date.now(),
               value: 1,
               fields: { text },
+              updatedAt: Date.now(),
             });
           }
         } else {
@@ -138,6 +141,7 @@ export default function CheckInScreen() {
               behaviorId: behavior.id,
               at: Date.now(),
               value: raw,
+              updatedAt: Date.now(),
             });
           }
         }

@@ -167,6 +167,10 @@ function AppShell() {
             <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
             <Stack.Screen name="settings" options={{ title: 'Settings' }} />
             <Stack.Screen name="goals" options={{ presentation: 'modal', title: 'Your goals' }} />
+            <Stack.Screen
+              name="privacy-sync-consent"
+              options={{ presentation: 'modal', title: 'Private sync' }}
+            />
             <Stack.Screen name="how-it-works" options={{ title: 'How it works' }} />
             <Stack.Screen name="manage-behaviors" options={{ title: 'Saved & archived' }} />
             <Stack.Screen name="review" options={{ title: 'Weekly review' }} />

@@ -62,6 +62,7 @@ export function buildBehavior(draft: BehaviorDraft, existing?: Behavior): Behavi
     activeDays: draft.activeDays,
     intervalMinutes: draft.intervalMinutes,
     captureSpec: draft.captureSpec,
+    updatedAt: Date.now(),
   };
 }
 
