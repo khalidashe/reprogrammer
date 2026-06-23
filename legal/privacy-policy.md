@@ -95,8 +95,8 @@ health-adjacent. This tier covers:
 **On the free tier, this writing never leaves your device.**
 
 **On the Pro tier, this writing only leaves your device if you explicitly opt in**
-via a dedicated consent screen that records the version you accepted and the
-date. When enabled:
+via a dedicated consent screen that records the version you accepted (currently
+**2026-06-22.1**) and the date. When enabled:
 
 - It is stored on our servers, **readable by us**, and **encrypted at rest**.
 - It is **not end-to-end encrypted.** Being honest about what that protects:
