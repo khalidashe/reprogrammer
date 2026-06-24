@@ -9,6 +9,8 @@ import {
   CaptureEntry,
   FocusSession,
   CoachPrescription,
+  ProgramEnrollment,
+  ProgramDayLog,
 } from '../types';
 import { generateUUID } from '../utils/uuid';
 import { MAX_FOCUS_SESSION_MS } from '../services/scheduler-core';
@@ -27,6 +29,8 @@ const BEHAVIORS_V1_KEY = 'rpg.behaviors.v1';
 const ENTRIES_KEY = 'rpg.entries.v1';
 const FOCUS_SESSIONS_KEY = 'rpg.focusSessions.v1';
 const PRESCRIPTIONS_KEY = 'rpg.prescriptions.v1';
+const PROGRAM_ENROLLMENTS_KEY = 'rpg.programEnrollments.v1';
+const PROGRAM_DAY_LOGS_KEY = 'rpg.programDayLogs.v1';
 
 const LEGACY_STABILITY_TO_LEVEL: Array<[number, number]> = [
   [6, 1],
@@ -115,6 +119,8 @@ interface StoreState {
   entries: CaptureEntry[];
   focusSessions: FocusSession[];
   prescriptions: CoachPrescription[];
+  programEnrollments: ProgramEnrollment[];
+  programDayLogs: ProgramDayLog[];
   appProfile: AppProfile;
   isHydrated: boolean;
 
@@ -139,6 +145,14 @@ interface StoreState {
   getActiveFocusSession: () => FocusSession | undefined;
   getFocusSessions: (behaviorId: string) => FocusSession[];
   addPrescription: (prescription: CoachPrescription) => Promise<void>;
+  // Book programs (the pivot). Local-only for now — Convex sync is the next step.
+  addEnrollment: (enrollment: ProgramEnrollment) => Promise<void>;
+  updateEnrollment: (enrollment: ProgramEnrollment) => Promise<void>;
+  deleteEnrollment: (id: string) => Promise<void>;
+  getActiveEnrollments: () => ProgramEnrollment[];
+  getEnrollmentForProgram: (programId: string) => ProgramEnrollment | undefined;
+  addProgramDayLog: (log: ProgramDayLog) => Promise<void>;
+  getProgramDayLogs: (enrollmentId: string) => ProgramDayLog[];
 }
 
 const useStore = create<StoreState>((set, get) => ({
@@ -148,6 +162,8 @@ const useStore = create<StoreState>((set, get) => ({
   entries: [],
   focusSessions: [],
   prescriptions: [],
+  programEnrollments: [],
+  programDayLogs: [],
   appProfile: { hasOnboarded: false },
   isHydrated: false,
 
@@ -163,6 +179,8 @@ const useStore = create<StoreState>((set, get) => ({
         entriesData,
         focusSessionsData,
         prescriptionsData,
+        programEnrollmentsData,
+        programDayLogsData,
       ] = await Promise.all([
         AsyncStorage.getItem(BEHAVIORS_KEY),
         AsyncStorage.getItem(BEHAVIORS_V2_KEY),
@@ -173,6 +191,8 @@ const useStore = create<StoreState>((set, get) => ({
         AsyncStorage.getItem(ENTRIES_KEY),
         AsyncStorage.getItem(FOCUS_SESSIONS_KEY),
         AsyncStorage.getItem(PRESCRIPTIONS_KEY),
+        AsyncStorage.getItem(PROGRAM_ENROLLMENTS_KEY),
+        AsyncStorage.getItem(PROGRAM_DAY_LOGS_KEY),
       ]);
 
       let behaviors: Behavior[];
@@ -204,6 +224,8 @@ const useStore = create<StoreState>((set, get) => ({
         entries,
         focusSessions: focusSessionsData ? JSON.parse(focusSessionsData) : [],
         prescriptions: prescriptionsData ? JSON.parse(prescriptionsData) : [],
+        programEnrollments: programEnrollmentsData ? JSON.parse(programEnrollmentsData) : [],
+        programDayLogs: programDayLogsData ? JSON.parse(programDayLogsData) : [],
         appProfile: appProfileData ? JSON.parse(appProfileData) : { hasOnboarded: false },
         isHydrated: true,
       });
@@ -405,6 +427,56 @@ const useStore = create<StoreState>((set, get) => ({
     const updated = [...state.prescriptions, prescription];
     set({ prescriptions: updated });
     await AsyncStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(updated));
+  },
+
+  // Book programs (the pivot). Local-only for now — mirrors focusSessions /
+  // prescriptions; Convex sync (programEnrollments / programDayLogs tables) is
+  // the next commit. Stamps `updatedAt` so the eventual LWW merge is correct.
+  addEnrollment: async (enrollment: ProgramEnrollment) => {
+    const state = get();
+    const stamped = { ...enrollment, updatedAt: Date.now() };
+    const updated = [...state.programEnrollments, stamped];
+    set({ programEnrollments: updated });
+    await AsyncStorage.setItem(PROGRAM_ENROLLMENTS_KEY, JSON.stringify(updated));
+  },
+
+  updateEnrollment: async (enrollment: ProgramEnrollment) => {
+    const state = get();
+    const stamped = { ...enrollment, updatedAt: Date.now() };
+    const updated = state.programEnrollments.map((e) => (e.id === stamped.id ? stamped : e));
+    set({ programEnrollments: updated });
+    await AsyncStorage.setItem(PROGRAM_ENROLLMENTS_KEY, JSON.stringify(updated));
+  },
+
+  deleteEnrollment: async (id: string) => {
+    const state = get();
+    const enrollments = state.programEnrollments.filter((e) => e.id !== id);
+    const dayLogs = state.programDayLogs.filter((l) => l.enrollmentId !== id);
+    set({ programEnrollments: enrollments, programDayLogs: dayLogs });
+    await AsyncStorage.setItem(PROGRAM_ENROLLMENTS_KEY, JSON.stringify(enrollments));
+    await AsyncStorage.setItem(PROGRAM_DAY_LOGS_KEY, JSON.stringify(dayLogs));
+  },
+
+  getActiveEnrollments: () => {
+    return get().programEnrollments.filter((e) => e.status === 'active' && e.deletedAt == null);
+  },
+
+  getEnrollmentForProgram: (programId: string) => {
+    return get().programEnrollments.find(
+      (e) => e.programId === programId && e.deletedAt == null,
+    );
+  },
+
+  addProgramDayLog: async (log: ProgramDayLog) => {
+    const state = get();
+    const stamped = { ...log, updatedAt: Date.now() };
+    const updated = [...state.programDayLogs, stamped];
+    set({ programDayLogs: updated });
+    await AsyncStorage.setItem(PROGRAM_DAY_LOGS_KEY, JSON.stringify(updated));
+  },
+
+  getProgramDayLogs: (enrollmentId: string) => {
+    return get().programDayLogs.filter((l) => l.enrollmentId === enrollmentId);
   },
 }));
 
