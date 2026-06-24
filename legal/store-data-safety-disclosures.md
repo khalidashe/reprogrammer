@@ -38,6 +38,24 @@ all tracking questions on both stores.
 
 **Data sale / sharing for ads:** **No** on both stores.
 
+### Authoritative field classification (source of truth)
+
+The split above — which fields sync, which count as the consent-gated **private
+tier**, and the consent version users accept — is defined in code at
+[`services/sync-policy.ts`](../services/sync-policy.ts): the `PRIVATE_FIELDS`
+registry (`behaviors.journal`, `checkIns.note`, `appProfiles.userBio` +
+`appProfiles.goals`), the wholly-private `entries` entity, and
+`PRIVACY_SYNC_CONSENT_VERSION` (currently `2026-06-22.1`, recorded with the
+acceptance timestamp). Keep this table in step with that file — it is the single
+source the app, the [Privacy Policy](./privacy-policy.md), and these answers all
+derive from, so a renamed/added field can't silently fall out of the contract.
+
+The private tier is enforced **at both ends** (REP-47): the client never pushes a
+private field or `entries` row without consent, and the server rejects `entries`
+writes that have no recorded consent. **Revoking consent purges the remote
+private copies** (the on-device copy stays). **In-app account deletion** (REP-48)
+erases every server row plus the authentication identity.
+
 ---
 
 ## 2. Apple — App Privacy answers (App Store Connect)
@@ -125,14 +143,19 @@ are **not yet implemented**. Before submitting, confirm the binary actually
 matches each declared data flow, and adjust the answers if a feature is not in
 the shipped build:
 
-- [ ] **Account wall + email capture** shipped (REP-46). If the account/email is
-      not actually collected yet, do not declare it as collected.
-- [ ] **Cloud sync** of behaviors/check-ins shipped (REP-47). If nothing syncs,
-      then nothing in tier 2/3 is "collected" — declare accordingly.
-- [ ] **Private-tier sync + consent gate** shipped (REP-47). Only declare the
-      sensitive free-text as collected if it can actually leave the device.
-- [ ] **In-app account deletion** shipped (REP-48) — required by Apple before you
-      can truthfully answer the deletion questions and pass review.
+- [ ] **Account wall + email capture** shipped (REP-46 — PR #26). If the
+      account/email is not actually collected yet, do not declare it as collected.
+- [ ] **Cloud sync** of behaviors/check-ins shipped (REP-47 — PR #27). If nothing
+      syncs, then nothing in tier 2/3 is "collected" — declare accordingly.
+- [ ] **Private-tier sync + consent gate** shipped (REP-47 — PR #27). Only declare
+      the sensitive free-text as collected if it can actually leave the device,
+      i.e. the consent screen is reachable and `entries`/private fields push.
+- [ ] **In-app account deletion** shipped (REP-48 — PR #28) — required by Apple
+      before you can truthfully answer the deletion questions and pass review.
+
+> Code for REP-46/47/48 is implemented in the PRs noted above. These boxes track
+> the **shipped binary**, so leave them unchecked until the merged build is
+> verified on a device (see each PR's verification steps).
 - [ ] **AI features present** — confirm which AI calls exist in the build (today:
       Pro behavior-refinement to Anthropic; the server-side Coach-reads-your-data
       flow is part of REP-6's later phases). Disclose only what ships.

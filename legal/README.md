@@ -15,7 +15,12 @@ accounts + cloud sync ship in v1), including the **2026-06-22 reversal**: for
 consenting Pro users, private writing (journals, check-in notes, bio/goals,
 reflections/CBT entries) **does** sync, stored **server-readable and encrypted at
 rest — not end-to-end encrypted**. The data tiers are derived from
-[`services/sync-policy.ts`](../services/sync-policy.ts).
+[`services/sync-policy.ts`](../services/sync-policy.ts) — the `PRIVATE_FIELDS`
+registry, the wholly-private `entries` entity, and the consent version
+`PRIVACY_SYNC_CONSENT_VERSION` (`2026-06-22.1`). The private tier is enforced at
+both ends (client + server) and revoking consent purges the remote copies
+(REP-47); in-app account deletion erases all server data + the auth identity
+(REP-48).
 
 ## ⚠ Before publishing / submitting
 
@@ -42,4 +47,6 @@ live:
 - [ ] Completed Apple App Privacy + Google Play Data Safety using the reference,
       after the build-accuracy check.
 - [ ] Confirmed the privacy-sync consent screen (REP-47) cites the Privacy Policy
-      version users accept.
+      and records `PRIVACY_SYNC_CONSENT_VERSION` (`2026-06-22.1`) on acceptance;
+      bump that constant and the "Last updated" date together if the sensitive
+      tier's scope changes.
