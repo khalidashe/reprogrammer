@@ -215,3 +215,171 @@ export interface AppProfile {
   /** Last local write time (REP-30). Drives last-write-wins cross-device sync. */
   updatedAt?: number;
 }
+
+/* ===========================================================================
+ * Book Programs (the pivot) — see PIVOT_PLAN.md and the Detailed Functional
+ * Specification. A Program is a book's method as a day-by-day deliberate-
+ * practice course; each Exercise is performed with an Instrument. These types
+ * are additive: the existing behavior model is soft-archived, not removed.
+ * ========================================================================= */
+
+/** The practice surface an exercise is performed with. */
+export type InstrumentKind =
+  | 'checkbox'
+  | 'journal'
+  | 'structured'
+  | 'tally'
+  | 'timer'
+  | 'rating'
+  | 'srs';
+
+/** Per-instrument config carried by an exercise (shape depends on the kind). */
+export interface InstrumentConfig {
+  /** structured → which built-in form. */
+  templateId?: CaptureTemplateId;
+  /** tally / rating → label + improvement direction. */
+  label?: string;
+  direction?: 'up' | 'down';
+  /** rating → numeric scale bounds. */
+  min?: number;
+  max?: number;
+  /** timer → target minutes + whether an in-session tally is shown. */
+  targetMinutes?: number;
+  withTally?: boolean;
+  /** checkbox → optional identity line ("I'm the kind of person who…"). */
+  identityLine?: string;
+  /** srs → which deck the cards belong to. */
+  deckId?: string;
+  /** journal → optional soft minimum. */
+  minWords?: number;
+}
+
+/** A single day's exercise within a program. */
+export interface Exercise {
+  prompt: string;
+  minutes: number;
+  instrument: InstrumentKind;
+  instrumentConfig?: InstrumentConfig;
+}
+
+/**
+ * One day — or an inclusive range of identical days, e.g. `[10, 12]` = "Day
+ * 10–12" — within a program.
+ */
+export interface ProgramDay {
+  day: number | [number, number];
+  week: number;
+  theme?: string;
+  exercises: Exercise[];
+}
+
+/**
+ * A recurring daily practice that switches on at `activatesOnDay` and then runs
+ * every remaining day *in addition to* that day's exercise (e.g. "daily SRS
+ * review from Day 6", "daily triple column from Day 8").
+ */
+export interface StandingExercise {
+  activatesOnDay: number;
+  prompt: string;
+  instrument: InstrumentKind;
+  instrumentConfig?: InstrumentConfig;
+}
+
+/**
+ * The structured, runnable layer of a book program. Lives alongside the
+ * existing `LibraryProgram` content fields (see services/library-content.ts);
+ * `ProgramContent` is the subset that makes a program enrollable.
+ */
+export interface ProgramContent {
+  primaryInstrument: InstrumentKind;
+  durationDays: number;
+  dailyMinutes: number;
+  setting: 'solo' | 'partner' | 'group';
+  /** ids of programs this one pairs well with. */
+  pairsWith?: string[];
+  days: ProgramDay[];
+  standingExercises?: StandingExercise[];
+}
+
+export type EnrollmentStatus = 'active' | 'paused' | 'completed' | 'graduated';
+
+/** A user's run of a program (local + Convex sync; LWW + soft-delete). */
+export interface ProgramEnrollment {
+  id: string;
+  programId: string;
+  startedAt: number;
+  /** 1-based; advances on completion, never by wall-clock. */
+  currentDay: number;
+  /** Daily reminder time, "HH:MM" 24-hour. */
+  reminderTime: string;
+  status: EnrollmentStatus;
+  /** Day numbers completed (handles out-of-order / ranges). */
+  completedDays: number[];
+  /** Calendar dates practiced ("YYYY-MM-DD") — drives the forgiving streak. */
+  practicedDates: string[];
+  /** The user's focus program; one is primary at a time. */
+  isPrimary: boolean;
+  createdAt: number;
+  updatedAt: number;
+  deletedAt?: number;
+}
+
+/** The daily "done" for a program day (local + Convex sync). */
+export interface ProgramDayLog {
+  id: string;
+  enrollmentId: string;
+  day: number;
+  completedAt: number;
+  note?: string;
+  updatedAt: number;
+  deletedAt?: number;
+}
+
+/**
+ * A growth signal an instrument optionally emits from a capture (PIVOT_PLAN.md
+ * §7). A uniform container — not a normalized cross-instrument score.
+ */
+export interface SkillSignal {
+  metricKey: string;
+  label: string;
+  value: number;
+  unit: string;
+  direction: 'up' | 'down';
+  at: number;
+}
+
+/** A spaced-repetition card the user authors (FSRS math in services/fsrs.ts). */
+export interface SrsCard {
+  id: string;
+  deckId: string;
+  front: string;
+  back: string;
+  /** Optional image URI (front). */
+  image?: string;
+  /** FSRS state. */
+  stability: number;
+  difficulty: number;
+  /** Next due timestamp. */
+  due: number;
+  createdAt: number;
+  updatedAt: number;
+  deletedAt?: number;
+}
+
+/** A logged SRS review (grade → FSRS update). */
+export interface SrsReview {
+  id: string;
+  cardId: string;
+  at: number;
+  /** 1=again, 2=hard, 3=good, 4=easy. */
+  grade: 1 | 2 | 3 | 4;
+  updatedAt: number;
+  deletedAt?: number;
+}
+
+/**
+ * How a capture (entry / focus session) is keyed. The behavior model used
+ * `behaviorId` directly; program instruments key by enrollment or exercise.
+ * Added now for forward use — capture re-keying lands with the instruments.
+ */
+export type CaptureSource = 'behavior' | 'enrollment' | 'exercise';
