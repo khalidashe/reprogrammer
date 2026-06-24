@@ -1,4 +1,4 @@
-import type { Domain, LibraryCategory, PracticeType } from '../types';
+import type { Domain, LibraryCategory, PracticeType, ProgramContent } from '../types';
 
 export interface LibraryGuide {
   id: string;
@@ -33,6 +33,12 @@ export interface LibraryProgram {
   guideIds: string[];
   body: string;
   sequence?: string[];
+  /**
+   * The structured, runnable layer (the pivot — REP book programs). When
+   * present, the program is enrollable as a day-by-day course; absent = a
+   * read-only catalog entry awaiting a content port.
+   */
+  program?: ProgramContent;
 }
 
 export interface AdoptTemplate {

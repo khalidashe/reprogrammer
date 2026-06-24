@@ -98,6 +98,258 @@ The ability to concentrate without distraction on cognitively demanding work is 
 ## Run It
 
 ~21 days. Set a daily deep-work block and protect it. Pairs with the Deep Focus, Digital Discipline, and Attention Fragmentation guides — and with the upcoming pull-mode drift counter.`,
+    program: {
+      primaryInstrument: 'timer',
+      durationDays: 21,
+      dailyMinutes: 45,
+      setting: 'solo',
+      pairsWith: ['pkg-make-it-stick', 'pkg-ultralearning'],
+      days: [
+        {
+          day: 1,
+          week: 1,
+          theme: 'The ritual',
+          exercises: [
+            {
+              prompt: `Design your ritual on paper: location, exact start time, duration (start at 30 minutes), the rules (phone in another room, every tab closed except the work), and what you're working on. Then run it once today.`,
+              minutes: 40,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 30, withTally: false },
+            },
+          ],
+        },
+        {
+          day: 2,
+          week: 1,
+          theme: 'The ritual',
+          exercises: [
+            {
+              prompt: `Run the ritual for 30 minutes. Each time your attention drifts, tap the drift counter and return to the task — don't judge the count, just record it.`,
+              minutes: 30,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 30, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 3,
+          week: 1,
+          theme: 'The ritual',
+          exercises: [
+            {
+              prompt: `Run the ritual for 40 minutes. Before starting, write one sentence defining what "done" looks like for this session. Tally your drifts.`,
+              minutes: 40,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 40, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 4,
+          week: 1,
+          theme: 'The ritual',
+          exercises: [
+            {
+              prompt: `Boredom training: today, in every queue, elevator, or wait, do not touch your phone — just wait. Tally each time you reach for it reflexively.`,
+              minutes: 5,
+              instrument: 'tally',
+              instrumentConfig: { label: 'Phone reaches', direction: 'down' },
+            },
+          ],
+        },
+        {
+          day: 5,
+          week: 1,
+          theme: 'The ritual',
+          exercises: [
+            {
+              prompt: `Run the ritual for 45 minutes. Compare today's drift tally to Day 2.`,
+              minutes: 45,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 45, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 6,
+          week: 1,
+          theme: 'The ritual',
+          exercises: [
+            {
+              prompt: `Schedule internet use: pick 3 fixed windows for all non-work browsing today. Outside those windows the internet is off-limits — even for 10-second checks. Mark done once your windows are set.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 7,
+          week: 1,
+          theme: 'Weekly review',
+          exercises: [
+            {
+              prompt: `Weekly review: total your deep minutes this week, your average drift tally, and your hardest distraction source. Write it down, then set next week's session length.`,
+              minutes: 15,
+              instrument: 'journal',
+            },
+          ],
+        },
+        {
+          day: 8,
+          week: 2,
+          theme: 'Execution discipline',
+          exercises: [
+            {
+              prompt: `Create your scoreboard — a visible tally of deep-work hours. Then run the ritual for 50 minutes and log the session.`,
+              minutes: 50,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 50, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 9,
+          week: 2,
+          theme: 'Execution discipline',
+          exercises: [
+            {
+              prompt: `Schedule every minute: divide today's workday into blocks on paper before you start; when the plan breaks, revise the blocks rather than abandon them. Then run the ritual for 50 minutes.`,
+              minutes: 50,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 50, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 10,
+          week: 2,
+          theme: 'Execution discipline',
+          exercises: [
+            {
+              prompt: `Shallow-work audit: for each task today ask "how many months to train a smart graduate to do this?" Label each deep or shallow. Then run the ritual for 50 minutes.`,
+              minutes: 50,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 50, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 11,
+          week: 2,
+          theme: 'Execution discipline',
+          exercises: [
+            {
+              prompt: `Run the ritual for 60 minutes. On one walk today, use "productive meditation": hold a single work problem in mind and return to it each time your thoughts drift.`,
+              minutes: 60,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 60, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 12,
+          week: 2,
+          theme: 'Execution discipline',
+          exercises: [
+            {
+              prompt: `Tool triage: list every app and site you use habitually; for each, ask whether it substantially serves a core goal. Block one that fails the test for the rest of the program. Then run the ritual for 60 minutes.`,
+              minutes: 60,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 60, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 13,
+          week: 2,
+          theme: 'Execution discipline',
+          exercises: [
+            {
+              prompt: `Run the ritual, then design and execute your shutdown ritual: review open loops, capture them in a trusted list, plan tomorrow's first block, and say a closing phrase ("Shutdown complete").`,
+              minutes: 60,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 60, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 14,
+          week: 2,
+          theme: 'Weekly review',
+          exercises: [
+            {
+              prompt: `Weekly review at the scoreboard: deep hours vs. Week 1, shallow percentage, and your drift trend. Write it down, then decide your Week 3 target.`,
+              minutes: 15,
+              instrument: 'journal',
+            },
+          ],
+        },
+        {
+          day: [15, 16],
+          week: 3,
+          theme: 'Depth as default',
+          exercises: [
+            {
+              prompt: `Run the ritual at 75 minutes with the full protocol: scheduled blocks, scoreboard, shutdown ritual, and scheduled internet windows.`,
+              minutes: 75,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 75, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 17,
+          week: 3,
+          theme: 'Depth as default',
+          exercises: [
+            {
+              prompt: `Grand gesture (small scale): run today's 75-minute session somewhere deliberately chosen for depth — a library, an empty office, a café without WiFi. Note the effect of the environment shift.`,
+              minutes: 75,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 75, withTally: true },
+            },
+          ],
+        },
+        {
+          day: [18, 19],
+          week: 3,
+          theme: 'Depth as default',
+          exercises: [
+            {
+              prompt: `Run a 90-minute session. On Day 19, attempt zero phone pickups between waking and the end of your deep block.`,
+              minutes: 90,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 90, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 20,
+          week: 3,
+          theme: 'Depth as default',
+          exercises: [
+            {
+              prompt: `Stress test: run the full ritual on a bad-day basis. If today is busy or chaotic, find and protect even a 30-minute block — the skill is keeping the streak under pressure.`,
+              minutes: 30,
+              instrument: 'timer',
+              instrumentConfig: { targetMinutes: 30, withTally: true },
+            },
+          ],
+        },
+        {
+          day: 21,
+          week: 3,
+          theme: 'Final review',
+          exercises: [
+            {
+              prompt: `Final review: total your deep hours over 21 days, your drift-tally trend, and shallow percentage now vs. Day 10. Write your permanent depth philosophy in 3 sentences at the top of your scoreboard.`,
+              minutes: 20,
+              instrument: 'journal',
+            },
+          ],
+        },
+      ],
+    },
   },
 
   // ── Social & Communication ────────────────────────────────────────────────
