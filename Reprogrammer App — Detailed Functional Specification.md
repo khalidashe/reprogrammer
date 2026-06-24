@@ -2,304 +2,166 @@
 
 ## Overview
 
-**Reprogrammer** is a behavioral habit-tracking mobile app (iOS/Android) that helps users reprogram their automatic behaviors through **deliberate awareness**. The app's core loop is:
+**Reprogrammer** is a deliberate-practice mobile app (iOS/Android) built on one idea:
 
-1. User creates a behavior to practice (e.g., "sit up straight")
-2. App sends randomized notifications within a daily time window (e.g., 9am-9pm)
-3. User responds Yes/No to each ping
-4. App tracks streaks and provides feedback (level-ups, pauses)
+> **Don't read the book. Run it.**
 
-**Tagline:** NOTICE · REPEAT · REPROGRAM
+Every great self-improvement book contains a *method*, but reading it changes nothing — knowing
+isn't doing. Reprogrammer takes a book, distills its method into a **day-by-day deliberate-practice
+program**, and hands the user one concrete exercise per day, practiced with **the exact training
+instrument that method demands**.
 
----
+- *Feeling Good* → a structured CBT thought record.
+- *Fluent Forever* → a spaced-repetition deck the user builds themselves.
+- *Deep Work* → a focus timer + an attention-drift tally.
+- *The Artist's Way* → a journaling surface for morning pages.
 
-## User Flows
+The app is a **program runner with a toolbox of practice instruments**. The instrument is chosen
+*per exercise*, with one designated as the program's primary instrument.
 
-### 1. First Launch (Onboarding)
-- **Splash screen** (1.4s animated intro) appears on app start
-- User is shown **4 template behaviors** as quick-start options:
-  - Confident Posture
-  - Unreactive Listening
-  - Poker Face
-  - Eye Contact
-- User can tap templates to add them instantly, or skip and create custom behaviors
-- Tapping "Continue" or creating a behavior sets `hasOnboarded = true`
-- User is routed to the Home screen
+**Tagline:** Don't read the book. Run it.
 
-### 2. Home Screen (Main Dashboard)
-- **Behavior grid view** showing all active behaviors as cards
-- Each card displays:
-  - Behavior title (e.g., "Sit Up Straight")
-  - Time window (e.g., "09:00 - 21:00")
-  - **Current streak** (displayed prominently in large, bright text)
-  - Quick stats: "X check-ins today", "Y active behaviors"
-- **Action buttons:**
-  - "+" button to create new behavior
-  - Refresh button to manually reschedule all notifications
-  - Settings icon to manage/archive behaviors
-  - Profile icon to view stats
-
-### 3. Create/Edit Behavior
-- **Modal that slides up from bottom** with a comprehensive form:
-
-  **Section 1: Core**
-  - Behavior title (e.g., "Confident Posture")
-  - Custom ping message (what the notification says; defaults to the title)
-  - Example: "Sit up straight" or "Enter room with eye contact"
-
-  **Section 2: Scheduling**
-  - Active days (toggles for Sun, Mon, Tue, etc.)
-  - Time window: Start time and End time (HH:mm; e.g., 09:00 to 21:00)
-  - Frequency: Pings per hour — 1-120 (one ping per hour up to two pings per minute)
-  - **Note:** Pings are spread evenly across the window with ~20% jitter around each slot center. Total pings/day = `pingsPerHour × windowHours`.
-
-- **Save** persists the behavior and schedules all notifications for the next 7 days
-- **Edit** updates an existing behavior and re-schedules notifications
-- **Delete** removes the behavior and all its check-ins and notifications
-
-### 4. Behavior Detail Screen
-- Shows rich **streak counter** (current consecutive "yes" days)
-  - Allows today to be missing (so "yes on Mon, yes on Tue, missed Wed" = 2-day streak)
-- **Calendar visualization:**
-  - 30-90 day grid of dots representing each day
-  - Green dots = "yes" check-ins
-  - Gray dots = "no" check-ins
-  - Hollow/blank dots = no check-in for that day
-  - Inactive dots = days outside the active days range
-- **Recent check-ins list:**
-  - Timestamp, result (yes/no), optional user note
-  - Chronologically sorted (newest first)
-- **Journal section:**
-  - All accumulated notes from check-ins and manual edits
-- **Actions:**
-  - Edit behavior
-  - Archive/hide behavior
-  - Bookmark/favorite behavior
-  - Delete behavior
-
-### 5. Check-In Sheet (Triggered by Notification)
-- **When user taps a notification,** app deep-links to this screen with:
-  - Behavior ID
-  - Attempt ID (to track which notification this is)
-  - Phase (initial ping, 15-min snooze, or 30-min snooze)
-
-- **Large Yes/No buttons** for quick response
-- **Optional note field** (user can add context: "felt awkward", "worked well", etc.)
-- **On Yes:**
-  - Check-in is marked as resolved
-  - Streak may increase
-  - If streak hits 7+ days, behavior levels up (see Level-Up Logic below)
-- **On No:**
-  - Check-in is marked as failed
-  - Notification is rescheduled for a snooze (15 min, then 30 min)
-  - After 3 consecutive "no"s, behavior is paused until end-of-day
-
-### 6. Profile Screen
-- User profile: name, bio, optional avatar
-- **Stats dashboard:**
-  - Total behaviors (all + active)
-  - Total check-ins
-  - Success rate (% of "yes" responses)
-  - Longest streak (across all behaviors)
-  - Total days active
-
-### 7. Settings/Management Screen
-- List of all behaviors (including hidden/archived ones)
-- **Bulk actions:**
-  - Archive/hide multiple behaviors
-  - Export behavior data (JSON)
-  - Clear all check-ins (for a specific behavior)
-- **Behavior cards** show:
-  - Title, current streak, last check-in date
-  - Delete button
-  - Archive button
+> The complete product strategy (positioning, competitive analysis, monetization, risks, store copy)
+> lives in `PIVOT_PLAN.md`. The phased build plan lives in `~/.claude/plans/steady-dancing-cosmos.md`.
+> This document is the functional specification of the app itself.
 
 ---
 
-## Notification System
+## Core concepts
 
-### Scheduling
-- **When behavior is created or updated,** the app calculates the next 7 days of notifications
-- For each active day within the time window:
-  - Computes `effectiveInterval = intervalMinutes × LEVEL_MULTIPLIERS[level - 1]` (capped at 120 minutes)
-  - Walks the window in steps of `effectiveInterval`, placing one anchor at each step (first anchor at window start)
-  - Applies ±20% jitter to each anchor (variable-interval reinforcement is more durable than fixed; Skinner)
-  - Enforces a minimum gap of 60% of `effectiveInterval` between consecutive pings to prevent jitter-induced collisions
-  - Skips slots whose time has already passed today
-  - Soft-caps at 30 pings/day per behavior to stay under the iOS 60-pending global limit
-  - Schedules each as a local device notification (soonest-first global ordering)
-
-### Level-Based Expansion (Spaced Repetition)
-- The base `intervalMinutes` is the user's chosen practice density (e.g., every 5 min during focused practice)
-- As the user builds streaks, the app expands the effective interval, mirroring SM-2 ease-factor expansion: dense pinging during habit formation, gradual spacing-out during consolidation
-- Multiplier curve indexed by `level`: `[1.0, 1.5, 2.5, 4.0, 6.0]` — final value reused for levels beyond 5
-- On lapse (3 consecutive "no" responses → end-of-day pause), `level` decrements by 1 (floor 1) so the next day contracts back to denser practice
-- Effective interval is hard-capped at 120 minutes
-
-### Notification Content
-- **Title:** Behavior title (e.g., "Sit Up Straight")
-- **Body:** Custom ping message (e.g., "Check your posture now")
-- **Metadata:**
-  - Behavior ID (to route the response)
-  - Attempt ID (to track which specific notification this is)
-  - Phase (initial, snooze15, snooze30)
-
-### Retry/Snooze Logic
-- **On "No" response:**
-  1. First "no" → reschedule 15 minutes later
-  2. Second "no" → reschedule 30 minutes later
-  3. Third "no" → pause behavior until end-of-day; cancel remaining pings
-
-### Permissions
-- **iOS:** App requests notification permission during onboarding
-- **Android:** Notifications granted by default
+- **Program** — a book's method as a finite, day-by-day course (e.g. "Deep Work — 21 days").
+  Carries a Thesis (what the book claims), a Method (the author's framework as an ordered sequence),
+  and the day-by-day exercises. Curated and shipped in the app (ported from the Quiescence vault).
+- **Instrument** — the practice surface an exercise is performed with: `checkbox`, `journal`,
+  `structured` (a typed form, e.g. CBT/OFNR), `tally`, `timer`, `rating`, or `srs` (spaced
+  repetition). All instruments implement one uniform contract.
+- **Enrollment** — a user's active run of a program: which day they're on, their daily reminder
+  time, status (active / paused / completed / graduated), and progress.
+- **Standing exercise** — a recurring daily practice a program installs partway through (e.g. "daily
+  SRS review from Day 6", "daily triple column from Day 8") that runs *in addition to* the day's new
+  exercise until the program ends.
 
 ---
 
-## Data Model
+## User flows
 
-### Behavior
-```
-- id (unique string)
-- title (e.g., "Confident Posture")
-- pingMessage (custom notification text)
-- journal (accumulated notes)
-- activeDays (array of 0-6: Sun-Sat)
-- window:
-  - from (HH:mm, e.g., "09:00")
-  - to (HH:mm, e.g., "21:00")
-- intervalMinutes (number; one of the presets [1, 2, 5, 10, 15, 20, 30, 45, 60]; minutes between consecutive pings within the window before level expansion is applied)
-- level (1, 2, 3, ... — increases on level-ups; multiplies `intervalMinutes` to produce the effective scheduling interval)
-- pausedUntil (timestamp; if set, no notifications until this time)
-- lastLevelUpStreak (streak count when last leveled up)
-- createdAt (timestamp)
-- hidden (archived flag)
-- bookmarked (favorite flag)
+### 1. First launch (onboarding) — target ≤60s to a real Day-1 exercise
+1. **Hook screen.** "Don't read the book. Run it." → *Choose your first book*.
+2. **Account.** One-tap **Sign in with Apple** (a mandatory account wall, per REP-30, satisfied fast).
+3. **Pick by outcome** (not by book title): *Focus deeply* (Deep Work) · *Build a keystone habit*
+   (Atomic Habits) · *Quiet your inner critic* (Feeling Good) · *Learn a language* (Fluent Forever) ·
+   *Reconnect with creativity* (The Artist's Way). Each card shows book · duration · daily minutes ·
+   primary-instrument icon.
+4. **Program preview.** Thesis (2–3 sentences) + **"Here's your Day 1"** showing the actual first
+   exercise and its instrument.
+5. **Reminder time.** Pick one daily time (notification-permission primer) → land on **Today** with
+   Day 1 ready. Sets `hasOnboarded = true`.
+
+### 2. Today (home)
+The daily loop, and the surface the daily reminder deep-links into.
+- **Header:** date + a quiet progress line per active program ("Deep Work · Day 7/19 · 6 days
+  practiced").
+- **Day card (primary):** program chip · day theme · the exercise prompt · estimated minutes · an
+  inline instrument affordance (timer → *Start*; tally → `+` stepper; structured → *Open record*;
+  checkbox → a check; journal → *Write*). Tap opens the instrument as a focused full-screen session.
+- **Standing-exercise card(s):** shown below the day card once activated; visually lighter, labelled
+  *ongoing practice* (e.g. "Daily review · 12 cards due").
+- **Multi-program (Pro, ≤3):** stacked groups, one per program, ordered by reminder time.
+- **Completion:** instruments self-report done where they can (timer hits target; tally/structured
+  saved); checkbox/journal get an explicit *Mark done*. Completing writes a day log, advances the
+  day, records the practiced date, with a light haptic and a calm check animation.
+- **All-done / empty / missed-yesterday** states as in `PIVOT_PLAN.md` §5a.
+
+### 3. Programs (browse + read)
+- Browse the catalog by category (The Foundation leads). Each program *is* its own reader:
+  Thesis → Method → the day-by-day.
+- Program detail gains a **Start program** action → daily reminder-time picker → creates an
+  enrollment. Free tier = one active program; additional concurrent programs are Pro.
+- SRS deck/card **management** lives here (in the program), not on Today.
+
+### 4. Instruments (the practice surfaces)
+Each exercise opens its instrument:
+- **checkbox** — mark a rep done (+ optional identity line). *(Absorbs the old behavior-rep model.)*
+- **journal** — free-text entry (e.g. morning pages).
+- **structured** — a typed form (CBT triple-column, NVC OFNR, three good things); fields may be text
+  or numeric (e.g. rate emotional charge 0–100 before/after).
+- **tally** — a counter (deep-work drift, "shoulds", interactions initiated).
+- **timer** — a focus session with an optional in-session tally (drift catches).
+- **rating** — a single numeric value on a scale.
+- **srs** — author cards (front/back + optional image), then review a due queue scheduled by FSRS.
+
+### 5. Progression, graduation & forgiveness
+- **Completion-based progression, calendar-based streak.** The next card is always the next
+  *unfinished* exercise — a missed day loses no content. Adherence counts *calendar days practiced*,
+  so the daily rhythm has teeth without shame.
+- **Minimum viable day.** Every exercise offers a 2-minute version; doing it still counts as
+  practiced.
+- **Graduation.** When the last day is completed the program becomes `graduated` and may move to a
+  lightweight maintenance track (per-instrument behaviour — e.g. SRS keeps its review queue forever;
+  a habit just continues). See `PIVOT_PLAN.md` §8a.
+
+### 6. You (settings + stats)
+Account, notification time + quiet hours, Pro status, graduated programs, and skill-gain stats.
+
+---
+
+## Information architecture
+Three tabs: **Today** / **Programs** / **You**. (During the migration, the legacy Behaviors tab
+remains reachable until it is archived in Phase 4.)
+
+---
+
+## Data model
+
+**Content (static, shipped in the app — extends `LibraryProgram` in `services/library-content.ts`):**
+- `Program` `{ id, title, book{author,year}, category, thesis, method[], primaryInstrument,
+  durationDays, dailyMinutes, setting (solo|partner|group), tracking[], pairsWith[],
+  days: ProgramDay[], standingExercises?: StandingExercise[] }`
+- `ProgramDay` `{ day: number | [start,end], week, theme, exercises: Exercise[] }` (supports day
+  ranges like "Day 10–12")
+- `Exercise` `{ prompt, minutes, instrument: Instrument, instrumentConfig? }`
+- `StandingExercise` `{ activatesOnDay, prompt, instrument, instrumentConfig }`
+
+**User data (local Zustand + AsyncStorage, synced to Convex with the per-userId + clientId +
+soft-delete + last-write-wins pattern):**
+- `programEnrollments` `{ programId, startedAt, currentDay, reminderTime, status, completedDays[],
+  practicedDates[], isPrimary }`
+- `programDayLogs` `{ enrollmentId, day, completedAt, note? }`
+- Instrument captures reuse the existing `entries` + `FocusSession`, re-keyed off `behaviorId` to a
+  generic `sourceType` + `sourceId`. **SRS** adds `srsCards` + `srsReviews` (front/back/media, FSRS
+  stability/difficulty/due).
+
+## Instrument contract
+Every instrument implements one interface so the app is a platform, not seven bespoke screens:
+```ts
+interface Instrument<Config, Capture> {
+  kind: 'checkbox' | 'journal' | 'structured' | 'tally' | 'timer' | 'rating' | 'srs';
+  render(ctx): ReactNode;                       // the practice surface
+  isComplete(capture): boolean;                 // what counts as done today
+  toProgress(capture): ProgressDelta;           // advances the program
+  skillSignal?(capture): SkillSignal | null;    // optional growth signal
+  reminders?(enrollment, config): ScheduledReminder[]; // e.g. SRS reviews-due
+}
 ```
 
-### Check-In
-```
-- id (unique)
-- behaviorId (which behavior)
-- at (timestamp)
-- result ('yes' | 'no')
-- note (optional user comment)
-```
+## Notifications
+One **daily practice digest** per user by default ("Your practice today: 3 exercises across 2
+programs") at the user's chosen time, plus an SRS reviews-due reminder. Per-program separate
+reminders are an opt-in. Quiet hours respected; total pings capped. The legacy randomized
+variable-interval ping engine (jitter/anchor/level) is retired.
 
-### Reminder Attempt
-```
-- id (unique)
-- behaviorId (which behavior)
-- scheduledFor (timestamp when notification fires)
-- phase ('initial' | 'snooze15' | 'snooze30')
-- status ('scheduled' | 'resolved' | 'skipped' | 'disabled')
-- noCount (count of consecutive "no" responses)
-- createdAt, updatedAt
-```
+## Monetization
+Free = browse/read the whole catalog + run **one** active program with all instruments. Pro
+(RevenueCat) = up to **3** concurrent programs, unlimited custom SRS decks, cross-program skill-gain
+analytics, multiple maintenance tracks, early access to new books. See `PIVOT_PLAN.md` §9.
 
 ---
 
-## Streak & Level-Up Logic
+## Deprecated model (soft-archived, not removed)
 
-### Streak Calculation
-- **Counts consecutive "yes" check-ins** working backwards from today
-- **Allows today to be missing:** If you have "yes" on Mon, "yes" on Tue, and no check-in on Wed, your streak from Wed's perspective is 2 (Tue-Mon)
-- **Streak resets to 0** if you get a "no" check-in
-
-### Level-Up System
-- **Trigger:** When streak reaches 7 days AND `(streak - lastLevelUpStreak) >= 7`
-- **Effect:**
-  - Behavior's `level` increments
-  - `lastLevelUpStreak` is updated to the current streak
-- **Rationale:** Marks progress and achievement milestones
-
----
-
-## Storage & Persistence
-
-### Local Storage
-- All data stored in device's **AsyncStorage** (async key-value store)
-- Keys:
-  - `rpg.behaviors.v1` (array of behaviors)
-  - `rpg.checkins.v1` (array of check-ins)
-  - `rpg.reminderAttempts.v1` (array of notification attempts)
-  - `rpg.app.v1` (user profile, onboarding flag)
-
-### On App Launch
-- App loads all data from AsyncStorage
-- Zustand store is hydrated with behaviors, check-ins, profile
-- Notification listener is attached
-- If it's a new day or app was closed, notifications are rescheduled
-
-### On App Resume
-- All notifications are recalculated and rescheduled (in case system clock changed)
-
-### Error Handling
-- If a behavior is malformed, it's silently ignored on load
-- Errors are logged locally (max 100 entries) for debugging
-- Invalid data doesn't crash the app; defaults to empty state
-
----
-
-## Optional Advanced Features (Deferred to v2)
-
-These are designed but not yet implemented:
-
-1. **Cloud Sync:** Clerk authentication + backend API
-   - User account, login, cross-device sync
-   - Behavior backup and restore
-   
-2. **Geofencing:** Location-based behavior triggers
-   - "When entering the office, practice eye contact"
-   - Separate from time-based notifications
-   
-3. **Calendar Integration:** Sync with iOS Calendar/Google Calendar
-   - Block time for "focused behavior practice"
-   
-4. **Analytics Dashboard:**
-   - Weekly review screen
-   - Success trends, habit evolution graphs
-   - Insights (e.g., "You're most consistent on Tuesdays")
-   
-5. **Behavior Archival UX:**
-   - Archive/hibernate behaviors without deleting
-   - "Resume later" flow
-   
-6. **Customization:**
-   - Snooze notifications (delay by hours or days)
-   - Behavior sharing with friends (accountability partners)
-   
-7. **AI Suggestions:**
-   - Recommend behaviors based on user profile
-   - Suggest better phrasing for behavior intentions
-   - Infer optimal notification windows from user's check-in patterns
-
----
-
-## Technical Constraints
-
-- **Mobile-first:** iOS and Android via React Native/Expo
-- **No internet required:** All functionality works offline
-- **Local notifications only:** No push server (v1)
-- **AsyncStorage only:** No database (v1)
-- **No external analytics:** User data stays on device
-- **Dark theme by default:** Minimal light theme support for now
-
----
-
-## Key User Behaviors to Support
-
-1. **Casual users:** Create 1-2 behaviors, check in occasionally, don't engage with streaks
-   - Benefit: Reminders alone are valuable for awareness
-   
-2. **Engaged users:** Create 5+ behaviors, respond to most pings, aim for streaks
-   - Benefit: Gamified progression, level-ups, streak competition
-   
-3. **Power users:** Customize everything, track journal notes, export data, manage multiple projects
-   - Benefit: Deep analytics, behavior relationships, personal insights
-
----
-
-## Summary
-
-Reprogrammer is a **focused MVP** that excels at one thing: **surfacing automatic behaviors into conscious awareness through randomized notifications and tracking progress via streaks**. The app is designed to scale to cloud sync, geofencing, and advanced analytics, but v1 is deliberately minimal—just the core notification → check-in → streak loop.
+The original product was a **behavior tracker**: users created "adopt"/"eliminate" behaviors, the app
+fired randomized pings within a daily window, the user answered Yes/No, and streaks/levels accrued
+(tagline *NOTICE · REPEAT · REPROGRAM*). That model is being **soft-archived** — its screens move
+under an `archive/` area and its schema fields are marked `@deprecated` rather than dropped, so
+existing users' data is preserved and the change is reversible. Its best mechanic (rep tracking) is
+*absorbed* into the `checkbox` instrument.

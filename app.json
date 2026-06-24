@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Reprogrammer",
+    "description": "Don't read the book. Run it. Reprogrammer turns the world's best books into guided, day-by-day practice — with the exact tool each method needs.",
     "slug": "Reprogrammer",
     "version": "1.0.0",
     "orientation": "portrait",
