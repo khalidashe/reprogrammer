@@ -7,7 +7,7 @@
  */
 import { buildWeeklyReview } from '../weekly-review';
 import { buildCoachInsights } from '../coach';
-import { Behavior, CaptureEntry, CheckIn } from '../../types';
+import { Behavior, CaptureEntry, CheckIn, CoachPrescription } from '../../types';
 
 let failures = 0;
 function expect(cond: boolean, msg: string) {
@@ -100,6 +100,80 @@ const reg = buildWeeklyReview([mk('r')], regChecks, [], NOW, 0);
 const regInsight = buildCoachInsights(reg).find((i) => i.kind === 'regression');
 expect(!!regInsight && regInsight.tone === 'support', 'regression → support insight');
 expect(!!regInsight && regInsight.guideId === 'guide-relapse-and-restart', 'regression links relapse guide');
+
+// ── Phase 2: prescriptions (the "do") ───────────────────────────────────────
+
+// Cold start pairs a "do": add your first behavior.
+expect(cs[0].prescription?.action === 'add_behavior', 'cold_start prescribes adding a behavior');
+
+// Regression pairs the relapse guide (read) with a recovery program (do), and
+// snapshots the behavior's success days as the loop baseline.
+expect(regInsight?.prescription?.action === 'open_program', 'regression prescribes a program');
+expect(
+  regInsight?.prescription?.targetId === 'pkg-rebuild-your-habits',
+  'default recovery program is Rebuild Your Habits'
+);
+expect(regInsight?.prescription?.behaviorId === 'r', 'regression prescription targets the behavior');
+expect(regInsight?.prescription?.baselineSuccessDays === 1, 'baseline = this week\'s success days');
+
+// Emotional behaviors get the CBT recovery program instead.
+const emoChecks: CheckIn[] = [ci('e', 7, 'yes'), ci('e', 8, 'yes'), ci('e', 9, 'yes'), ci('e', 0, 'yes')];
+const emo = buildWeeklyReview([mk('e', { domain: 'emotional' })], emoChecks, [], NOW, 0);
+const emoReg = buildCoachInsights(emo).find((i) => i.kind === 'regression');
+expect(emoReg?.prescription?.targetId === 'pkg-feeling-good', 'emotional regression → Feeling Good');
+
+// ── Phase 2: close the loop ─────────────────────────────────────────────────
+
+const liveStart = buildWeeklyReview([mk('a')], [], [], NOW, 0).window.start;
+const rx = (over: Partial<CoachPrescription> = {}): CoachPrescription => ({
+  id: 'rx1',
+  insightKind: 'regression',
+  behaviorId: 'L',
+  action: 'open_program',
+  targetId: 'pkg-rebuild-your-habits',
+  baselineSuccessDays: 1,
+  windowStart: liveStart - 7 * DAY, // prescribed last week
+  prescribedAt: at(8),
+  status: 'active',
+  updatedAt: at(8),
+  ...over,
+});
+
+// Loop win: prescribed last week, behavior is now well above baseline.
+const winChecks: CheckIn[] = [ci('L', 0, 'yes'), ci('L', 1, 'yes'), ci('L', 2, 'yes'), ci('L', 3, 'yes')];
+const winR = buildWeeklyReview([mk('L')], winChecks, [], NOW, 0);
+const winInsights = buildCoachInsights(winR, [rx()]);
+expect(winInsights[0].kind === 'loop_win', 'recovered behavior → loop_win leads the card');
+expect(
+  winInsights[0].resolves?.id === 'rx1' && winInsights[0].resolves?.status === 'resolved_improved',
+  'loop_win carries the resolution to persist'
+);
+expect(
+  winInsights.filter((i) => i.behaviorId === 'L').length === 1,
+  'prescribed behavior is not double-counted (loop replaces fresh insights)'
+);
+
+// Loop follow-up: prescribed last week, behavior still at/under baseline.
+const stallChecks: CheckIn[] = [ci('L', 0, 'yes')]; // 1 good day = baseline, no gain
+const stallR = buildWeeklyReview([mk('L')], stallChecks, [], NOW, 0);
+const stallInsights = buildCoachInsights(stallR, [rx()]);
+const followup = stallInsights.find((i) => i.kind === 'loop_followup');
+expect(!!followup, 'stalled behavior → loop_followup');
+expect(followup?.resolves?.status === 'resolved_stalled', 'loop_followup resolves as stalled');
+expect(followup?.guideId === 'guide-relapse-and-restart', 'loop_followup re-links the relapse guide');
+
+// Too soon: a prescription made this same week doesn't close yet, and suppresses
+// a fresh nudge for that behavior (we just prescribed — don't nag).
+const sameWeek = buildCoachInsights(winR, [rx({ windowStart: liveStart })]);
+expect(
+  !sameWeek.some((i) => i.kind === 'loop_win' || i.kind === 'loop_followup'),
+  'same-week prescription does not close the loop'
+);
+expect(sameWeek.every((i) => i.behaviorId !== 'L'), 'a just-prescribed behavior is left alone');
+
+// Resolved prescriptions are inert — no loop fires for them.
+const resolved = buildCoachInsights(winR, [rx({ status: 'resolved_improved' })]);
+expect(!resolved.some((i) => i.kind === 'loop_win'), 'already-resolved prescription does not re-fire');
 
 // Cap: never more than 3 insights.
 expect(buildCoachInsights(bw).length <= 3, 'never exceeds 3 insights');

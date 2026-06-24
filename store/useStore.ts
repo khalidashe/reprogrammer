@@ -8,6 +8,8 @@ import {
   BehaviorKind,
   CaptureEntry,
   FocusSession,
+  CoachPrescription,
+  PrescriptionStatus,
 } from '../types';
 import { generateUUID } from '../utils/uuid';
 import { MAX_FOCUS_SESSION_MS } from '../services/scheduler-core';
@@ -25,6 +27,7 @@ const BEHAVIORS_V2_KEY = 'rpg.behaviors.v2';
 const BEHAVIORS_V1_KEY = 'rpg.behaviors.v1';
 const ENTRIES_KEY = 'rpg.entries.v1';
 const FOCUS_SESSIONS_KEY = 'rpg.focusSessions.v1';
+const PRESCRIPTIONS_KEY = 'rpg.prescriptions.v1';
 
 const LEGACY_STABILITY_TO_LEVEL: Array<[number, number]> = [
   [6, 1],
@@ -112,6 +115,7 @@ interface StoreState {
   reminderAttempts: ReminderAttempt[];
   entries: CaptureEntry[];
   focusSessions: FocusSession[];
+  prescriptions: CoachPrescription[];
   appProfile: AppProfile;
   isHydrated: boolean;
 
@@ -135,6 +139,8 @@ interface StoreState {
   endFocusSession: (sessionId: string) => Promise<void>;
   getActiveFocusSession: () => FocusSession | undefined;
   getFocusSessions: (behaviorId: string) => FocusSession[];
+  addPrescription: (prescription: CoachPrescription) => Promise<void>;
+  resolvePrescription: (id: string, status: PrescriptionStatus) => Promise<void>;
 }
 
 const useStore = create<StoreState>((set, get) => ({
@@ -143,6 +149,7 @@ const useStore = create<StoreState>((set, get) => ({
   reminderAttempts: [],
   entries: [],
   focusSessions: [],
+  prescriptions: [],
   appProfile: { hasOnboarded: false },
   isHydrated: false,
 
@@ -157,6 +164,7 @@ const useStore = create<StoreState>((set, get) => ({
         appProfileData,
         entriesData,
         focusSessionsData,
+        prescriptionsData,
       ] = await Promise.all([
         AsyncStorage.getItem(BEHAVIORS_KEY),
         AsyncStorage.getItem(BEHAVIORS_V2_KEY),
@@ -166,6 +174,7 @@ const useStore = create<StoreState>((set, get) => ({
         AsyncStorage.getItem('rpg.app.v1'),
         AsyncStorage.getItem(ENTRIES_KEY),
         AsyncStorage.getItem(FOCUS_SESSIONS_KEY),
+        AsyncStorage.getItem(PRESCRIPTIONS_KEY),
       ]);
 
       let behaviors: Behavior[];
@@ -196,6 +205,7 @@ const useStore = create<StoreState>((set, get) => ({
         reminderAttempts: reminderAttemptsData ? JSON.parse(reminderAttemptsData) : [],
         entries,
         focusSessions: focusSessionsData ? JSON.parse(focusSessionsData) : [],
+        prescriptions: prescriptionsData ? JSON.parse(prescriptionsData) : [],
         appProfile: appProfileData ? JSON.parse(appProfileData) : { hasOnboarded: false },
         isHydrated: true,
       });
@@ -232,18 +242,21 @@ const useStore = create<StoreState>((set, get) => ({
     const attemptsUpdated = state.reminderAttempts.filter((a) => a.behaviorId !== id);
     const entriesUpdated = state.entries.filter((e) => e.behaviorId !== id);
     const focusSessionsUpdated = state.focusSessions.filter((s) => s.behaviorId !== id);
+    const prescriptionsUpdated = state.prescriptions.filter((p) => p.behaviorId !== id);
     set({
       behaviors: updated,
       checkIns: checkInsUpdated,
       reminderAttempts: attemptsUpdated,
       entries: entriesUpdated,
       focusSessions: focusSessionsUpdated,
+      prescriptions: prescriptionsUpdated,
     });
     await AsyncStorage.setItem(BEHAVIORS_KEY, JSON.stringify(updated));
     await AsyncStorage.setItem('rpg.checkins.v1', JSON.stringify(checkInsUpdated));
     await AsyncStorage.setItem('rpg.reminderAttempts.v1', JSON.stringify(attemptsUpdated));
     await AsyncStorage.setItem(ENTRIES_KEY, JSON.stringify(entriesUpdated));
     await AsyncStorage.setItem(FOCUS_SESSIONS_KEY, JSON.stringify(focusSessionsUpdated));
+    await AsyncStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(prescriptionsUpdated));
     cloudSync.deleteBehavior(id);
     for (const c of removedCheckIns) cloudSync.deleteCheckIn(c.id);
     for (const e of removedEntries) cloudSync.deleteEntry(e.id);
@@ -383,6 +396,29 @@ const useStore = create<StoreState>((set, get) => ({
 
   getFocusSessions: (behaviorId: string) => {
     return get().focusSessions.filter((s) => s.behaviorId === behaviorId);
+  },
+
+  // Coach prescriptions (REP-6 Phase 2). Recorded when the user accepts an
+  // insight's "do"; the next weekly review closes the loop. Local-only for now
+  // (coaching metadata is non-sensitive — cloud sync is a fast-follow).
+  addPrescription: async (prescription: CoachPrescription) => {
+    const state = get();
+    const updated = [...state.prescriptions, prescription];
+    set({ prescriptions: updated });
+    await AsyncStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(updated));
+  },
+
+  resolvePrescription: async (id: string, status: PrescriptionStatus) => {
+    const state = get();
+    let changed = false;
+    const updated = state.prescriptions.map((p) => {
+      if (p.id !== id || p.status === status) return p;
+      changed = true;
+      return { ...p, status, updatedAt: Date.now() };
+    });
+    if (!changed) return;
+    set({ prescriptions: updated });
+    await AsyncStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(updated));
   },
 }));
 
