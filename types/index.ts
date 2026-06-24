@@ -134,6 +134,44 @@ export interface FocusSession {
   catches: number;
 }
 
+/**
+ * The trackable "do" a Coach prescription points the user at (REP-6 Phase 2).
+ * Every prescription pairs a "read" (the insight + its guide) with one of these.
+ */
+export type CoachActionKind = 'add_behavior' | 'open_program' | 'open_adopt' | 'open_guide';
+
+/**
+ * `active` from creation; `dismissed` reserved for an explicit user opt-out. The
+ * loop itself is derived from the review window (see services/coach.ts), so no
+ * "resolved" state is persisted in Phase 2.
+ */
+export type PrescriptionStatus = 'active' | 'dismissed';
+
+/**
+ * A coaching prescription the user accepted (REP-6 Phase 2). Recorded when they
+ * tap an insight's "do" CTA; the following weekly review checks whether the
+ * paired behavior improved and closes the loop. Local-only for now — coaching
+ * metadata is non-sensitive, so cloud sync is a fast-follow, not a blocker.
+ */
+export interface CoachPrescription {
+  id: string;
+  /** The insight kind that produced it — for copy + future analytics. */
+  insightKind: string;
+  /** The behavior this is meant to help; the loop is tracked only when set. */
+  behaviorId?: string;
+  action: CoachActionKind;
+  /** Guide / program / adopt-template id the action opens. */
+  targetId?: string;
+  /** The behavior's success days the week it was prescribed — the baseline. */
+  baselineSuccessDays: number;
+  /** Start of the review window it was prescribed against. */
+  windowStart: number;
+  prescribedAt: number;
+  status: PrescriptionStatus;
+  /** Last local write time (REP-30). Drives last-write-wins if sync lands. */
+  updatedAt: number;
+}
+
 export interface ReminderAttempt {
   id: string;
   behaviorId: string;

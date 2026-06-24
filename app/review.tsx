@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { useState, useMemo, type ComponentProps } from 'react';
+import { useState, useMemo, useCallback, type ComponentProps } from 'react';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
@@ -7,8 +7,11 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import { useIsPro } from '@/hooks/useIsPro';
 import { useContentModals } from '@/components/library/content-modals-provider';
+import { useFeedback } from '@/components/ui/feedback';
 import { haptics } from '@/services/haptics';
+import { generateUUID } from '@/utils/uuid';
 import type { DayStatus } from '@/services/consistency';
+import type { CoachActionKind } from '@/types';
 import {
   buildWeeklyReview,
   formatWindowLabel,
@@ -38,15 +41,17 @@ export default function ReviewScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { behaviors, checkIns, entries } = useStore();
+  const { behaviors, checkIns, entries, prescriptions, addPrescription } = useStore();
   const { isPro } = useIsPro();
-  const { openGuide } = useContentModals();
+  const { openGuide, openProgram, openAdopt } = useContentModals();
+  const { showToast } = useFeedback();
   const [weeksAgo, setWeeksAgo] = useState(0);
 
   const review = useMemo(
     () => buildWeeklyReview(behaviors, checkIns, entries, Date.now(), weeksAgo),
     [behaviors, checkIns, entries, weeksAgo]
   );
+  const isLiveWeek = weeksAgo === 0;
 
   const atFreeEdge = !isPro && weeksAgo >= FREE_WEEKS_BACK;
 
@@ -88,7 +93,53 @@ export default function ReviewScreen() {
     () => countReflections(behaviors, entries),
     [behaviors, entries]
   );
-  const insights = useMemo(() => buildCoachInsights(review), [review]);
+  const insights = useMemo(
+    () => buildCoachInsights(review, isLiveWeek ? prescriptions : []),
+    [review, prescriptions, isLiveWeek]
+  );
+
+  // Accept a prescription's "do": perform the action, and (when it's tied to a
+  // behavior) record it so next week's review can check whether it helped.
+  const handlePrescribe = useCallback(
+    (ins: CoachInsight) => {
+      const p = ins.prescription;
+      if (!p) return;
+      haptics.selection();
+      switch (p.action) {
+        case 'add_behavior':
+          router.push('/create');
+          break;
+        case 'open_program':
+          if (p.targetId) openProgram(p.targetId);
+          break;
+        case 'open_adopt':
+          if (p.targetId) openAdopt(p.targetId);
+          break;
+        case 'open_guide':
+          if (p.targetId) openGuide(p.targetId);
+          break;
+      }
+      const alreadyTracking =
+        !!p.behaviorId &&
+        prescriptions.some((x) => x.status === 'active' && x.behaviorId === p.behaviorId);
+      if (p.behaviorId && !alreadyTracking) {
+        void addPrescription({
+          id: generateUUID(),
+          insightKind: ins.kind,
+          behaviorId: p.behaviorId,
+          action: p.action,
+          targetId: p.targetId,
+          baselineSuccessDays: p.baselineSuccessDays ?? 0,
+          windowStart: review.window.start,
+          prescribedAt: Date.now(),
+          status: 'active',
+          updatedAt: Date.now(),
+        });
+        showToast('Added to your plan — I’ll check back next week.');
+      }
+    },
+    [router, openProgram, openAdopt, openGuide, prescriptions, addPrescription, showToast, review.window.start]
+  );
 
   return (
     <ScrollView
@@ -182,7 +233,13 @@ export default function ReviewScreen() {
           </View>
 
           {insights.length > 0 ? (
-            <CoachCard insights={insights} colors={colors} onOpenGuide={openGuide} />
+            <CoachCard
+              insights={insights}
+              colors={colors}
+              live={isLiveWeek}
+              onOpenGuide={openGuide}
+              onPrescribe={handlePrescribe}
+            />
           ) : null}
 
           {review.behaviors.map((row) => (
@@ -233,11 +290,26 @@ function coachIconFor(kind: CoachInsight['kind']): ComponentProps<typeof IconSym
     case 'momentum':
       return 'flame.fill';
     case 'showed_up':
+    case 'loop_win':
       return 'checkmark';
     case 'regression':
+    case 'loop_followup':
       return 'book.fill';
     default:
       return 'sparkles';
+  }
+}
+
+function ctaIconFor(action: CoachActionKind): ComponentProps<typeof IconSymbol>['name'] {
+  switch (action) {
+    case 'add_behavior':
+      return 'plus';
+    case 'open_program':
+      return 'square.stack.fill';
+    case 'open_adopt':
+      return 'plus.circle.fill';
+    case 'open_guide':
+      return 'book.fill';
   }
 }
 
@@ -250,11 +322,15 @@ function coachTone(tone: CoachTone, colors: typeof Colors.dark) {
 function CoachCard({
   insights,
   colors,
+  live,
   onOpenGuide,
+  onPrescribe,
 }: {
   insights: CoachInsight[];
   colors: typeof Colors.dark;
+  live: boolean;
   onOpenGuide: (guideId: string) => void;
+  onPrescribe: (insight: CoachInsight) => void;
 }) {
   return (
     <View style={[styles.coachCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -265,6 +341,7 @@ function CoachCard({
       {insights.map((ins, i) => {
         const tone = coachTone(ins.tone, colors);
         const tappable = !!ins.guideId;
+        const cta = live ? ins.prescription : undefined;
         return (
           <Pressable
             key={ins.id}
@@ -285,6 +362,23 @@ function CoachCard({
             <View style={styles.coachBody}>
               <Text style={[styles.coachTitle, { color: colors.text }]}>{ins.title}</Text>
               <Text style={[styles.coachText, { color: colors.textMuted }]}>{ins.body}</Text>
+              {cta ? (
+                <Pressable
+                  onPress={() => onPrescribe(ins)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={cta.label}
+                  style={({ pressed }) => [
+                    styles.coachCta,
+                    { backgroundColor: colors.tintSoft },
+                    pressed && { opacity: PRESSED_OPACITY },
+                  ]}
+                >
+                  <IconSymbol name={ctaIconFor(cta.action)} size={13} color={colors.accentText} />
+                  <Text style={[styles.coachCtaText, { color: colors.accentText }]}>{cta.label}</Text>
+                  <IconSymbol name="chevron.right" size={12} color={colors.accentText} />
+                </Pressable>
+              ) : null}
             </View>
             {tappable ? (
               <IconSymbol name="chevron.right" size={15} color={colors.textMuted} />
@@ -537,6 +631,17 @@ const styles = StyleSheet.create({
   coachBody: { flex: 1, gap: 2 },
   coachTitle: { ...Type.bodyBold, fontWeight: '700' },
   coachText: { ...Type.caption },
+  coachCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Space.xs,
+    paddingHorizontal: Space.sm,
+    paddingVertical: Space.xs,
+    borderRadius: Radius.pill,
+    marginTop: Space.xs,
+  },
+  coachCtaText: { ...Type.micro, fontWeight: '700', letterSpacing: 0 },
 
   reflectionsLink: {
     flexDirection: 'row',

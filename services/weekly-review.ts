@@ -7,7 +7,7 @@
  * No new capture primitives yet — those are later phases. Pure + injectable
  * `now` so it is unit-testable.
  */
-import { Behavior, BehaviorKind, CaptureEntry, CaptureType, CheckIn } from '../types';
+import { Behavior, BehaviorKind, CaptureEntry, CaptureType, CheckIn, Domain } from '../types';
 import type { DayStatus } from './consistency';
 import { calculateStreak } from './streak';
 
@@ -129,6 +129,10 @@ export interface BehaviorWeek {
   behaviorId: string;
   title: string;
   kind: BehaviorKind;
+  /** Life domain, when set — lets the Coach match a recovery program (REP-6 Phase 2). */
+  domain?: Domain;
+  /** The Library guide this behavior came from, when any (REP-6 Phase 2). */
+  libraryGuideId?: string;
   level: number;
   dayStatuses: DayStatus[];
   successDays: number;
@@ -207,6 +211,8 @@ export function buildBehaviorWeek(
     behaviorId: behavior.id,
     title: behavior.title,
     kind: behavior.kind,
+    domain: behavior.domain,
+    libraryGuideId: behavior.libraryGuideId,
     level: behavior.level,
     dayStatuses,
     successDays,
