@@ -580,3 +580,9 @@ test of "is this the right product?"
   deck-per-program vs free decks). Draft the **Phase-0 spec/README rewrite** outline so it's ready to
   execute. Full **internal-contradiction sweep** and a **convergence check** — if no meaningful,
   non-cosmetic improvement remains, stop the loop and notify.
+- **Loop concluded (2026-06-24).** The plan was approved and implementation started (Phase 0 docs +
+  Phase 1a domain types committed). The strategy doc has converged for build purposes; the remaining
+  v4 refinement items now move from *strategy iteration* to *implementation work* and are tracked in
+  the executable plan (`~/.claude/plans/steady-dancing-cosmos.md`): pricing → read the real
+  RevenueCat config during Phase 2 gating; SkillSignal→UI → Phase 5; SRS card-authoring spec →
+  Phase 3. The `/loop` is stopped here — further changes land as code, not as more doc passes.
