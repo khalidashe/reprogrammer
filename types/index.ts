@@ -140,11 +140,12 @@ export interface FocusSession {
  */
 export type CoachActionKind = 'add_behavior' | 'open_program' | 'open_adopt' | 'open_guide';
 
-export type PrescriptionStatus =
-  | 'active'
-  | 'resolved_improved'
-  | 'resolved_stalled'
-  | 'dismissed';
+/**
+ * `active` from creation; `dismissed` reserved for an explicit user opt-out. The
+ * loop itself is derived from the review window (see services/coach.ts), so no
+ * "resolved" state is persisted in Phase 2.
+ */
+export type PrescriptionStatus = 'active' | 'dismissed';
 
 /**
  * A coaching prescription the user accepted (REP-6 Phase 2). Recorded when they

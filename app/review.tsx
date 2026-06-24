@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { useState, useMemo, useEffect, useCallback, type ComponentProps } from 'react';
+import { useState, useMemo, useCallback, type ComponentProps } from 'react';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
@@ -41,8 +41,7 @@ export default function ReviewScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { behaviors, checkIns, entries, prescriptions, addPrescription, resolvePrescription } =
-    useStore();
+  const { behaviors, checkIns, entries, prescriptions, addPrescription } = useStore();
   const { isPro } = useIsPro();
   const { openGuide, openProgram, openAdopt } = useContentModals();
   const { showToast } = useFeedback();
@@ -98,14 +97,6 @@ export default function ReviewScreen() {
     () => buildCoachInsights(review, isLiveWeek ? prescriptions : []),
     [review, prescriptions, isLiveWeek]
   );
-
-  // Close the loop: persist any resolutions the Coach surfaced this render. Once
-  // resolved, the prescription leaves the active set, so each loop fires once.
-  useEffect(() => {
-    for (const ins of insights) {
-      if (ins.resolves) void resolvePrescription(ins.resolves.id, ins.resolves.status);
-    }
-  }, [insights, resolvePrescription]);
 
   // Accept a prescription's "do": perform the action, and (when it's tied to a
   // behavior) record it so next week's review can check whether it helped.

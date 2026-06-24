@@ -13,7 +13,7 @@
  * are Phase 3; LLM enrichment is Phase 4.
  */
 import type { WeeklyReview, BehaviorWeek } from './weekly-review';
-import type { CoachActionKind, CoachPrescription, PrescriptionStatus } from '../types';
+import type { CoachActionKind, CoachPrescription } from '../types';
 
 export type CoachInsightKind =
   | 'cold_start'
@@ -57,8 +57,6 @@ export interface CoachInsight {
   guideId?: string;
   /** Optional trackable action paired with the read — the "do". */
   prescription?: CoachPrescriptionDraft;
-  /** Set on a loop insight: the prescription it closes and the status to record. */
-  resolves?: { id: string; status: PrescriptionStatus };
 }
 
 const MAX_INSIGHTS = 3;
@@ -66,6 +64,14 @@ const STREAK_MOMENTUM = 3; // days
 const CAPTURE_DELTA = 15; // % move worth calling out
 const REGRESSION_DELTA = -34; // a single behavior's success-day drop worth a gentle note
 const BEST_WEEK_DELTA = 25; // % rise in good days that earns a "strong week"
+
+// Close the loop in the week *after* a prescription — not the same week (too
+// soon), not forever (no nagging). The review window rolls daily, so the loop
+// is derived from how many days have passed, never from a mutated status — that
+// keeps it visible all week instead of vanishing the moment it's "resolved".
+const DAY_MS = 24 * 60 * 60 * 1000;
+const LOOP_MIN_DAYS = 7;
+const LOOP_MAX_DAYS = 13;
 
 const RELAPSE_GUIDE = 'guide-relapse-and-restart';
 
@@ -251,11 +257,10 @@ function loopWin(row: BehaviorWeek, p: CoachPrescription): CoachInsight {
     behaviorId: row.behaviorId,
     title: `${row.title} is bouncing back`,
     body: `Up to ${row.successDays} good ${row.successDays === 1 ? 'day' : 'days'} from ${p.baselineSuccessDays} when you started the plan — that’s the loop closing.`,
-    resolves: { id: p.id, status: 'resolved_improved' },
   };
 }
 
-function loopFollowup(row: BehaviorWeek, p: CoachPrescription): CoachInsight {
+function loopFollowup(row: BehaviorWeek): CoachInsight {
   return {
     id: `loop_followup:${row.behaviorId}`,
     kind: 'loop_followup',
@@ -264,23 +269,34 @@ function loopFollowup(row: BehaviorWeek, p: CoachPrescription): CoachInsight {
     title: `Still finding ${row.title}’s rhythm`,
     body: 'Last week’s plan hasn’t moved the needle yet. Shrink it — a two-minute version you can’t fail beats a big one you skip.',
     guideId: RELAPSE_GUIDE,
-    resolves: { id: p.id, status: 'resolved_stalled' },
   };
 }
 
+/** Days from a prescription's window to the current review window. */
+function daysSince(review: WeeklyReview, p: CoachPrescription): number {
+  return Math.round((review.window.start - p.windowStart) / DAY_MS);
+}
+
+/** A prescription is "live" — recent enough to suppress fresh nudges for its behavior. */
+function isLivePrescription(review: WeeklyReview, p: CoachPrescription): boolean {
+  return p.status !== 'dismissed' && !!p.behaviorId && daysSince(review, p) <= LOOP_MAX_DAYS;
+}
+
 /**
- * For each active prescription made in an earlier window whose behavior is still
- * here, emit a loop insight — celebrate the recovery or gently follow up. Each
- * carries the resolution the screen persists, so it fires exactly once.
+ * For each prescription whose loop window has arrived (the week after it was
+ * made) and whose behavior is still here, emit a loop insight — celebrate the
+ * recovery or gently follow up. Purely window-derived, so it shows for the whole
+ * week rather than vanishing once "resolved".
  */
 function closeLoops(review: WeeklyReview, prescriptions: CoachPrescription[]): CoachInsight[] {
   const out: CoachInsight[] = [];
   for (const p of prescriptions) {
-    if (p.status !== 'active' || !p.behaviorId) continue;
-    if (p.windowStart >= review.window.start) continue; // needs a full week to elapse
+    if (p.status === 'dismissed' || !p.behaviorId) continue;
+    const elapsed = daysSince(review, p);
+    if (elapsed < LOOP_MIN_DAYS || elapsed > LOOP_MAX_DAYS) continue;
     const row = review.behaviors.find((b) => b.behaviorId === p.behaviorId);
     if (!row) continue;
-    out.push(row.successDays > p.baselineSuccessDays ? loopWin(row, p) : loopFollowup(row, p));
+    out.push(row.successDays > p.baselineSuccessDays ? loopWin(row, p) : loopFollowup(row));
   }
   return out;
 }
@@ -307,12 +323,14 @@ export function buildCoachInsights(
     return [cs];
   }
 
-  // Loop closing leads. Behaviors with an active prescription are "used" so they
-  // don't also draw a fresh win/regression note — their loop insight stands in.
+  // Loop closing leads. Behaviors with a live (recent) prescription are "used"
+  // so they don't also draw a fresh win/regression note — their loop insight, or
+  // the just-prescribed quiet, stands in. Older prescriptions fall out of this
+  // set, so a behavior that slips again later gets fresh treatment.
   const loops = closeLoops(review, prescriptions);
   const used = new Set<string>(
     prescriptions
-      .filter((p) => p.status === 'active' && p.behaviorId)
+      .filter((p) => isLivePrescription(review, p))
       .map((p) => p.behaviorId as string)
   );
   const chosen: CoachInsight[] = [...loops];

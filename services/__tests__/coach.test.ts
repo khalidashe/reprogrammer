@@ -145,10 +145,6 @@ const winR = buildWeeklyReview([mk('L')], winChecks, [], NOW, 0);
 const winInsights = buildCoachInsights(winR, [rx()]);
 expect(winInsights[0].kind === 'loop_win', 'recovered behavior → loop_win leads the card');
 expect(
-  winInsights[0].resolves?.id === 'rx1' && winInsights[0].resolves?.status === 'resolved_improved',
-  'loop_win carries the resolution to persist'
-);
-expect(
   winInsights.filter((i) => i.behaviorId === 'L').length === 1,
   'prescribed behavior is not double-counted (loop replaces fresh insights)'
 );
@@ -159,7 +155,6 @@ const stallR = buildWeeklyReview([mk('L')], stallChecks, [], NOW, 0);
 const stallInsights = buildCoachInsights(stallR, [rx()]);
 const followup = stallInsights.find((i) => i.kind === 'loop_followup');
 expect(!!followup, 'stalled behavior → loop_followup');
-expect(followup?.resolves?.status === 'resolved_stalled', 'loop_followup resolves as stalled');
 expect(followup?.guideId === 'guide-relapse-and-restart', 'loop_followup re-links the relapse guide');
 
 // Too soon: a prescription made this same week doesn't close yet, and suppresses
@@ -171,9 +166,24 @@ expect(
 );
 expect(sameWeek.every((i) => i.behaviorId !== 'L'), 'a just-prescribed behavior is left alone');
 
-// Resolved prescriptions are inert — no loop fires for them.
-const resolved = buildCoachInsights(winR, [rx({ status: 'resolved_improved' })]);
-expect(!resolved.some((i) => i.kind === 'loop_win'), 'already-resolved prescription does not re-fire');
+// Expired: a prescription older than the loop window stops closing AND stops
+// suppressing — the behavior gets fresh insights again if it slips/soars later.
+const expired = buildCoachInsights(winR, [rx({ windowStart: liveStart - 21 * DAY })]);
+expect(
+  !expired.some((i) => i.kind === 'loop_win' || i.kind === 'loop_followup'),
+  'a prescription past its loop window no longer closes'
+);
+expect(
+  expired.some((i) => i.behaviorId === 'L' && i.kind !== 'loop_win'),
+  'an expired prescription stops suppressing its behavior'
+);
+
+// Dismissed prescriptions are inert — no loop fires for them.
+const dismissed = buildCoachInsights(winR, [rx({ status: 'dismissed' })]);
+expect(
+  !dismissed.some((i) => i.kind === 'loop_win'),
+  'a dismissed prescription does not close the loop'
+);
 
 // Cap: never more than 3 insights.
 expect(buildCoachInsights(bw).length <= 3, 'never exceeds 3 insights');

@@ -9,7 +9,6 @@ import {
   CaptureEntry,
   FocusSession,
   CoachPrescription,
-  PrescriptionStatus,
 } from '../types';
 import { generateUUID } from '../utils/uuid';
 import { MAX_FOCUS_SESSION_MS } from '../services/scheduler-core';
@@ -140,7 +139,6 @@ interface StoreState {
   getActiveFocusSession: () => FocusSession | undefined;
   getFocusSessions: (behaviorId: string) => FocusSession[];
   addPrescription: (prescription: CoachPrescription) => Promise<void>;
-  resolvePrescription: (id: string, status: PrescriptionStatus) => Promise<void>;
 }
 
 const useStore = create<StoreState>((set, get) => ({
@@ -399,24 +397,12 @@ const useStore = create<StoreState>((set, get) => ({
   },
 
   // Coach prescriptions (REP-6 Phase 2). Recorded when the user accepts an
-  // insight's "do"; the next weekly review closes the loop. Local-only for now
-  // (coaching metadata is non-sensitive — cloud sync is a fast-follow).
+  // insight's "do"; the next weekly review closes the loop (derived from the
+  // window, so no status change is needed to display it). Local-only for now —
+  // coaching metadata is non-sensitive, so cloud sync is a fast-follow.
   addPrescription: async (prescription: CoachPrescription) => {
     const state = get();
     const updated = [...state.prescriptions, prescription];
-    set({ prescriptions: updated });
-    await AsyncStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(updated));
-  },
-
-  resolvePrescription: async (id: string, status: PrescriptionStatus) => {
-    const state = get();
-    let changed = false;
-    const updated = state.prescriptions.map((p) => {
-      if (p.id !== id || p.status === status) return p;
-      changed = true;
-      return { ...p, status, updatedAt: Date.now() };
-    });
-    if (!changed) return;
     set({ prescriptions: updated });
     await AsyncStorage.setItem(PRESCRIPTIONS_KEY, JSON.stringify(updated));
   },
