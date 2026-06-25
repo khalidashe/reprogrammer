@@ -15,6 +15,7 @@ import {
   handleNotificationAction,
   requestNotificationPermission,
   rescheduleAll,
+  scheduleDailyDigest,
   setupNotificationCategory,
 } from '@/services/notifications';
 import { AnimatedSplash } from '@/components/animated-splash';
@@ -105,7 +106,14 @@ function AppShell() {
             attemptId?: string;
             phase?: string;
             onboardingDemo?: boolean;
+            deepLink?: string;
           };
+
+          // Book-programs daily digest (the pivot): open Today.
+          if (data.deepLink === 'today') {
+            router.navigate('/(tabs)/today');
+            return;
+          }
 
           // Onboarding's demo ping just walks the first-run tour forward (REP-39):
           // route back into onboarding and jump to the logging-options step.
@@ -131,6 +139,7 @@ function AppShell() {
       );
 
       await rescheduleAll({ force: true });
+      await scheduleDailyDigest();
     };
 
     setup();
@@ -138,6 +147,7 @@ function AppShell() {
     const onAppStateChange = (state: AppStateStatus) => {
       if (state === 'active') {
         rescheduleAll();
+        scheduleDailyDigest();
       }
     };
     const sub = AppState.addEventListener('change', onAppStateChange);

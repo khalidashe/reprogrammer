@@ -9,6 +9,7 @@ import useStore from '@/store/useStore';
 import { generateUUID } from '@/utils/uuid';
 import { dateKey } from '@/services/scheduler-core';
 import { haptics } from '@/services/haptics';
+import { scheduleDailyDigest } from '@/services/notifications';
 import {
   enrollablePrograms,
   enrollableProgramById,
@@ -75,6 +76,7 @@ export default function TodayScreen() {
       updatedAt: now,
     };
     await addEnrollment(enrollment);
+    await scheduleDailyDigest();
   };
 
   const markDone = async (

@@ -14,6 +14,7 @@ import {
   mulberry32,
   isReminderMuteActive,
   hasActiveFocusSession,
+  parseHHmm,
   SCHEDULE_LEAD_MS,
 } from './scheduler-core';
 import {
@@ -220,6 +221,62 @@ export async function rescheduleAll(options?: { force?: boolean }): Promise<void
   const toSchedule = all.slice(0, MAX_SCHEDULED);
   for (const c of toSchedule) {
     await scheduleCandidate(c);
+  }
+}
+
+/**
+ * Book programs (the pivot): a single daily "practice digest" reminder that
+ * deep-links into Today. Replaces the per-behavior jitter pings for programs —
+ * one calm nudge at the user's chosen time, not a stream. Self-contained
+ * (cancels + reschedules its own identifier) so it survives `rescheduleAll`'s
+ * behavior-only cancellation; call it on launch, on foreground, and after
+ * enrolling. Honors the same global mute / notifications-denied rules.
+ */
+export const DAILY_DIGEST_ID = 'program-daily-digest';
+
+export async function scheduleDailyDigest(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(DAILY_DIGEST_ID);
+  } catch {
+    // not scheduled yet; ignore
+  }
+
+  const store = useStore.getState();
+  if (store.appProfile.notificationsDenied) return;
+  if (isReminderMuteActive(store.appProfile, Date.now())) return;
+
+  const active = store.programEnrollments.filter(
+    (e) => e.status === 'active' && e.deletedAt == null,
+  );
+  if (active.length === 0) return;
+
+  // One digest at the earliest reminder time across active programs.
+  const time = [...active.map((e) => e.reminderTime)].sort()[0] ?? '09:00';
+  const { h, m } = parseHHmm(time);
+  const body =
+    active.length === 1
+      ? "Today's practice is ready — pick up where you left off."
+      : `Your practice today: ${active.length} programs.`;
+
+  const content: Notifications.NotificationContentInput = {
+    title: 'Reprogrammer',
+    body,
+    sound: true,
+    data: { deepLink: 'today' },
+  };
+  if (Platform.OS === 'android') {
+    (content as any).channelId = ANDROID_CHANNEL_ID;
+  }
+
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: DAILY_DIGEST_ID,
+      content,
+      trigger: { type: 'daily', hour: h, minute: m, repeats: true } as any,
+    });
+  } catch (error) {
+    console.error('[DIGEST] Failed to schedule daily digest:', error);
   }
 }
 
