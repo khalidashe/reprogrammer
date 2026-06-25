@@ -56,6 +56,13 @@ const MAPPING = {
   // Catalog rows
   'minus.circle': 'remove-circle-outline',
   'circle': 'circle',
+  // Book programs (the pivot) — Today tab + instrument icons
+  'sun.max.fill': 'today',
+  'checkmark.circle.fill': 'check-circle',
+  'checkmark.seal.fill': 'verified',
+  'square.and.pencil': 'edit-note',
+  'list.bullet.rectangle.fill': 'list-alt',
+  'slider.horizontal.3': 'tune',
 } as IconMapping;
 
 /**
