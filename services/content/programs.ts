@@ -34,6 +34,272 @@ You don't rise to the level of your goals; you fall to the level of your systems
 ## Run It
 
 ~30 days, 10–15 minutes a day. Pick one behavior to build and one to break, then train them on your dashboard. This is the meta-program — its machinery (stacking, the Two-Minute Rule, tracking) plugs into every other program.`,
+    program: {
+      primaryInstrument: 'checkbox',
+      durationDays: 30,
+      dailyMinutes: 12,
+      setting: 'solo',
+      pairsWith: ['pkg-tiny-habits'],
+      days: [
+        {
+          day: 1,
+          week: 1,
+          theme: 'Make it obvious',
+          exercises: [
+            {
+              prompt: `Write your Habits Scorecard: list every habit in your day from waking to sleeping and mark each +, –, or =. Circle the one habit to build and the one to break for this program.`,
+              minutes: 15,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 2,
+          week: 1,
+          theme: 'Make it obvious',
+          exercises: [
+            {
+              prompt: `Write one implementation intention for your new habit: "I will [behavior] at [time] in [location]." Put it where you'll see it at that time, then execute it today.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 3,
+          week: 1,
+          theme: 'Make it obvious',
+          exercises: [
+            {
+              prompt: `Build a habit stack: "After [existing habit], I will [new habit]." Anchor it to something you already do daily without fail, then execute it.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 4,
+          week: 1,
+          theme: 'Make it obvious',
+          exercises: [
+            {
+              prompt: `Redesign one room so the cue for your new habit is unmissable (book on the pillow, shoes by the door). Do the habit when you hit the cue.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 5,
+          week: 1,
+          theme: 'Make it obvious',
+          exercises: [
+            {
+              prompt: `Inversion: find the cue for your bad habit and remove it from sight (delete the app, hide the snack, leave the phone in another room). Tally every urge you notice today.`,
+              minutes: 10,
+              instrument: 'tally',
+              instrumentConfig: { label: 'Urges', direction: 'down' },
+            },
+          ],
+        },
+        {
+          day: 6,
+          week: 1,
+          theme: 'Make it obvious',
+          exercises: [
+            {
+              prompt: `Point-and-call: each time the bad-habit urge hits, say out loud what you're about to do ("I'm about to open Instagram because I'm bored"). At least three times today.`,
+              minutes: 5,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 7,
+          week: 1,
+          theme: 'Weekly review',
+          exercises: [
+            {
+              prompt: `Weekly review: count completed reps of the new habit and note which cue worked best. Adjust your stack or intention for Week 2.`,
+              minutes: 10,
+              instrument: 'journal',
+            },
+          ],
+        },
+        {
+          day: 8,
+          week: 2,
+          theme: 'Make it attractive & easy',
+          exercises: [
+            {
+              prompt: `Temptation bundling: pair the habit with something you crave ("Only listen to [favorite podcast] while doing [habit]"). Execute the bundle today.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 9,
+          week: 2,
+          theme: 'Make it attractive & easy',
+          exercises: [
+            {
+              prompt: `Two-Minute Rule: scale your habit down to a version that takes under 2 minutes and do only that today, even if you want more. Master showing up.`,
+              minutes: 2,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 10,
+          week: 2,
+          theme: 'Make it attractive & easy',
+          exercises: [
+            {
+              prompt: `Reduce friction to zero: prepare everything the habit needs the night before. Tomorrow, notice how much faster it is to start.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 11,
+          week: 2,
+          theme: 'Make it attractive & easy',
+          exercises: [
+            {
+              prompt: `Increase friction on the bad habit by at least 20 seconds (log out, unplug it, move it upstairs). Tally today's occurrences and compare to Day 5.`,
+              minutes: 10,
+              instrument: 'tally',
+              instrumentConfig: { label: 'Occurrences', direction: 'down' },
+            },
+          ],
+        },
+        {
+          day: 12,
+          week: 2,
+          theme: 'Make it attractive & easy',
+          exercises: [
+            {
+              prompt: `Do the 2-minute version, then let yourself continue only if you want to. Notice whether starting was the hard part.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 13,
+          week: 2,
+          theme: 'Make it attractive & easy',
+          exercises: [
+            {
+              prompt: `Environment pass #2: remove one more bad-habit cue you've noticed this week and replace it with a good-habit cue in the same spot.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 14,
+          week: 2,
+          theme: 'Weekly review',
+          exercises: [
+            {
+              prompt: `Weekly review: compare your bad-habit count on Day 11 vs. Day 5. Write one sentence: "It's getting easier because ______."`,
+              minutes: 10,
+              instrument: 'journal',
+            },
+          ],
+        },
+        {
+          day: 15,
+          week: 3,
+          theme: 'Make it satisfying',
+          exercises: [
+            {
+              prompt: `Start a habit tracker (paper calendar or app). Mark today's X immediately after the habit, not later — the mark is the reward.`,
+              minutes: 5,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: [16, 20],
+          week: 3,
+          theme: 'Make it satisfying',
+          exercises: [
+            {
+              prompt: `Daily reps with your tracker. After marking the X, say one line out loud: "I am the kind of person who [identity tied to the habit]." That's the identity vote.`,
+              minutes: 10,
+              instrument: 'checkbox',
+              instrumentConfig: {
+                identityLine: 'I am the kind of person who keeps the promises I make to myself.',
+              },
+            },
+          ],
+        },
+        {
+          day: 21,
+          week: 3,
+          theme: 'Weekly review',
+          exercises: [
+            {
+              prompt: `Weekly review: look at your chain of X's. If you missed a day, write down what broke and apply the "never miss twice" rule going forward.`,
+              minutes: 10,
+              instrument: 'journal',
+            },
+          ],
+        },
+        {
+          day: [22, 27],
+          week: 4,
+          theme: 'Identity & automation',
+          exercises: [
+            {
+              prompt: `Continue daily reps, raising difficulty by ~5% (one more page, minute, or rep) — stay in the Goldilocks zone: hard enough to engage, easy enough to win.`,
+              minutes: 15,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 28,
+          week: 4,
+          theme: 'Identity & automation',
+          exercises: [
+            {
+              prompt: `Accountability: tell one person what habit you've built and that you'll report your tracker weekly. Make breaking the chain socially costly.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 29,
+          week: 4,
+          theme: 'Identity & automation',
+          exercises: [
+            {
+              prompt: `Write your habit contract for the bad habit: the specific behavior, the penalty for doing it, and who enforces it.`,
+              minutes: 10,
+              instrument: 'checkbox',
+            },
+          ],
+        },
+        {
+          day: 30,
+          week: 4,
+          theme: 'Final review',
+          exercises: [
+            {
+              prompt: `Final review: reps completed out of 30, bad-habit count now vs. Day 1, and the identity sentence you now believe. Decide: maintain, scale up, or stack a second habit.`,
+              minutes: 15,
+              instrument: 'journal',
+            },
+          ],
+        },
+      ],
+    },
   },
   {
     id: 'pkg-tiny-habits',
