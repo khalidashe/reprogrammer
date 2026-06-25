@@ -54,6 +54,7 @@ export default function ProgramSessionScreen() {
   const [catches, setCatches] = useState(0);
   const [affirmation, setAffirmation] = useState('');
   const [done, setDone] = useState(false);
+  const [completedLabel, setCompletedLabel] = useState('');
 
   const sessionIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<number | null>(null);
@@ -123,6 +124,9 @@ export default function ProgramSessionScreen() {
       note: withTally ? `${catches} drifts caught` : undefined,
       updatedAt: Date.now(),
     });
+    // Capture the label for the day just finished *before* the enrollment
+    // advances, so the review reads "Day N done" (not the next day).
+    setCompletedLabel(dayProgressLabel(enrollment, content));
     await updateEnrollment(completeCurrentDay(enrollment, content, dateKey(new Date())));
     setDone(true);
   };
@@ -137,7 +141,7 @@ export default function ProgramSessionScreen() {
           <IconSymbol name="checkmark.seal.fill" size={28} color={colors.accentText} />
           <Text style={[Type.h1, { color: colors.text, marginTop: Space.sm }]}>Day complete</Text>
           <Text style={[Type.body, { color: colors.textMuted, marginTop: Space.xs, textAlign: 'center' }]}>
-            {dayProgressLabel(enrollment, content)} done. Showing up is the streak that counts.
+            {completedLabel} done. Showing up is the streak that counts.
           </Text>
 
           <View style={[styles.statRow, { borderTopColor: colors.border }]}>
