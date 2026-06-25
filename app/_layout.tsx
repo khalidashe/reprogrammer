@@ -23,6 +23,7 @@ import { FeedbackProvider } from '@/components/ui/feedback';
 import { convex } from '@/services/convex-client';
 import { authSecureStorage } from '@/services/secure-storage';
 import { useCloudSyncBootstrap } from '@/hooks/useCloudSyncBootstrap';
+import { DEV_SKIP_AUTH } from '@/services/dev-flags';
 
 // Hold the native splash until the JS splash has painted, so the >R_ mark hands
 // off seamlessly into the blinking-cursor AnimatedSplash (REP-43).
@@ -58,6 +59,13 @@ function AppShell() {
   // signed-in user still passes this gate offline.
   useEffect(() => {
     if (!isHydrated || authLoading) return;
+
+    // Dev-only (double-gated): skip the onboarding/sign-in wall so local builds
+    // land straight in the app for screenshots. Inert in production.
+    if (DEV_SKIP_AUTH) {
+      if (pathname === '/onboarding' || pathname === '/auth') router.replace('/(tabs)');
+      return;
+    }
 
     if (!appProfile.hasOnboarded) {
       // New users run the teaching flow; the sign-up wall sits at its end.
