@@ -110,6 +110,33 @@ export default function TodayScreen() {
     });
   };
 
+  const openJournal = (enrollment: ProgramEnrollment, minimal = false) => {
+    router.push({
+      pathname: '/program-journal',
+      params: { enrollmentId: enrollment.id, minimal: minimal ? '1' : '0' },
+    });
+  };
+
+  // Dispatch an exercise to its instrument surface; instruments without a
+  // dedicated surface yet (checkbox/tally/rating/structured/srs) complete inline.
+  const runExercise = (
+    enrollment: ProgramEnrollment,
+    content: ProgramContent,
+    exercise: Exercise,
+    minimal = false,
+  ) => {
+    if (exercise.instrument === 'timer') return openTimer(enrollment, exercise, minimal);
+    if (exercise.instrument === 'journal') return openJournal(enrollment, minimal);
+    return markDone(enrollment, content, minimal);
+  };
+
+  const actionLabel = (exercise: Exercise) =>
+    exercise.instrument === 'timer'
+      ? 'Start session'
+      : exercise.instrument === 'journal'
+        ? 'Write'
+        : 'Mark done';
+
   const padding = {
     paddingTop: insets.top + Space.lg,
     paddingBottom: insets.bottom + Space.xxl,
@@ -232,30 +259,20 @@ export default function TodayScreen() {
                   ) : (
                     <>
                       <Pressable
-                        onPress={() =>
-                          exercise.instrument === 'timer'
-                            ? openTimer(enrollment, exercise)
-                            : markDone(enrollment, content)
-                        }
+                        onPress={() => runExercise(enrollment, content, exercise)}
                         style={({ pressed }) => [
                           styles.button,
                           { backgroundColor: colors.tint },
                           pressed && { opacity: PRESSED_OPACITY },
                         ]}
-                        accessibilityLabel={
-                          exercise.instrument === 'timer' ? 'Start session' : 'Mark done'
-                        }
+                        accessibilityLabel={actionLabel(exercise)}
                       >
                         <Text style={[Type.bodyBold, { color: colors.textOnBrand }]}>
-                          {exercise.instrument === 'timer' ? 'Start session' : 'Mark done'}
+                          {actionLabel(exercise)}
                         </Text>
                       </Pressable>
                       <Pressable
-                        onPress={() =>
-                          exercise.instrument === 'timer'
-                            ? openTimer(enrollment, exercise, true)
-                            : markDone(enrollment, content, true)
-                        }
+                        onPress={() => runExercise(enrollment, content, exercise, true)}
                         hitSlop={8}
                         accessibilityLabel="Do the two-minute version"
                       >
