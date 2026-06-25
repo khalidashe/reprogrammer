@@ -188,6 +188,10 @@ function AppShell() {
               name="program-journal"
               options={{ presentation: 'fullScreenModal', headerShown: false }}
             />
+            <Stack.Screen
+              name="program-structured"
+              options={{ presentation: 'fullScreenModal', headerShown: false }}
+            />
             <Stack.Screen name="behavior/[id]" options={{ title: 'Behavior' }} />
             <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
             <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />

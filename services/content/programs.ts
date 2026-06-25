@@ -835,6 +835,36 @@ Your moods are created by your thoughts, not by events — and when moods turn p
 ## Run It
 
 ~21 days of triple-column thought records. Pairs with the Rumination Interrupt guide. (Note: CBT-style material — educational, not a substitute for therapy.)`,
+    program: {
+      primaryInstrument: 'structured',
+      durationDays: 21,
+      dailyMinutes: 13,
+      setting: 'solo',
+      pairsWith: ['pkg-artists-way'],
+      days: [
+        { day: 1, week: 1, theme: 'Catch and name', exercises: [{ prompt: `Study the ten cognitive distortions. Write each in your own words with one personal example from your past week. Keep this sheet — it's your field guide.`, minutes: 20, instrument: 'journal' }] },
+        { day: 2, week: 1, theme: 'Catch and name', exercises: [{ prompt: `Thought catching: carry a card or note app. Each time your mood dips today, write the literal sentence in your head (not a summary — the actual words). Tally at least 3 catches.`, minutes: 10, instrument: 'tally', instrumentConfig: { label: 'Catches', direction: 'up' } }] },
+        { day: 3, week: 1, theme: 'Catch and name', exercises: [{ prompt: `Take yesterday's catches and name the distortion(s) in each using your field guide. Most thoughts carry 2–3 distortions; find them all.`, minutes: 10, instrument: 'journal' }] },
+        { day: 4, week: 1, theme: 'Catch and name', exercises: [{ prompt: `First triple column — pick your strongest catch so far. Fill in the automatic thought, its distortions, and a rational response. Rule: the response must be something you actually believe.`, minutes: 15, instrument: 'structured', instrumentConfig: { templateId: 'cbt' } }] },
+        { day: 5, week: 1, theme: 'Catch and name', exercises: [{ prompt: `Triple column on a fresh catch. Before you start, rate the thought's emotional charge 0–100; after writing the response, rate it again and note the drop.`, minutes: 15, instrument: 'structured', instrumentConfig: { templateId: 'cbt' } }] },
+        { day: 6, week: 1, theme: 'Catch and name', exercises: [{ prompt: `Distortion spotting in the wild: find 3 distortions today outside your own head (news, social media, other people's complaints). Tally them — naming them externally sharpens internal detection.`, minutes: 10, instrument: 'tally', instrumentConfig: { label: 'Distortions spotted', direction: 'up' } }] },
+        { day: 7, week: 1, theme: 'Weekly review', exercises: [{ prompt: `Weekly review: count your catches and list your two most frequent distortions. These two are your signature — Week 2 targets them.`, minutes: 10, instrument: 'journal' }] },
+        { day: 8, week: 2, theme: 'Rewrite and act', exercises: [{ prompt: `Daily triple column (from now on: every day, at least one thought, signature distortions first). Today, add the "vertical arrow": under your response ask "if the thought were true, why would it upset me?" — and answer.`, minutes: 15, instrument: 'structured', instrumentConfig: { templateId: 'cbt' } }] },
+        { day: 9, week: 2, theme: 'Rewrite and act', exercises: [{ prompt: `Should-statement hunt: catch every "should / must / have to" you say or think today and tally them. Rewrite the three loudest as preferences ("I'd prefer…", "It would help if…").`, minutes: 10, instrument: 'tally', instrumentConfig: { label: 'Shoulds', direction: 'down' } }] },
+        { day: 10, week: 2, theme: 'Rewrite and act', exercises: [{ prompt: `Triple column + behavioral test: take one "I can't" thought and design a 10-minute experiment that tests it ("I can't write" → write one bad paragraph). Run it; record the result next to your prediction.`, minutes: 25, instrument: 'structured', instrumentConfig: { templateId: 'cbt' } }] },
+        { day: 11, week: 2, theme: 'Rewrite and act', exercises: [{ prompt: `Anti-procrastination sheet: pick one dreaded task, break it into steps; for each step predict difficulty and satisfaction (0–100), do it, and record the actuals. Compare predicted vs. actual.`, minutes: 20, instrument: 'journal' }] },
+        { day: 12, week: 2, theme: 'Rewrite and act', exercises: [{ prompt: `Disqualifying-the-positive counter: write three things you did adequately or well today, and for each, block the discount ("that doesn't count because…") by writing why it does count.`, minutes: 10, instrument: 'journal' }] },
+        { day: 13, week: 2, theme: 'Rewrite and act', exercises: [{ prompt: `Triple column on a thought about another person (resentment, blame). Watch specifically for mind reading and personalization.`, minutes: 15, instrument: 'structured', instrumentConfig: { templateId: 'cbt' } }] },
+        { day: 14, week: 2, theme: 'Weekly review', exercises: [{ prompt: `Weekly review: average your before/after charge ratings this week and your should-tally trend. Write one sentence: "The distortion that loses the most power on paper is ______."`, minutes: 10, instrument: 'journal' }] },
+        { day: 15, week: 3, theme: 'Make it reflexive', exercises: [{ prompt: `Speed round — three triple columns in 10 minutes total. The goal is fluency: catch, name, answer without deliberating.`, minutes: 10, instrument: 'structured', instrumentConfig: { templateId: 'cbt' } }] },
+        { day: 16, week: 3, theme: 'Make it reflexive', exercises: [{ prompt: `Mental-only rep: when a negative thought hits, run the triple column in your head in under 60 seconds — literal thought → distortion → one-sentence answer. Paper backup tonight only if the charge stays above 50.`, minutes: 5, instrument: 'checkbox' }] },
+        { day: 17, week: 3, theme: 'Make it reflexive', exercises: [{ prompt: `The hardest thought: take the most persistent, believable negative thought about yourself. Full written treatment — triple column + vertical arrow + one behavioral experiment scheduled against it.`, minutes: 25, instrument: 'structured', instrumentConfig: { templateId: 'cbt' } }] },
+        { day: 18, week: 3, theme: 'Make it reflexive', exercises: [{ prompt: `Run yesterday's experiment. Record prediction vs. result.`, minutes: 15, instrument: 'checkbox' }] },
+        { day: 19, week: 3, theme: 'Make it reflexive', exercises: [{ prompt: `Relapse rehearsal: write the three thoughts most likely to return in a bad week and pre-write their rational responses now, while calm. This is your emergency card.`, minutes: 15, instrument: 'journal' }] },
+        { day: 20, week: 3, theme: 'Make it reflexive', exercises: [{ prompt: `Mental-only day: no paper unless a thought survives two mental rewrites. Notice how many thoughts needed paper at all.`, minutes: 5, instrument: 'checkbox' }] },
+        { day: 21, week: 3, theme: 'Final review', exercises: [{ prompt: `Final review: compare Week 1 vs. Week 3 — catches per day, average charge drop, paper vs. mental-only. Decide your maintenance dose (e.g., a written column twice a week + the emergency card).`, minutes: 15, instrument: 'journal' }] },
+      ],
+    },
   },
 
   // ── Performance & Productivity ────────────────────────────────────────────

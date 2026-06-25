@@ -117,8 +117,19 @@ export default function TodayScreen() {
     });
   };
 
+  const openStructured = (enrollment: ProgramEnrollment, exercise: Exercise, minimal = false) => {
+    router.push({
+      pathname: '/program-structured',
+      params: {
+        enrollmentId: enrollment.id,
+        templateId: exercise.instrumentConfig?.templateId ?? 'cbt',
+        minimal: minimal ? '1' : '0',
+      },
+    });
+  };
+
   // Dispatch an exercise to its instrument surface; instruments without a
-  // dedicated surface yet (checkbox/tally/rating/structured/srs) complete inline.
+  // dedicated surface yet (checkbox/tally/rating/srs) complete inline.
   const runExercise = (
     enrollment: ProgramEnrollment,
     content: ProgramContent,
@@ -127,6 +138,7 @@ export default function TodayScreen() {
   ) => {
     if (exercise.instrument === 'timer') return openTimer(enrollment, exercise, minimal);
     if (exercise.instrument === 'journal') return openJournal(enrollment, minimal);
+    if (exercise.instrument === 'structured') return openStructured(enrollment, exercise, minimal);
     return markDone(enrollment, content, minimal);
   };
 
@@ -135,7 +147,9 @@ export default function TodayScreen() {
       ? 'Start session'
       : exercise.instrument === 'journal'
         ? 'Write'
-        : 'Mark done';
+        : exercise.instrument === 'structured'
+          ? 'Open record'
+          : 'Mark done';
 
   const padding = {
     paddingTop: insets.top + Space.lg,
