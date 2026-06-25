@@ -36,6 +36,7 @@ export default function ProgramSessionScreen() {
   const enrollmentId = params.enrollmentId as string;
   const targetMinutes = Number(params.targetMinutes ?? 0);
   const withTally = params.withTally === '1';
+  const minimal = params.minimal === '1';
 
   const programEnrollments = useStore((s) => s.programEnrollments);
   const startFocusSession = useStore((s) => s.startFocusSession);
@@ -121,7 +122,10 @@ export default function ProgramSessionScreen() {
       enrollmentId: enrollment.id,
       day: enrollment.currentDay,
       completedAt: Date.now(),
-      note: withTally ? `${catches} drifts caught` : undefined,
+      note:
+        [withTally ? `${catches} drifts caught` : null, minimal ? '2-minute version' : null]
+          .filter(Boolean)
+          .join(' · ') || undefined,
       updatedAt: Date.now(),
     });
     // Capture the label for the day just finished *before* the enrollment

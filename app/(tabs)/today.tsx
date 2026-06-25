@@ -77,25 +77,33 @@ export default function TodayScreen() {
     await addEnrollment(enrollment);
   };
 
-  const markDone = async (enrollment: ProgramEnrollment, content: ProgramContent) => {
+  const markDone = async (
+    enrollment: ProgramEnrollment,
+    content: ProgramContent,
+    minimal = false,
+  ) => {
     haptics.success();
     await addProgramDayLog({
       id: generateUUID(),
       enrollmentId: enrollment.id,
       day: enrollment.currentDay,
       completedAt: Date.now(),
+      note: minimal ? '2-minute version' : undefined,
       updatedAt: Date.now(),
     });
     await updateEnrollment(completeCurrentDay(enrollment, content, todayKey));
   };
 
-  const openTimer = (enrollment: ProgramEnrollment, exercise: Exercise) => {
+  const openTimer = (enrollment: ProgramEnrollment, exercise: Exercise, minimal = false) => {
     router.push({
       pathname: '/program-session',
       params: {
         enrollmentId: enrollment.id,
-        targetMinutes: String(exercise.instrumentConfig?.targetMinutes ?? exercise.minutes),
+        targetMinutes: String(
+          minimal ? 2 : (exercise.instrumentConfig?.targetMinutes ?? exercise.minutes),
+        ),
         withTally: exercise.instrumentConfig?.withTally ? '1' : '0',
+        minimal: minimal ? '1' : '0',
       },
     });
   };
@@ -219,30 +227,46 @@ export default function TodayScreen() {
                       <IconSymbol name="checkmark.circle.fill" size={18} color={colors.accentText} />
                       <Text style={[Type.bodyBold, { color: colors.accentText }]}>Done for today</Text>
                     </View>
-                  ) : exercise.instrument === 'timer' ? (
-                    <Pressable
-                      onPress={() => openTimer(enrollment, exercise)}
-                      style={({ pressed }) => [
-                        styles.button,
-                        { backgroundColor: colors.tint },
-                        pressed && { opacity: PRESSED_OPACITY },
-                      ]}
-                      accessibilityLabel="Start session"
-                    >
-                      <Text style={[Type.bodyBold, { color: colors.textOnBrand }]}>Start session</Text>
-                    </Pressable>
                   ) : (
-                    <Pressable
-                      onPress={() => markDone(enrollment, content)}
-                      style={({ pressed }) => [
-                        styles.button,
-                        { backgroundColor: colors.tint },
-                        pressed && { opacity: PRESSED_OPACITY },
-                      ]}
-                      accessibilityLabel="Mark done"
-                    >
-                      <Text style={[Type.bodyBold, { color: colors.textOnBrand }]}>Mark done</Text>
-                    </Pressable>
+                    <>
+                      <Pressable
+                        onPress={() =>
+                          exercise.instrument === 'timer'
+                            ? openTimer(enrollment, exercise)
+                            : markDone(enrollment, content)
+                        }
+                        style={({ pressed }) => [
+                          styles.button,
+                          { backgroundColor: colors.tint },
+                          pressed && { opacity: PRESSED_OPACITY },
+                        ]}
+                        accessibilityLabel={
+                          exercise.instrument === 'timer' ? 'Start session' : 'Mark done'
+                        }
+                      >
+                        <Text style={[Type.bodyBold, { color: colors.textOnBrand }]}>
+                          {exercise.instrument === 'timer' ? 'Start session' : 'Mark done'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          exercise.instrument === 'timer'
+                            ? openTimer(enrollment, exercise, true)
+                            : markDone(enrollment, content, true)
+                        }
+                        hitSlop={8}
+                        accessibilityLabel="Do the two-minute version"
+                      >
+                        <Text
+                          style={[
+                            Type.caption,
+                            { color: colors.textMuted, textAlign: 'center', marginTop: Space.sm },
+                          ]}
+                        >
+                          Short on time? Do the 2-minute version
+                        </Text>
+                      </Pressable>
+                    </>
                   )}
                 </View>
               ))}
