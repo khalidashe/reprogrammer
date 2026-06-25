@@ -11,7 +11,7 @@
  * `userId|sessionId`, so we simulate a signed-in user with that subject.
  */
 import { convexTest } from "convex-test";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { Id } from "./_generated/dataModel";
@@ -135,9 +135,17 @@ test("deleteAccount erases the caller's rows and user record", async () => {
     return userId;
   });
 
-  await asUser(t, userId).mutation(api.account.deleteAccount, {});
-  // purgeUser is scheduled (and self-reschedules in batches) — flush the chain.
-  for (let i = 0; i < 5; i++) await t.finishInProgressScheduledFunctions();
+  // purgeUser is scheduled via runAfter(0) and self-reschedules in batches. Those
+  // jobs fire on a setTimeout, so run the scheduling + flush under fake timers and
+  // drain the whole chain — finishInProgressScheduledFunctions alone races the
+  // macrotask and can assert before the purge has run.
+  vi.useFakeTimers();
+  try {
+    await asUser(t, userId).mutation(api.account.deleteAccount, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+  } finally {
+    vi.useRealTimers();
+  }
 
   const remaining = await t.run(async (ctx) => {
     const behaviors = await ctx.db.query("behaviors").collect();
