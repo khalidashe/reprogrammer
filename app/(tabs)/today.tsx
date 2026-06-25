@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -12,6 +12,7 @@ import { haptics } from '@/services/haptics';
 import {
   enrollablePrograms,
   enrollableProgramById,
+  resolveDay,
   exercisesForDay,
   standingExercisesForDay,
   isComplete,
@@ -49,6 +50,8 @@ export default function TodayScreen() {
   const addEnrollment = useStore((s) => s.addEnrollment);
   const updateEnrollment = useStore((s) => s.updateEnrollment);
   const addProgramDayLog = useStore((s) => s.addProgramDayLog);
+  const [whyOpen, setWhyOpen] = useState<Record<string, boolean>>({});
+  const toggleWhy = (id: string) => setWhyOpen((m) => ({ ...m, [id]: !m[id] }));
 
   const todayKey = dateKey(new Date());
   const active = programEnrollments.filter(
@@ -164,6 +167,7 @@ export default function TodayScreen() {
 
           const dayExercises = exercisesForDay(content, enrollment.currentDay);
           const standing = standingExercisesForDay(content, enrollment.currentDay);
+          const theme = resolveDay(content, enrollment.currentDay)?.theme;
 
           return (
             <View key={enrollment.id} style={{ marginTop: Space.xl }}>
@@ -179,7 +183,14 @@ export default function TodayScreen() {
                   key={`${enrollment.id}-${i}`}
                   style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <View style={styles.exerciseHead}>
+                  {done ? (
+                    <Text style={[Type.caption, { color: colors.textMuted }]}>
+                      Tomorrow{theme ? ` · ${theme}` : ''}
+                    </Text>
+                  ) : theme ? (
+                    <Text style={[Type.caption, { color: colors.accentText }]}>{theme}</Text>
+                  ) : null}
+                  <View style={[styles.exerciseHead, { marginTop: Space.xxs }]}>
                     <IconSymbol
                       name={INSTRUMENT_ICON[exercise.instrument]}
                       size={20}
@@ -192,6 +203,16 @@ export default function TodayScreen() {
                   <Text style={[Type.body, { color: colors.text, marginTop: Space.sm }]}>
                     {exercise.prompt}
                   </Text>
+                  <Pressable onPress={() => toggleWhy(enrollment.id)} hitSlop={8}>
+                    <Text style={[Type.caption, { color: colors.accentText, marginTop: Space.sm }]}>
+                      {whyOpen[enrollment.id] ? 'Hide context' : 'Why this?'}
+                    </Text>
+                  </Pressable>
+                  {whyOpen[enrollment.id] ? (
+                    <Text style={[Type.caption, { color: colors.textMuted, marginTop: Space.xxs }]}>
+                      {prog.description}
+                    </Text>
+                  ) : null}
 
                   {done ? (
                     <View style={[styles.doneRow, { borderTopColor: colors.border }]}>
