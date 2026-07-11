@@ -12,6 +12,7 @@ import {
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { SearchBar } from '@/components/library/search-bar';
 import { useIsPro } from '@/hooks/useIsPro';
+import { cardStyle, ScreenHeader, Pill } from '@/components/ui/primitives';
 import { FREE_GUIDE_IDS } from '@/constants/limits';
 
 export default function LibraryScreen() {
@@ -36,12 +37,12 @@ export default function LibraryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Space.md }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Library</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {LIBRARY_GUIDES.length} guides — research-grounded, with practice drills.
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Library"
+        subtitle={`${LIBRARY_GUIDES.length} guides — research-grounded, with practice drills.`}
+        colors={colors}
+        insetsTop={insets.top}
+      />
 
       <SearchBar
         value={query}
@@ -92,10 +93,7 @@ function GuideCard({
       onPress={onPress}
       style={[
         styles.card,
-        {
-          backgroundColor: locked ? colors.surfaceMuted : colors.tintSoft,
-          borderColor: locked ? colors.border : colors.tintMuted,
-        },
+        cardStyle(colors, locked ? 'muted' : 'brandSoft'),
       ]}
       accessibilityLabel={
         locked
@@ -108,13 +106,9 @@ function GuideCard({
         <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]}>
           {guide.title}
         </Text>
-        {locked && (
-          <Text style={[styles.cardLockBadge, { color: colors.tint }]}>PRO</Text>
-        )}
+        {locked && <Pill label="PRO" colors={colors} tone="brand" color={colors.tint} />}
       </View>
-      <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
-        {domainLabel(guide.domain)} · {guide.estimatedMinutes} min read
-      </Text>
+      <Pill label={`${domainLabel(guide.domain)} · ${guide.estimatedMinutes} min`} colors={colors} tone="muted" />
       <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={3}>
         {guide.summary}
       </Text>
@@ -124,12 +118,6 @@ function GuideCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.md,
-  },
-  title: { ...Type.h1 },
-  subtitle: { ...Type.caption, marginTop: Space.xs },
   scrollContent: {
     padding: Space.lg,
     paddingTop: Space.md,
@@ -146,9 +134,7 @@ const styles = StyleSheet.create({
     padding: Space.md,
     gap: Space.xs,
   },
-  cardTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: Space.sm },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   cardTitle: { ...Type.bodyBold },
-  cardLockBadge: { ...Type.micro, fontWeight: '700', letterSpacing: 1 },
-  cardMeta: { ...Type.micro, marginTop: 2 },
-  cardBody: { ...Type.caption, marginTop: Space.xs },
+  cardBody: { ...Type.caption, marginTop: Space.xxs },
 });

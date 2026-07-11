@@ -10,6 +10,7 @@ import {
   type ThemeColors,
 } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { cardStyle, ScreenHeader, Pill } from '@/components/ui/primitives';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ADOPT_TEMPLATES,
@@ -73,42 +74,48 @@ export default function StatesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Space.md }]}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {activeTab === 'states' ? 'States' : 'Packages'}
-        </Text>
-
-        <View style={[styles.toggle, { backgroundColor: colors.surfaceMuted }]}>
-          <Pressable
-            onPress={() => setActiveTab('states')}
-            style={[
-              styles.toggleButton,
-              activeTab === 'states' && { backgroundColor: colors.tint },
-            ]}
-            accessibilityLabel="States tab"
-          >
-            <IconSymbol
-              name="square.stack.fill"
-              size={18}
-              color={activeTab === 'states' ? colors.textOnBrand : colors.textMuted}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveTab('packages')}
-            style={[
-              styles.toggleButton,
-              activeTab === 'packages' && { backgroundColor: colors.tint },
-            ]}
-            accessibilityLabel="Packages tab"
-          >
-            <IconSymbol
-              name="square.grid.2x2.fill"
-              size={18}
-              color={activeTab === 'packages' ? colors.textOnBrand : colors.textMuted}
-            />
-          </Pressable>
-        </View>
-      </View>
+      <ScreenHeader
+        title={activeTab === 'states' ? 'States' : 'Packages'}
+        subtitle={
+          activeTab === 'states'
+            ? 'Adopt a habit or break one. Tap to preview.'
+            : 'Curated collections of guides.'
+        }
+        colors={colors}
+        insetsTop={insets.top}
+        right={
+          <View style={[styles.toggle, { backgroundColor: colors.surfaceMuted }]}>
+            <Pressable
+              onPress={() => setActiveTab('states')}
+              style={[
+                styles.toggleButton,
+                activeTab === 'states' && { backgroundColor: colors.tint },
+              ]}
+              accessibilityLabel="States tab"
+            >
+              <IconSymbol
+                name="square.stack.fill"
+                size={18}
+                color={activeTab === 'states' ? colors.textOnBrand : colors.textMuted}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => setActiveTab('packages')}
+              style={[
+                styles.toggleButton,
+                activeTab === 'packages' && { backgroundColor: colors.tint },
+              ]}
+              accessibilityLabel="Packages tab"
+            >
+              <IconSymbol
+                name="square.grid.2x2.fill"
+                size={18}
+                color={activeTab === 'packages' ? colors.textOnBrand : colors.textMuted}
+              />
+            </Pressable>
+          </View>
+        }
+      />
 
       <SearchBar
         value={query}
@@ -228,14 +235,13 @@ function TemplateCard({
   onPress: () => void;
 }) {
   const isEliminate = kind === 'eliminate';
-  const bg = isEliminate ? colors.warningSoft : colors.tintSoft;
-  const border = isEliminate ? colors.warning : colors.tintMuted;
+  const variant = isEliminate ? 'muted' : 'brand';
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.gridCard,
-        { backgroundColor: bg, borderColor: border },
+        cardStyle(colors, isEliminate ? 'muted' : 'brandSoft'),
       ]}
       accessibilityLabel={`${title}, ${kind === 'eliminate' ? 'Eliminate' : 'Adopt'}, ${domain}`}
       accessibilityHint="Opens template details"
@@ -246,9 +252,7 @@ function TemplateCard({
       >
         {title}
       </Text>
-      <Text style={[styles.gridCardMeta, { color: colors.textMuted }]}>
-        {domain}
-      </Text>
+      <Pill label={domain} colors={colors} tone={variant === 'muted' ? 'muted' : 'brand'} />
     </Pressable>
   );
 }
@@ -276,7 +280,7 @@ function PackagesBrowser({ colors, packages, onSelect }: PackagesBrowserProps) {
             onPress={() => onSelect(pkg)}
             style={[
               styles.packageCard,
-              { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+              cardStyle(colors, 'brandSoft'),
             ]}
             accessibilityLabel={`${pkg.title} package, ${pkg.guideIds.length} guides`}
             accessibilityHint="Opens package details"
@@ -302,14 +306,6 @@ function PackagesBrowser({ colors, packages, onSelect }: PackagesBrowserProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: { ...Type.h1 },
   toggle: {
     flexDirection: 'row',
     padding: Space.xs,
@@ -349,7 +345,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   gridCardTitle: { ...Type.bodyBold },
-  gridCardMeta: { ...Type.caption },
   packageList: { gap: Space.md },
   sectionHint: { ...Type.caption, marginBottom: Space.xs },
   packageCard: {

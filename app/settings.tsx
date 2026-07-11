@@ -13,6 +13,7 @@ import { useCallback, useState } from 'react';
 import { useQuery } from 'convex/react';
 import { useAuthActions } from '@convex-dev/auth/react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
@@ -25,6 +26,7 @@ import useStore from '@/store/useStore';
 import { deriveStage } from '@/services/levels';
 import { rescheduleAll } from '@/services/notifications';
 import { hhmmToDate, dateToHHmm, formatTimeForDisplayString } from '@/utils/time';
+import { cardStyle, ScreenHeader, SectionTitle, SurfaceButton } from '@/components/ui/primitives';
 
 const MANAGE_URL = Platform.select({
   ios: 'https://apps.apple.com/account/subscriptions',
@@ -36,6 +38,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   const { isPro, isSignedIn } = useIsPro();
   const user = useQuery(api.users.getCurrentUser);
   const { signOut } = useAuthActions();
@@ -155,16 +158,20 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader
+        title="Settings"
+        subtitle="Your practice, your account, your quiet hours."
+        colors={colors}
+        insetsTop={insets.top}
+      />
+
       <View style={styles.statsGrid}>
         {stats.map((stat) => (
           <View
             key={stat.label}
             style={[
               styles.statCard,
-              {
-                backgroundColor: stat.isZero ? colors.surfaceMuted : colors.tintSoft,
-                borderColor: stat.isZero ? colors.border : colors.tintMuted,
-              },
+              cardStyle(colors, stat.isZero ? 'muted' : 'brandSoft'),
             ]}
           >
             <Text
@@ -333,10 +340,8 @@ function Section({
 }) {
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-        {title.toUpperCase()}
-      </Text>
-      <View style={[styles.sectionBody, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <SectionTitle title={title} colors={colors} />
+      <View style={[styles.sectionBody, cardStyle(colors, 'surface')]}>
         {children}
       </View>
     </View>
@@ -377,20 +382,14 @@ function ActionButton({
   destructive?: boolean;
   colors: ThemeColors;
 }) {
-  const bg = primary ? colors.tint : colors.surfaceMuted;
-  const fg = primary
-    ? colors.textOnBrand
-    : destructive
-      ? colors.danger
-      : colors.text;
   return (
-    <Pressable
+    <SurfaceButton
+      label={label}
       onPress={onPress}
-      style={[styles.button, { backgroundColor: bg }]}
-      accessibilityLabel={label}
-    >
-      <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
-    </Pressable>
+      colors={colors}
+      primary={primary}
+      destructive={destructive}
+    />
   );
 }
 
@@ -414,7 +413,6 @@ const styles = StyleSheet.create({
   statValue: { ...Type.display2, fontWeight: '700' },
   statLabel: { ...Type.caption, textAlign: 'center' },
   section: { padding: Space.lg, gap: Space.sm },
-  sectionTitle: { ...Type.micro, letterSpacing: 1, marginLeft: Space.sm },
   sectionBody: {
     borderRadius: Radius.md,
     borderWidth: 1,
@@ -430,14 +428,6 @@ const styles = StyleSheet.create({
   row: { gap: 2 },
   rowLabel: { ...Type.bodyBold },
   rowValue: { ...Type.caption },
-  button: {
-    paddingVertical: Space.md,
-    paddingHorizontal: Space.lg,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-    marginTop: Space.xs,
-  },
-  buttonText: { ...Type.bodyBold },
   toggle: {
     paddingHorizontal: Space.md,
     paddingVertical: Space.xs + Space.xxs,

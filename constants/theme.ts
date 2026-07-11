@@ -1,45 +1,56 @@
 /**
  * Reprogrammer theme tokens.
  *
- * Palette comes from the design system: a neon-green brand scale (50–900) and
- * a neutrals scale (1–13). The semantic colors map below reflects the
- * mental-health-app tuning recommended in the design review:
- *   - 700/800 as primary brand for body text and AA contrast
+ * Palette is aligned to the shadcn/ui preset `b2oY2vzEG`:
+ *   Style  → Vega
+ *   Base   → Mist      (neutral scale with a whisper of green)
+ *   Theme  → Green     (shadcn green-50..950, calm + AA-safe)
+ *   Font   → Inter     (loaded in app/_layout.tsx)
+ *   Icons  → Lucide-style (mapped through components/ui/icon-symbol)
+ *   Radius → Default
+ *
+ * Semantic colors map below reflects the mental-health-app tuning:
+ *   - 600/700 as primary brand (AA contrast on white/near-black)
  *   - 50–200 as soft surfaces / enabled-state tile fills
- *   - 400/500 reserved for celebration moments (streak milestones)
+ *   - 400 reserved for celebration moments (streak milestones)
  *   - complementary amber / muted red / calm blue for semantic states
  */
 
 import { Platform } from 'react-native';
 
-/** Raw brand palette: neon-green */
-export const NeonGreen = {
-  50: '#ebffe8',
-  100: '#c1ffb6',
-  200: '#a3ff93',
-  300: '#79ff62',
-  400: '#5fff43',
-  500: '#37ff14',
-  600: '#32e812',
-  700: '#27b50e',
-  800: '#1e8c0b',
-  900: '#176b08',
+/** Raw brand palette: shadcn Green (50–950). Calm, not neon. */
+export const Green = {
+  50: '#f0fdf4',
+  100: '#dcfce7',
+  200: '#bbf7d0',
+  300: '#86efac',
+  400: '#4ade80',
+  500: '#22c55e',
+  600: '#16a34a',
+  700: '#15803d',
+  800: '#166534',
+  900: '#14532d',
 } as const;
 
-/** Raw palette: neutrals (1 = white, 13 = black) */
-export const Neutrals = {
+/**
+ * Raw palette: Mist neutrals (1 = white, 13 = black).
+ * Standard grays with a faint green undertone so surfaces feel cohesive
+ * with the brand without sacrificing the light/dark contrast of the old
+ * pure-gray scale.
+ */
+export const Mist = {
   1: '#ffffff',
-  2: '#fcfcfc',
-  3: '#f5f5f5',
-  4: '#f0f0f0',
-  5: '#d9d9d9',
-  6: '#bfbfbf',
-  7: '#8c8c8c',
-  8: '#595959',
-  9: '#454545',
-  10: '#262626',
-  11: '#1f1f1f',
-  12: '#141414',
+  2: '#fafbfa',
+  3: '#f4f6f4',
+  4: '#eef1ee',
+  5: '#dde2dd',
+  6: '#c3c9c3',
+  7: '#8f978f',
+  8: '#5f665f',
+  9: '#4a514a',
+  10: '#2c322c',
+  11: '#232923',
+  12: '#161916',
   13: '#000000',
 } as const;
 
@@ -99,39 +110,39 @@ type ThemeVariant = {
 export const Colors: { light: ThemeVariant; dark: ThemeVariant } = {
   light: {
     // Foreground / text
-    text: Neutrals[11],
-    textMuted: Neutrals[8],
-    textOnBrand: Neutrals[1],
+    text: Mist[11],
+    textMuted: Mist[8],
+    textOnBrand: Mist[1],
 
     // Surfaces
-    background: Neutrals[1],
-    surface: Neutrals[2],
-    surfaceMuted: Neutrals[3],
-    border: Neutrals[5],
+    background: Mist[1],
+    surface: Mist[2],
+    surfaceMuted: Mist[3],
+    border: Mist[5],
 
-    // Brand — toned down for mental-health calm
-    tint: NeonGreen[700],
-    tintMuted: NeonGreen[200],
-    tintSoft: NeonGreen[50],
+    // Brand — shadcn Green, calm and AA-safe on white
+    tint: Green[600],
+    tintMuted: Green[200],
+    tintSoft: Green[50],
     /** Reserve for celebration / streak hits — used sparingly. */
-    tintCelebrate: NeonGreen[400],
+    tintCelebrate: Green[400],
 
     // States — used by tile fills
-    stateEnabledBg: NeonGreen[200],
-    stateEnabledText: NeonGreen[900],
-    stateDisabledBg: NeonGreen[50],
-    stateDisabledStripe: NeonGreen[200],
-    stateDisabledText: Neutrals[8],
+    stateEnabledBg: Green[200],
+    stateEnabledText: Green[900],
+    stateDisabledBg: Green[50],
+    stateDisabledStripe: Green[200],
+    stateDisabledText: Mist[8],
 
     // Tabs
-    icon: Neutrals[8],
-    tabIconDefault: Neutrals[7],
-    tabIconSelected: NeonGreen[700],
-    tabBarBackground: Neutrals[1],
+    icon: Mist[8],
+    tabIconDefault: Mist[7],
+    tabIconSelected: Green[600],
+    tabBarBackground: Mist[1],
 
     // Semantic
-    success: NeonGreen[700],
-    successSoft: NeonGreen[100],
+    success: Green[600],
+    successSoft: Green[100],
     warning: Semantic.amber,
     warningSoft: Semantic.amberSoft,
     danger: Semantic.danger,
@@ -141,38 +152,38 @@ export const Colors: { light: ThemeVariant; dark: ThemeVariant } = {
   },
   dark: {
     // Foreground / text
-    text: Neutrals[3],
-    textMuted: Neutrals[6],
-    textOnBrand: Neutrals[1],
+    text: Mist[3],
+    textMuted: Mist[6],
+    textOnBrand: Mist[1],
 
     // Surfaces
-    background: Neutrals[12],
-    surface: Neutrals[11],
-    surfaceMuted: Neutrals[10],
-    border: Neutrals[10],
+    background: Mist[12],
+    surface: Mist[11],
+    surfaceMuted: Mist[10],
+    border: Mist[10],
 
-    // Brand — slightly brighter green for dark backgrounds, but still tamed
-    tint: NeonGreen[500],
-    tintMuted: NeonGreen[800],
-    tintSoft: NeonGreen[900],
-    tintCelebrate: NeonGreen[400],
+    // Brand — brighter green for dark backgrounds
+    tint: Green[500],
+    tintMuted: Green[800],
+    tintSoft: Green[900],
+    tintCelebrate: Green[400],
 
     // States
-    stateEnabledBg: NeonGreen[800],
-    stateEnabledText: NeonGreen[50],
-    stateDisabledBg: NeonGreen[900],
-    stateDisabledStripe: NeonGreen[700],
-    stateDisabledText: Neutrals[6],
+    stateEnabledBg: Green[800],
+    stateEnabledText: Green[50],
+    stateDisabledBg: Green[900],
+    stateDisabledStripe: Green[700],
+    stateDisabledText: Mist[6],
 
     // Tabs
-    icon: Neutrals[6],
-    tabIconDefault: Neutrals[7],
-    tabIconSelected: NeonGreen[500],
-    tabBarBackground: Neutrals[12],
+    icon: Mist[6],
+    tabIconDefault: Mist[7],
+    tabIconSelected: Green[500],
+    tabBarBackground: Mist[12],
 
     // Semantic
-    success: NeonGreen[500],
-    successSoft: NeonGreen[900],
+    success: Green[500],
+    successSoft: Green[900],
     warning: Semantic.amber,
     warningSoft: '#451a03',
     danger: '#f87171',
@@ -190,16 +201,27 @@ export type ThemeColors = ThemeVariant;
  * Use these as `{ ...Type.body }` spread into style objects, with `color`
  * applied separately at the call site.
  */
+/**
+ * Typography scale — 5 steps + a reserved display token.
+ * Each token carries its Inter family weight so that `fontWeight` resolves to
+ * the real loaded face instead of synthesizing from the regular cut.
+ *   body/caption       → Inter (400)
+ *   bodyBold/micro     → Inter_600SemiBold
+ *   h1/h2/display      → Inter_700Bold
+ *   display2           → Inter_800ExtraBold
+ * Spread these (`{ ...Type.body }`) into style objects; apply `color` separately.
+ */
 export const Type = {
-  h1: { fontSize: 24, lineHeight: 30, fontWeight: '700' as const },
-  h2: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const },
-  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' as const },
-  bodyBold: { fontSize: 15, lineHeight: 22, fontWeight: '600' as const },
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const },
+  h1: { fontSize: 24, lineHeight: 30, fontWeight: '700' as const, fontFamily: 'Inter_700Bold' },
+  h2: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const, fontFamily: 'Inter_700Bold' },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' as const, fontFamily: 'Inter' },
+  bodyBold: { fontSize: 15, lineHeight: 22, fontWeight: '600' as const, fontFamily: 'Inter_600SemiBold' },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const, fontFamily: 'Inter' },
   micro: {
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '600' as const,
+    fontFamily: 'Inter_600SemiBold',
     letterSpacing: 0.5,
   },
   /**
@@ -210,10 +232,11 @@ export const Type = {
     fontSize: 28,
     lineHeight: 34,
     fontWeight: '800' as const,
+    fontFamily: 'Inter_800ExtraBold',
     letterSpacing: -0.5,
   },
   /** Streak / milestone moment — reserved. */
-  display: { fontSize: 48, lineHeight: 54, fontWeight: '700' as const },
+  display: { fontSize: 48, lineHeight: 54, fontWeight: '700' as const, fontFamily: 'Inter_700Bold' },
 } as const;
 
 /**
@@ -235,11 +258,11 @@ export const Space = {
 
 /**
  * Border radius scale. `xs` for inputs/small chips, `pill` for fully-rounded
- * affordances.
+ * affordances. Tuned to the shadcn "Default" radius language.
  */
 export const Radius = {
   xs: 8, // inputs, small chips
-  sm: 6, // badges, pills, chips
+  sm: 10, // badges, pills, chips
   md: 12, // buttons, cards, inputs
   lg: 20, // tiles, modals
   pill: 9999, // fully rounded
@@ -255,27 +278,33 @@ export const Layout = {
   tileWidthPct: 48, // (100 - gridGapPct) / 2
 } as const;
 
+/**
+ * Font families. `sans` resolves to Inter once it has been loaded by
+ * expo-font in app/_layout.tsx; until then RN falls back to the system font.
+ */
+/**
+ * Font families. `sans` resolves to the Inter regular face once loaded by
+ * expo-font in app/_layout.tsx. The weighted cuts (Inter_500Medium,
+ * Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold) are referenced
+ * directly from the `Type` tokens so headings/bold text use the true weights.
+ */
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
+    sans: 'Inter',
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
+    sans: 'Inter',
     serif: 'serif',
-    rounded: 'normal',
+    rounded: 'Inter',
     mono: 'monospace',
   },
   web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    sans: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    rounded: "Inter, 'SF Pro Rounded', Meiryo, sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });
