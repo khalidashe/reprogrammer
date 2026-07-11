@@ -42,12 +42,15 @@ export interface EliminateTemplate {
   triggers?: string[];
 }
 
-import { LIBRARY_GUIDES } from './content/guides';
+import { LIBRARY_GUIDES as RAW_LIBRARY_GUIDES } from './content/guides';
 import { LIBRARY_PACKAGES } from './content/packages';
 import { ADOPT_TEMPLATES } from './content/adopt-templates';
 import { ELIMINATE_TEMPLATES } from './content/eliminate-templates';
+import { sortGuidesFreeFirst } from '@/constants/limits';
 
-export { LIBRARY_GUIDES, LIBRARY_PACKAGES, ADOPT_TEMPLATES, ELIMINATE_TEMPLATES };
+export const LIBRARY_GUIDES = sortGuidesFreeFirst(RAW_LIBRARY_GUIDES);
+
+export { LIBRARY_PACKAGES, ADOPT_TEMPLATES, ELIMINATE_TEMPLATES };
 
 export function featuredTemplates(): AdoptTemplate[] {
   return ADOPT_TEMPLATES.filter((t) => t.featured);

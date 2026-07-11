@@ -20,3 +20,16 @@ export const FREE_GUIDE_IDS: ReadonlySet<string> = new Set([
   'guide-small-talk',
   'guide-relapse-and-restart',
 ]);
+
+/**
+ * Stable sort: free guides first, Pro guides after. Within each tier the
+ * original order is preserved. Apply to any guide list to surface free
+ * content ahead of paywalled content.
+ */
+export function sortGuidesFreeFirst<T extends { id: string }>(guides: T[]): T[] {
+  return [...guides].sort((a, b) => {
+    const aFree = FREE_GUIDE_IDS.has(a.id) ? 0 : 1;
+    const bFree = FREE_GUIDE_IDS.has(b.id) ? 0 : 1;
+    return aFree - bFree;
+  });
+}

@@ -93,16 +93,27 @@ export function Pill({
   );
 }
 
-export function SectionTitle({ title, colors }: { title: string; colors: ThemeColors }) {
+export function SectionTitle({
+  title,
+  colors,
+  right,
+}: {
+  title: string;
+  colors: ThemeColors;
+  right?: ReactNode;
+}) {
   return (
-    <Text
-      style={[
-        Type.micro,
-        { color: colors.textMuted, letterSpacing: 1, marginLeft: Space.sm, marginBottom: Space.xs },
-      ]}
-    >
-      {title.toUpperCase()}
-    </Text>
+    <View style={styles.sectionTitleRow}>
+      <Text
+        style={[
+          Type.micro,
+          { fontSize: 12, color: colors.textMuted, letterSpacing: 1, marginLeft: Space.sm },
+        ]}
+      >
+        {title.toUpperCase()}
+      </Text>
+      {right}
+    </View>
   );
 }
 
@@ -148,10 +159,19 @@ const styles = {
   },
   headerText: { flex: 1, gap: 2 },
   pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     paddingHorizontal: Space.sm,
     paddingVertical: Space.xxs,
     borderRadius: Radius.pill,
-    alignSelf: 'flex-start' as const,
+    gap: Space.xxs,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Space.xs - 1,
   },
   button: {
     paddingVertical: Space.md,
