@@ -188,7 +188,6 @@ export const Colors: { light: ThemeVariant; dark: ThemeVariant } = {
     dangerSoft: 'rgba(224, 114, 107, 0.12)',
     info: '#6BA8F5',
     infoSoft: 'rgba(107, 168, 245, 0.12)',
->>>>>>> mine/main
   },
 };
 
