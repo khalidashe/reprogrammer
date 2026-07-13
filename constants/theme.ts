@@ -1,19 +1,12 @@
 /**
  * Reprogrammer theme tokens.
  *
- * Palette is aligned to the shadcn/ui preset `b2oY2vzEG`:
- *   Style  → Vega
- *   Base   → Mist      (neutral scale with a whisper of green)
- *   Theme  → Green     (shadcn green-50..950, calm + AA-safe)
- *   Font   → Inter     (loaded in app/_layout.tsx)
- *   Icons  → Lucide-style (mapped through components/ui/icon-symbol)
- *   Radius → Default
- *
- * Semantic colors map below reflects the mental-health-app tuning:
- *   - 600/700 as primary brand (AA contrast on white/near-black)
- *   - 50–200 as soft surfaces / enabled-state tile fills
- *   - 400 reserved for celebration moments (streak milestones)
- *   - complementary amber / muted red / calm blue for semantic states
+ * Calm dark-premium system (Atoms north star). Surfaces are neutral; the green
+ * brand (#46E06A, a calmer take on the original neon) is reserved as a sparse
+ * accent for progress / mastery / affirmative moments — never a flood fill.
+ * Amber marks streaks and "tried"; coral marks eliminate / destructive actions.
+ * The raw NeonGreen / Neutrals / Semantic scales below are kept for reference;
+ * components should consume the semantic `Colors[scheme]` tokens.
  */
 
 import { Platform } from 'react-native';
@@ -88,6 +81,7 @@ type ThemeVariant = {
   tintMuted: string;
   tintSoft: string;
   tintCelebrate: string;
+  accentText: string;
   stateEnabledBg: string;
   stateEnabledText: string;
   stateDisabledBg: string;
@@ -110,91 +104,123 @@ type ThemeVariant = {
 export const Colors: { light: ThemeVariant; dark: ThemeVariant } = {
   light: {
     // Foreground / text
-    text: Mist[11],
-    textMuted: Mist[8],
-    textOnBrand: Mist[1],
+    text: '#1A1C1A',
+    textMuted: '#5F655E',
+    textOnBrand: '#FFFFFF',
 
-    // Surfaces
-    background: Mist[1],
-    surface: Mist[2],
-    surfaceMuted: Mist[3],
-    border: Mist[5],
+    // Surfaces — neutral
+    background: '#FBFCFB',
+    surface: '#FFFFFF',
+    surfaceMuted: '#F1F3F1',
+    border: '#E3E6E3',
 
-    // Brand — shadcn Green, calm and AA-safe on white
-    tint: Green[600],
-    tintMuted: Green[200],
-    tintSoft: Green[50],
+    // Brand green — calmer (#46E06A), darkened for AA on light surfaces
+    tint: '#149544',
+    tintMuted: '#BFE8CC',
+    tintSoft: '#EAF8EF',
     /** Reserve for celebration / streak hits — used sparingly. */
-    tintCelebrate: Green[400],
+    tintCelebrate: '#46E06A',
+    /** Green text on a green-tint background (pills, labels). */
+    accentText: '#15803D',
 
-    // States — used by tile fills
-    stateEnabledBg: Green[200],
-    stateEnabledText: Green[900],
-    stateDisabledBg: Green[50],
-    stateDisabledStripe: Green[200],
-    stateDisabledText: Mist[8],
+    // State tiles — now neutral surfaces (green is an accent, not the fill)
+    stateEnabledBg: '#FFFFFF',
+    stateEnabledText: '#1A1C1A',
+    stateDisabledBg: '#F1F3F1',
+    stateDisabledStripe: '#E3E6E3',
+    stateDisabledText: '#5F655E',
 
     // Tabs
-    icon: Mist[8],
-    tabIconDefault: Mist[7],
-    tabIconSelected: Green[600],
-    tabBarBackground: Mist[1],
+    icon: '#5F655E',
+    tabIconDefault: '#9AA09A',
+    tabIconSelected: '#149544',
+    tabBarBackground: '#FFFFFF',
 
     // Semantic
-    success: Green[600],
-    successSoft: Green[100],
-    warning: Semantic.amber,
-    warningSoft: Semantic.amberSoft,
-    danger: Semantic.danger,
-    dangerSoft: Semantic.dangerSoft,
-    info: Semantic.info,
-    infoSoft: Semantic.infoSoft,
+    success: '#149544',
+    successSoft: '#EAF8EF',
+    warning: '#C97A0E',
+    warningSoft: '#FBF0DA',
+    danger: '#D4544C',
+    dangerSoft: '#FCEBEA',
+    info: '#2F6FD0',
+    infoSoft: '#E6F0FB',
   },
   dark: {
     // Foreground / text
-    text: Mist[3],
-    textMuted: Mist[6],
-    textOnBrand: Mist[1],
+    text: '#ECEFE9',
+    textMuted: '#8A908A',
+    textOnBrand: '#0C2A13', // dark green — reads on the bright-green accent
 
-    // Surfaces
-    background: Mist[12],
-    surface: Mist[11],
-    surfaceMuted: Mist[10],
-    border: Mist[10],
+    // Surfaces — neutral, dark-first
+    background: '#111312',
+    surface: '#1A1E1B',
+    surfaceMuted: '#202420',
+    border: '#2A2E2A',
 
-    // Brand — brighter green for dark backgrounds
-    tint: Green[500],
-    tintMuted: Green[800],
-    tintSoft: Green[900],
-    tintCelebrate: Green[400],
+    // Brand green — calmer #46E06A, used sparingly
+    tint: '#46E06A',
+    tintMuted: '#2E8F4A',
+    tintSoft: 'rgba(70, 224, 106, 0.12)',
+    tintCelebrate: '#5FE87E',
+    /** Green text on a green-tint background (pills, labels). */
+    accentText: '#7FE39A',
 
-    // States
-    stateEnabledBg: Green[800],
-    stateEnabledText: Green[50],
-    stateDisabledBg: Green[900],
-    stateDisabledStripe: Green[700],
-    stateDisabledText: Mist[6],
+    // State tiles — neutral surfaces
+    stateEnabledBg: '#1A1E1B',
+    stateEnabledText: '#ECEFE9',
+    stateDisabledBg: '#161917',
+    stateDisabledStripe: '#2A2E2A',
+    stateDisabledText: '#8A908A',
 
     // Tabs
-    icon: Mist[6],
-    tabIconDefault: Mist[7],
-    tabIconSelected: Green[500],
-    tabBarBackground: Mist[12],
+    icon: '#8A908A',
+    tabIconDefault: '#6C726A',
+    tabIconSelected: '#46E06A',
+    tabBarBackground: '#111312',
 
     // Semantic
-    success: Green[500],
-    successSoft: Green[900],
-    warning: Semantic.amber,
-    warningSoft: '#451a03',
-    danger: '#f87171',
-    dangerSoft: '#450a0a',
-    info: '#60a5fa',
-    infoSoft: '#172554',
+    success: '#46E06A',
+    successSoft: 'rgba(70, 224, 106, 0.12)',
+    warning: '#F4B740',
+    warningSoft: 'rgba(244, 183, 64, 0.12)',
+    danger: '#E0726B',
+    dangerSoft: 'rgba(224, 114, 107, 0.12)',
+    info: '#6BA8F5',
+    infoSoft: 'rgba(107, 168, 245, 0.12)',
+>>>>>>> mine/main
   },
 };
 
 export type ThemeName = keyof typeof Colors;
 export type ThemeColors = ThemeVariant;
+
+/**
+ * Standard pressed-state opacity for tappable surfaces. Use via Pressable's
+ * function-style: `style={({ pressed }) => [base, pressed && { opacity: PRESSED_OPACITY }]}`.
+ * Keeps touch feedback consistent and calm across the app.
+ */
+export const PRESSED_OPACITY = 0.85;
+
+/**
+ * Canonical "selected / active control" treatment — a soft tint, NEVER a
+ * saturated fill. This is the single source of truth for selected chips, the
+ * active segment of a toggle, on-state switches, open pickers, and any control
+ * the user has chosen. Pair the label/icon with `colors.accentText`.
+ *
+ * The brand green (`tint`) is reserved as a surgical accent for genuinely
+ * affirmative / progress / mastery moments — typically the ONE primary action
+ * on a screen — not for every selectable control. The base style should set
+ * `borderWidth: 1` so the border reads.
+ */
+export function controlSelected(c: ThemeColors): { backgroundColor: string; borderColor: string } {
+  return { backgroundColor: c.tintSoft, borderColor: c.tintMuted };
+}
+
+/** Resting (unselected) counterpart to {@link controlSelected}. */
+export function controlResting(c: ThemeColors): { backgroundColor: string; borderColor: string } {
+  return { backgroundColor: c.surfaceMuted, borderColor: c.border };
+}
 
 /**
  * Typography scale — 5 steps + a reserved display token.

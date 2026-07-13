@@ -3,30 +3,41 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Alert,
   Linking,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { useAuthActions } from '@convex-dev/auth/react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import {
+  Colors,
+  Type,
+  Space,
+  Radius,
+  PRESSED_OPACITY,
+  controlSelected,
+  controlResting,
+  type ThemeColors,
+} from '@/constants/theme';
 import { useIsPro } from '@/hooks/useIsPro';
 import {
   restorePurchases,
   logoutRevenueCat,
 } from '@/services/revenuecat';
 import useStore from '@/store/useStore';
+import { useFeedback } from '@/components/ui/feedback';
+import { haptics } from '@/services/haptics';
 import { deriveStage } from '@/services/levels';
 import { rescheduleAll } from '@/services/notifications';
+import { isReminderMuteActive } from '@/services/scheduler-core';
 import { hhmmToDate, dateToHHmm, formatTimeForDisplayString } from '@/utils/time';
-import { cardStyle, ScreenHeader, SectionTitle, SurfaceButton } from '@/components/ui/primitives';
 
 const MANAGE_URL = Platform.select({
   ios: 'https://apps.apple.com/account/subscriptions',
@@ -38,11 +49,12 @@ export default function SettingsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
   const { isPro, isSignedIn } = useIsPro();
   const user = useQuery(api.users.getCurrentUser);
+  const deleteAccount = useMutation(api.account.deleteAccount);
   const { signOut } = useAuthActions();
   const { behaviors, checkIns, appProfile, updateAppProfile, getStreak } = useStore();
+  const { showToast } = useFeedback();
   const [, setRefresh] = useState({});
   const [pickerOpen, setPickerOpen] = useState<'from' | 'to' | null>(null);
 
@@ -53,6 +65,8 @@ export default function SettingsScreen() {
   );
 
   const activeStates = behaviors.filter((b) => !b.hidden);
+  const bookmarkedCount = behaviors.filter((b) => b.bookmarked).length;
+  const archivedCount = behaviors.filter((b) => b.hidden).length;
   const totalCheckIns = checkIns.length;
   const successCount = checkIns.filter((c) => c.result === 'yes').length;
   const successRate =
@@ -66,8 +80,8 @@ export default function SettingsScreen() {
   ).length;
 
   const stats: { value: string | number; isZero: boolean; label: string }[] = [
-    { value: activeStates.length, isZero: activeStates.length === 0, label: 'Active states' },
-    { value: habitualCount, isZero: habitualCount === 0, label: 'Habitual states' },
+    { value: activeStates.length, isZero: activeStates.length === 0, label: 'Active behaviors' },
+    { value: habitualCount, isZero: habitualCount === 0, label: 'Habitual behaviors' },
     { value: totalCheckIns, isZero: totalCheckIns === 0, label: 'Total check-ins' },
     {
       value: totalCheckIns > 0 ? `${successRate}%` : '—',
@@ -80,13 +94,23 @@ export default function SettingsScreen() {
 
   const quietHours = appProfile.quietHours;
   const quietHoursEnabled = quietHours != null;
+  const remindersMuted = isReminderMuteActive(appProfile);
+  const privateSyncOn = appProfile.privacySyncConsent !== undefined;
+
+  const handleToggleMute = async () => {
+    haptics.selection();
+    await updateAppProfile({
+      remindersMutedUntil: remindersMuted ? undefined : 'indefinite',
+    });
+    await rescheduleAll({ force: true });
+  };
 
   const handleRestore = async () => {
     try {
       await restorePurchases();
-      Alert.alert('Purchases restored', 'Any active subscription is now applied.');
+      showToast('Purchases restored — any active subscription is now applied.');
     } catch (e: any) {
-      Alert.alert('Restore failed', e?.message ?? 'Unknown error');
+      showToast(`Restore failed — ${e?.message ?? 'please try again.'}`);
     }
   };
 
@@ -103,7 +127,58 @@ export default function SettingsScreen() {
     await signOut();
   };
 
+  const resetLocalData = async () => {
+    await AsyncStorage.multiRemove([
+      'rpg.behaviors.v3',
+      'rpg.behaviors.v2',
+      'rpg.behaviors.v1',
+      'rpg.checkins.v1',
+      'rpg.reminderAttempts.v1',
+      'rpg.app.v1',
+      'rpg.entries.v1',
+      'rpg.focusSessions.v1',
+    ]);
+    useStore.setState({
+      behaviors: [],
+      checkIns: [],
+      reminderAttempts: [],
+      entries: [],
+      focusSessions: [],
+      appProfile: { hasOnboarded: false },
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently erases your account and all data from our servers — your behaviors, check-ins, reflections, and settings. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount({});
+            } catch (e: any) {
+              showToast(`Couldn't delete account — ${e?.message ?? 'please try again.'}`);
+              return;
+            }
+            try {
+              await logoutRevenueCat();
+            } catch {
+              // ignore — RC may not be configured
+            }
+            await signOut();
+            await resetLocalData();
+          },
+        },
+      ]
+    );
+  };
+
   const handleToggleQuietHours = async () => {
+    haptics.selection();
     if (quietHoursEnabled) {
       await updateAppProfile({ quietHours: undefined });
     } else {
@@ -135,19 +210,17 @@ export default function SettingsScreen() {
     return (
       <Pressable
         onPress={() => setPickerOpen(isOpen ? null : which)}
-        style={[
+        style={({ pressed }) => [
           styles.timeChip,
-          {
-            backgroundColor: isOpen ? colors.tint : colors.background,
-            borderColor: colors.tint,
-          },
+          isOpen ? controlSelected(colors) : controlResting(colors),
+          pressed && { opacity: PRESSED_OPACITY },
         ]}
         accessibilityLabel={`Quiet hours ${which} time, currently ${formatTimeForDisplayString(value)}`}
       >
         <Text
           style={[
             styles.timeChipText,
-            { color: isOpen ? colors.textOnBrand : colors.text },
+            { color: isOpen ? colors.accentText : colors.text },
           ]}
         >
           {formatTimeForDisplayString(value)}
@@ -157,27 +230,31 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader
-        title="Settings"
-        subtitle="Your practice, your account, your quiet hours."
-        colors={colors}
-        insetsTop={insets.top}
-      />
-
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.scrollInner}
+    >
       <View style={styles.statsGrid}>
         {stats.map((stat) => (
           <View
             key={stat.label}
             style={[
               styles.statCard,
-              cardStyle(colors, stat.isZero ? 'muted' : 'brandSoft'),
+              { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
             <Text
               style={[
                 styles.statValue,
-                { color: stat.isZero ? colors.textMuted : colors.tint },
+                {
+                  // Numbers are neutral data — green is reserved for the one
+                  // genuinely "earned" metric (longest streak).
+                  color: stat.isZero
+                    ? colors.textMuted
+                    : stat.label === 'Longest streak'
+                      ? colors.tint
+                      : colors.text,
+                },
               ]}
             >
               {stat.value}
@@ -189,10 +266,38 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      <Section title="You" colors={colors}>
+        {appProfile.goals ? (
+          <Row label="Your goals" value={appProfile.goals} colors={colors} />
+        ) : null}
+        <ActionButton
+          label={appProfile.goals ? 'Edit your goals' : 'Set your goals'}
+          onPress={() => router.push('/goals')}
+          colors={colors}
+        />
+      </Section>
+
+      <Section title="Your behaviors" colors={colors}>
+        <ActionButton
+          label={`Bookmarked${bookmarkedCount ? ` (${bookmarkedCount})` : ''}`}
+          onPress={() =>
+            router.push({ pathname: '/manage-behaviors', params: { tab: 'bookmarked' } })
+          }
+          colors={colors}
+        />
+        <ActionButton
+          label={`Archived${archivedCount ? ` (${archivedCount})` : ''}`}
+          onPress={() =>
+            router.push({ pathname: '/manage-behaviors', params: { tab: 'archived' } })
+          }
+          colors={colors}
+        />
+      </Section>
+
       <Section title="Subscription" colors={colors}>
         <Row
           label={isPro ? 'Reprogrammer Pro' : 'Free plan'}
-          value={isPro ? 'Active' : 'Upgrade for unlimited states + sync + AI'}
+          value={isPro ? 'Active' : 'Upgrade for unlimited behaviors + sync + AI'}
           colors={colors}
         />
         {!isPro && (
@@ -225,9 +330,29 @@ export default function SettingsScreen() {
               value={user?.email ?? user?.name ?? 'Account'}
               colors={colors}
             />
+            <Row
+              label="Private sync"
+              value={
+                privateSyncOn
+                  ? 'On — your private writing backs up'
+                  : 'Off — private writing stays on this device'
+              }
+              colors={colors}
+            />
+            <ActionButton
+              label={privateSyncOn ? 'Manage private sync' : 'Turn on private sync'}
+              onPress={() => router.push('/privacy-sync-consent')}
+              colors={colors}
+            />
             <ActionButton
               label="Sign out"
               onPress={handleSignOut}
+              colors={colors}
+              destructive
+            />
+            <ActionButton
+              label="Delete account"
+              onPress={handleDeleteAccount}
               colors={colors}
               destructive
             />
@@ -267,19 +392,49 @@ export default function SettingsScreen() {
             colors={colors}
           />
         )}
+        <View style={styles.sectionRow}>
+          <Text style={[styles.sectionSub, { color: colors.textMuted, flex: 1 }]}>
+            Mute all reminders — silence every ping until you turn it back on.
+          </Text>
+          <Pressable
+            onPress={handleToggleMute}
+            style={({ pressed }) => [
+              styles.toggle,
+              remindersMuted ? controlSelected(colors) : controlResting(colors),
+              pressed && { opacity: PRESSED_OPACITY },
+            ]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: remindersMuted }}
+            accessibilityLabel={
+              remindersMuted ? 'Unmute all reminders' : 'Mute all reminders'
+            }
+          >
+            <Text
+              style={[
+                styles.toggleText,
+                { color: remindersMuted ? colors.accentText : colors.text },
+              ]}
+            >
+              {remindersMuted ? 'Muted' : 'Off'}
+            </Text>
+          </Pressable>
+        </View>
       </Section>
 
       <Section title="Quiet hours" colors={colors}>
         <View style={styles.sectionRow}>
           <Text style={[styles.sectionSub, { color: colors.textMuted, flex: 1 }]}>
-            Reminders pause inside this window across every state.
+            Reminders pause inside this window across every behavior.
           </Text>
           <Pressable
             onPress={handleToggleQuietHours}
-            style={[
+            style={({ pressed }) => [
               styles.toggle,
-              { backgroundColor: quietHoursEnabled ? colors.tint : colors.surfaceMuted },
+              quietHoursEnabled ? controlSelected(colors) : controlResting(colors),
+              pressed && { opacity: PRESSED_OPACITY },
             ]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: quietHoursEnabled }}
             accessibilityLabel={
               quietHoursEnabled ? 'Disable quiet hours' : 'Enable quiet hours'
             }
@@ -287,7 +442,7 @@ export default function SettingsScreen() {
             <Text
               style={[
                 styles.toggleText,
-                { color: quietHoursEnabled ? colors.textOnBrand : colors.text },
+                { color: quietHoursEnabled ? colors.accentText : colors.text },
               ]}
             >
               {quietHoursEnabled ? 'On' : 'Off'}
@@ -319,9 +474,14 @@ export default function SettingsScreen() {
           Reprogrammer uses spaced repetition to help you become aware of automatic
           behaviors and practice changing them.
         </Text>
-        <Text style={[styles.tagline, { color: colors.tint }]}>
+        <Text style={[styles.tagline, { color: colors.textMuted }]}>
           Notice · Repeat · Reprogram
         </Text>
+        <ActionButton
+          label="How it works"
+          onPress={() => router.push('/how-it-works')}
+          colors={colors}
+        />
       </Section>
 
       <View style={styles.spacing} />
@@ -340,8 +500,10 @@ function Section({
 }) {
   return (
     <View style={styles.section}>
-      <SectionTitle title={title} colors={colors} />
-      <View style={[styles.sectionBody, cardStyle(colors, 'surface')]}>
+      <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+        {title}
+      </Text>
+      <View style={[styles.sectionBody, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {children}
       </View>
     </View>
@@ -382,19 +544,36 @@ function ActionButton({
   destructive?: boolean;
   colors: ThemeColors;
 }) {
+  const bg = primary ? colors.tint : colors.surfaceMuted;
+  const fg = primary
+    ? colors.textOnBrand
+    : destructive
+      ? colors.danger
+      : colors.text;
   return (
-    <SurfaceButton
-      label={label}
+    <Pressable
       onPress={onPress}
-      colors={colors}
-      primary={primary}
-      destructive={destructive}
-    />
+      style={({ pressed }) => [
+        styles.button,
+        { backgroundColor: bg },
+        pressed && { opacity: PRESSED_OPACITY },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  scrollInner: {
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    paddingBottom: Space.lg,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -413,8 +592,9 @@ const styles = StyleSheet.create({
   statValue: { ...Type.display2, fontWeight: '700' },
   statLabel: { ...Type.caption, textAlign: 'center' },
   section: { padding: Space.lg, gap: Space.sm },
+  sectionTitle: { ...Type.caption, fontWeight: '600', marginLeft: Space.sm },
   sectionBody: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     padding: Space.md,
     gap: Space.sm,
@@ -425,13 +605,28 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   sectionSub: { ...Type.caption },
-  row: { gap: 2 },
+  row: { gap: Space.xxs },
   rowLabel: { ...Type.bodyBold },
   rowValue: { ...Type.caption },
+  button: {
+    paddingVertical: Space.md,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    marginTop: Space.xs,
+  },
+  buttonText: { ...Type.bodyBold },
   toggle: {
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + Space.xxs,
-    borderRadius: Radius.sm,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    minHeight: 44,
+    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleText: { ...Type.bodyBold },
   timeRow: {
@@ -443,8 +638,11 @@ const styles = StyleSheet.create({
   timeChip: {
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     borderWidth: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   timeChipText: { ...Type.bodyBold },
   descriptionText: { ...Type.body },

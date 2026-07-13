@@ -1,6 +1,6 @@
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import { Type, Space, Radius, PRESSED_OPACITY, type ThemeColors } from '@/constants/theme';
 
 interface SearchBarProps {
   value: string;
@@ -46,7 +46,8 @@ export function SearchBar({
         <Pressable
           onPress={() => onChangeText('')}
           hitSlop={8}
-          style={styles.clearButton}
+          style={({ pressed }) => [styles.clearButton, pressed && { opacity: PRESSED_OPACITY }]}
+          accessibilityRole="button"
           accessibilityLabel="Clear search"
         >
           <IconSymbol name="xmark" size={14} color={colors.textMuted} />

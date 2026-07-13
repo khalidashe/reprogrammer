@@ -6,22 +6,25 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Alert } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFeedback } from '@/components/ui/feedback';
+import { haptics } from '@/services/haptics';
 import { Colors } from '@/constants/theme';
 import useStore from '@/store/useStore';
-import { generateUUID } from '@/utils/uuid';
 import { scheduleForBehavior } from '@/services/notifications';
-import { INITIAL_LEVEL, INITIAL_LAST_LEVELUP_STREAK } from '@/services/levels';
+import {
+  buildBehavior,
+  draftFromAdoptTemplate,
+  draftFromEliminateTemplate,
+} from '@/services/behavior-factory';
 import {
   LIBRARY_GUIDES,
-  LIBRARY_PACKAGES,
+  LIBRARY_PROGRAMS,
   ADOPT_TEMPLATES,
   ELIMINATE_TEMPLATES,
   type AdoptTemplate,
   type EliminateTemplate,
 } from '@/services/library-content';
-import type { Behavior } from '@/types';
 import { ContentModal } from './modals';
 import type { ContentTarget } from './content-link-resolver';
 
@@ -29,50 +32,8 @@ interface ContentModalsApi {
   openGuide: (id: string) => void;
   openAdopt: (id: string) => void;
   openEliminate: (id: string) => void;
-  openPackage: (id: string) => void;
+  openProgram: (id: string) => void;
   close: () => void;
-}
-
-function buildAdoptBehavior(template: AdoptTemplate): Behavior {
-  return {
-    id: generateUUID(),
-    kind: 'adopt',
-    title: template.title,
-    pingMessage: template.pingMessage,
-    practiceType: template.practiceType,
-    domain: template.domain,
-    libraryGuideId: template.libraryGuideId,
-    window: template.window,
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-    intervalMinutes: template.intervalMinutes,
-    level: INITIAL_LEVEL,
-    lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
-    createdAt: Date.now(),
-    hidden: false,
-    bookmarked: false,
-  };
-}
-
-function buildEliminateBehavior(
-  template: EliminateTemplate,
-  replacementStateId: string
-): Behavior {
-  return {
-    id: generateUUID(),
-    kind: 'eliminate',
-    title: template.title,
-    pingMessage: template.pingMessage,
-    domain: template.domain,
-    replacementStateId,
-    window: { from: '09:00', to: '21:00' },
-    activeDays: [0, 1, 2, 3, 4, 5, 6],
-    intervalMinutes: 30,
-    level: INITIAL_LEVEL,
-    lastLevelUpStreak: INITIAL_LAST_LEVELUP_STREAK,
-    createdAt: Date.now(),
-    hidden: false,
-    bookmarked: false,
-  };
 }
 
 const ContentModalsContext = createContext<ContentModalsApi | null>(null);
@@ -90,6 +51,7 @@ export function useContentModals(): ContentModalsApi {
 export function ContentModalsProvider({ children }: { children: ReactNode }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { showSheet, showToast } = useFeedback();
   const { behaviors, addBehavior } = useStore();
   const [stack, setStack] = useState<NonNullable<ContentTarget>[]>([]);
 
@@ -123,10 +85,10 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
     [pushTarget]
   );
 
-  const openPackage = useCallback(
+  const openProgram = useCallback(
     (id: string) => {
-      const pkg = LIBRARY_PACKAGES.find((p) => p.id === id);
-      if (pkg) pushTarget({ kind: 'package', pkg });
+      const program = LIBRARY_PROGRAMS.find((p) => p.id === id);
+      if (program) pushTarget({ kind: 'program', program });
     },
     [pushTarget]
   );
@@ -146,13 +108,14 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
 
   const handleAddAdopt = useCallback(
     async (template: AdoptTemplate) => {
-      const behavior = buildAdoptBehavior(template);
+      const behavior = buildBehavior(draftFromAdoptTemplate(template));
       await addBehavior(behavior);
       await scheduleForBehavior(behavior);
       close();
-      Alert.alert('Added', `"${template.title}" is now on your dashboard.`);
+      haptics.success();
+      showToast(`"${template.title}" is now on your dashboard.`);
     },
-    [addBehavior, close]
+    [addBehavior, close, showToast]
   );
 
   const handleAddEliminate = useCallback(
@@ -167,49 +130,53 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
             b.title === adoptTemplate?.title)
       );
       if (!replacement) {
-        Alert.alert(
-          'Add replacement first',
-          `"${template.title}" needs the Adopt state "${adoptTemplate?.title ?? 'replacement'}" to be active.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
+        showSheet({
+          title: 'Add replacement first',
+          message: `"${template.title}" needs the Adopt behavior "${adoptTemplate?.title ?? 'replacement'}" to be active.`,
+          actions: [
             ...(adoptTemplate
               ? [
                   {
-                    text: 'View Adopt',
+                    label: 'View Adopt',
                     onPress: () => openAdopt(adoptTemplate.id),
                   },
                   {
-                    text: 'Add it',
+                    label: 'Add it',
                     onPress: async () => {
-                      const adoptBehavior = buildAdoptBehavior(adoptTemplate);
+                      const adoptBehavior = buildBehavior(
+                        draftFromAdoptTemplate(adoptTemplate)
+                      );
                       await addBehavior(adoptBehavior);
                       await scheduleForBehavior(adoptBehavior);
-                      const elimBehavior = buildEliminateBehavior(
-                        template,
-                        adoptBehavior.id
+                      const elimBehavior = buildBehavior(
+                        draftFromEliminateTemplate(template, adoptBehavior.id)
                       );
                       await addBehavior(elimBehavior);
                       await scheduleForBehavior(elimBehavior);
                       close();
-                      Alert.alert(
-                        'Added',
+                      haptics.success();
+                      showToast(
                         `Both "${adoptTemplate.title}" and "${template.title}" are on your dashboard.`
                       );
                     },
                   },
                 ]
               : []),
-          ]
-        );
+            { label: 'Cancel', style: 'cancel' as const },
+          ],
+        });
         return;
       }
-      const behavior = buildEliminateBehavior(template, replacement.id);
+      const behavior = buildBehavior(
+        draftFromEliminateTemplate(template, replacement.id)
+      );
       await addBehavior(behavior);
       await scheduleForBehavior(behavior);
       close();
-      Alert.alert('Added', `"${template.title}" is now on your dashboard.`);
+      haptics.success();
+      showToast(`"${template.title}" is now on your dashboard.`);
     },
-    [addBehavior, behaviors, close, openAdopt]
+    [addBehavior, behaviors, close, openAdopt, showSheet, showToast]
   );
 
   const onAdd = useCallback(() => {
@@ -224,8 +191,8 @@ export function ContentModalsProvider({ children }: { children: ReactNode }) {
       : false;
 
   const api = useMemo<ContentModalsApi>(
-    () => ({ openGuide, openAdopt, openEliminate, openPackage, close }),
-    [openGuide, openAdopt, openEliminate, openPackage, close]
+    () => ({ openGuide, openAdopt, openEliminate, openProgram, close }),
+    [openGuide, openAdopt, openEliminate, openProgram, close]
   );
 
   return (

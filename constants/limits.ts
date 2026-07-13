@@ -10,15 +10,24 @@ export const FREE_TIER_STATE_CAP = 3;
 
 /**
  * Curated set of library guides available on the free tier. Everything else
- * shows a lock icon and routes to the paywall on tap. Picked to span domains
- * (cognitive, emotional, social, recovery) so free users get a meaningful
- * starter experience without exhausting the catalog.
+ * shows a lock icon and routes to the paywall on tap.
+ *
+ * The whole **Foundation** category (how-change-works, start-small,
+ * relapse-and-restart) is free on purpose — it's the gateway prologue we
+ * recommend to every new user, so it can't sit behind the paywall (REP-11).
+ * The rest of the free picks span domains (cognitive, social) so free users
+ * get a meaningful starter experience without exhausting the catalog.
  */
 export const FREE_GUIDE_IDS: ReadonlySet<string> = new Set([
+  // The Foundation — gateway, always free
+  'guide-context-design',
+  'guide-action-over-consumption',
+  'guide-social-environment',
+  'guide-relapse-and-restart',
+  // Cross-domain free picks
   'guide-deep-focus',
   'guide-confidence',
   'guide-small-talk',
-  'guide-relapse-and-restart',
 ]);
 
 /**

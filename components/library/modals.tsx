@@ -9,13 +9,15 @@ import {
 import Markdown from 'react-native-markdown-display';
 import {
   domainLabel,
+  isCrossBook,
+  programById,
   type LibraryGuide,
-  type LibraryPackage,
+  type LibraryProgram,
   type AdoptTemplate,
   type EliminateTemplate,
   LIBRARY_GUIDES,
 } from '@/services/library-content';
-import { Type, Space, Radius, type ThemeColors } from '@/constants/theme';
+import { Type, Space, Radius, PRESSED_OPACITY, type ThemeColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   transformWikiLinks,
@@ -24,6 +26,7 @@ import {
   type ContentTarget,
 } from './content-link-resolver';
 import { createMarkdownStyles } from './markdown-styles';
+import { FeedbackButton } from '@/components/feedback-button';
 
 interface ModalHeaderProps {
   canBack: boolean;
@@ -38,8 +41,9 @@ function ModalHeader({ canBack, colors, onBack, onClose }: ModalHeaderProps) {
       {canBack ? (
         <Pressable
           onPress={onBack}
-          style={styles.headerButton}
+          style={({ pressed }) => [styles.headerButton, pressed && { opacity: PRESSED_OPACITY }]}
           hitSlop={8}
+          accessibilityRole="button"
           accessibilityLabel="Back to previous"
         >
           <IconSymbol name="chevron.left" size={22} color={colors.textMuted} />
@@ -49,8 +53,9 @@ function ModalHeader({ canBack, colors, onBack, onClose }: ModalHeaderProps) {
       )}
       <Pressable
         onPress={onClose}
-        style={styles.headerButton}
+        style={({ pressed }) => [styles.headerButton, pressed && { opacity: PRESSED_OPACITY }]}
         hitSlop={8}
+        accessibilityRole="button"
         accessibilityLabel="Close"
       >
         <IconSymbol name="xmark" size={20} color={colors.textMuted} />
@@ -101,9 +106,13 @@ export function GuideView({ guide, colors, onOpenTarget }: GuideViewProps) {
       <Text style={[styles.modalMeta, { color: colors.textMuted }]}>
         {domainLabel(guide.domain)} · {guide.estimatedMinutes} min read
       </Text>
-      <View style={{ marginTop: 12 }}>
+      <View style={{ marginTop: Space.md }}>
         <MarkdownBody body={guide.body} colors={colors} onOpenTarget={onOpenTarget} />
       </View>
+      <FeedbackButton
+        context={{ kind: 'guide', id: guide.id, title: guide.title }}
+        colors={colors}
+      />
     </ScrollView>
   );
 }
@@ -171,6 +180,10 @@ export function AdoptView({
             />
           </>
         ) : null}
+        <FeedbackButton
+          context={{ kind: 'adopt', id: template.id, title: template.title }}
+          colors={colors}
+        />
       </ScrollView>
 
       <View
@@ -182,10 +195,13 @@ export function AdoptView({
         <Pressable
           onPress={onAdd}
           disabled={added}
-          style={[
+          style={({ pressed }) => [
             styles.addButton,
             { backgroundColor: added ? colors.surfaceMuted : colors.tint },
+            pressed && !added && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: added }}
           accessibilityLabel={added ? 'Already added' : 'Add to dashboard'}
         >
           <Text
@@ -278,6 +294,10 @@ export function EliminateView({
             />
           </>
         ) : null}
+        <FeedbackButton
+          context={{ kind: 'eliminate', id: template.id, title: template.title }}
+          colors={colors}
+        />
       </ScrollView>
 
       <View
@@ -289,10 +309,13 @@ export function EliminateView({
         <Pressable
           onPress={onAdd}
           disabled={added}
-          style={[
+          style={({ pressed }) => [
             styles.addButton,
             { backgroundColor: added ? colors.surfaceMuted : colors.tint },
+            pressed && !added && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: added }}
           accessibilityLabel={added ? 'Already added' : 'Add to dashboard'}
         >
           <Text
@@ -309,24 +332,59 @@ export function EliminateView({
   );
 }
 
-interface PackageViewProps {
-  pkg: LibraryPackage;
+interface ProgramViewProps {
+  program: LibraryProgram;
   colors: ThemeColors;
   onOpenTarget: (target: NonNullable<ContentTarget>) => void;
 }
 
-export function PackageView({ pkg, colors, onOpenTarget }: PackageViewProps) {
-  const guides: LibraryGuide[] = pkg.guideIds
+export function ProgramView({ program, colors, onOpenTarget }: ProgramViewProps) {
+  const guides: LibraryGuide[] = program.guideIds
     .map((id) => LIBRARY_GUIDES.find((g) => g.id === id))
     .filter((g): g is LibraryGuide => g !== undefined);
+  const crossBook = isCrossBook(program);
+  const sourcePrograms: LibraryProgram[] = (program.sourceProgramIds ?? [])
+    .map((id) => programById(id))
+    .filter((p): p is LibraryProgram => p !== undefined);
 
   return (
     <ScrollView contentContainerStyle={styles.modalContent}>
-      <Text style={[styles.modalTitle, { color: colors.text }]}>{pkg.title}</Text>
+      <Text style={[styles.modalTitle, { color: colors.text }]}>{program.title}</Text>
       <Text style={[styles.modalMeta, { color: colors.textMuted }]}>
-        {pkg.guideIds.length} guides
+        {crossBook
+          ? `Cross-book · ${sourcePrograms.length} books · ${program.guideIds.length} guides`
+          : `${program.guideIds.length} guides`}
       </Text>
-      <Text style={[styles.intro, { color: colors.text }]}>{pkg.description}</Text>
+      <Text style={[styles.intro, { color: colors.text }]}>{program.description}</Text>
+
+      {crossBook && sourcePrograms.length > 0 ? (
+        <>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+            Built from
+          </Text>
+          {sourcePrograms.map((sp) => (
+            <Pressable
+              key={sp.id}
+              onPress={() => onOpenTarget({ kind: 'program', program: sp })}
+              style={({ pressed }) => [
+                styles.includedGuide,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                pressed && { opacity: PRESSED_OPACITY },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`${sp.title}${sp.book ? `, by ${sp.book.author}` : ''}`}
+              accessibilityHint="Opens the source program"
+            >
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{sp.title}</Text>
+              {sp.book ? (
+                <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
+                  {sp.book.author} · {sp.book.year}
+                </Text>
+              ) : null}
+            </Pressable>
+          ))}
+        </>
+      ) : null}
 
       <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
         Included guides
@@ -335,10 +393,12 @@ export function PackageView({ pkg, colors, onOpenTarget }: PackageViewProps) {
         <Pressable
           key={guide.id}
           onPress={() => onOpenTarget({ kind: 'guide', guide })}
-          style={[
+          style={({ pressed }) => [
             styles.includedGuide,
-            { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            pressed && { opacity: PRESSED_OPACITY },
           ]}
+          accessibilityRole="button"
           accessibilityLabel={`${guide.title} guide, ${guide.estimatedMinutes} minute read`}
           accessibilityHint="Opens the full guide"
         >
@@ -354,11 +414,15 @@ export function PackageView({ pkg, colors, onOpenTarget }: PackageViewProps) {
         </Pressable>
       ))}
 
-      {pkg.body ? (
-        <View style={{ marginTop: 16 }}>
-          <MarkdownBody body={pkg.body} colors={colors} onOpenTarget={onOpenTarget} />
+      {program.body ? (
+        <View style={{ marginTop: Space.lg }}>
+          <MarkdownBody body={program.body} colors={colors} onOpenTarget={onOpenTarget} />
         </View>
       ) : null}
+      <FeedbackButton
+        context={{ kind: 'program', id: program.id, title: program.title }}
+        colors={colors}
+      />
     </ScrollView>
   );
 }
@@ -428,9 +492,9 @@ export function ContentModal({
               onAdd={onAdd}
             />
           )}
-          {target.kind === 'package' && (
-            <PackageView
-              pkg={target.pkg}
+          {target.kind === 'program' && (
+            <ProgramView
+              program={target.program}
               colors={colors}
               onOpenTarget={onOpenTarget}
             />
@@ -466,8 +530,8 @@ const styles = StyleSheet.create({
   modalTitle: { ...Type.h1 },
   modalMeta: { ...Type.caption, marginTop: Space.xs },
   sectionLabel: {
-    ...Type.micro,
-    textTransform: 'uppercase',
+    ...Type.caption,
+    fontWeight: '600',
     marginTop: Space.lg,
     marginBottom: Space.xs,
   },
@@ -513,7 +577,9 @@ const styles = StyleSheet.create({
   addButton: {
     paddingVertical: Space.md,
     borderRadius: Radius.md,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   addButtonText: { ...Type.bodyBold },
 });

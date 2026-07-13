@@ -12,7 +12,9 @@ const practiceTypeValidator = v.union(
   v.literal("mental"),
   v.literal("physical"),
   v.literal("learning"),
-  v.literal("dual"),
+  v.literal("mental_physical"),
+  v.literal("mental_learning"),
+  v.literal("physical_learning"),
 );
 const domainValidator = v.union(
   v.literal("language_cognitive"),
@@ -29,10 +31,12 @@ export const listMine = query({
   handler: async (ctx): Promise<Doc<"behaviors">[]> => {
     const userId = await auth.getUserId(ctx);
     if (!userId) return [];
+    // Cap raised for long-term users (REP-48). Behaviors are few per user, so
+    // this is generous headroom; switch to cursor pagination if anyone nears it.
     const rows = await ctx.db
       .query("behaviors")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .take(500);
+      .take(2000);
     return rows.filter((b) => b.deletedAt === undefined);
   },
 });
@@ -67,6 +71,7 @@ export const upsert = mutation({
     level: v.number(),
     lastLevelUpStreak: v.number(),
     pausedUntil: v.optional(v.number()),
+    pausedIndefinitely: v.optional(v.boolean()),
     createdAt: v.number(),
     hidden: v.boolean(),
     bookmarked: v.boolean(),

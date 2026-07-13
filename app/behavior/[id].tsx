@@ -4,21 +4,26 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  FlatList,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors, Type, Space, Radius } from '@/constants/theme';
+import { Colors, Type, Space, Radius, PRESSED_OPACITY, type ThemeColors } from '@/constants/theme';
 import useStore from '@/store/useStore';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ComponentProps } from 'react';
 import { cancelForBehavior, rescheduleAll, sendTestNotification } from '@/services/notifications';
 import type { CheckIn } from '@/types';
-import { endOfLocalDay } from '@/services/scheduler-core';
+import { endOfLocalDay, isBehaviorPaused } from '@/services/scheduler-core';
 import { deriveStage, stageLabel } from '@/services/levels';
+import { lastNDaysStatus } from '@/services/consistency';
+import { completedSessions, driftsPer30Min } from '@/services/focus';
+import { useFeedback } from '@/components/ui/feedback';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { countReflections } from '@/services/reflections';
+import { FeedbackButton } from '@/components/feedback-button';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function formatPausedUntil(ms: number): string {
   const d = new Date(ms);
@@ -41,13 +46,16 @@ export default function BehaviorDetailScreen() {
   const {
     behaviors,
     checkIns,
+    entries,
     getStreak,
+    getFocusSessions,
     deleteBehavior,
     updateBehavior,
     updateCheckIn,
     deleteCheckIn,
   } = useStore();
   const { openGuide } = useContentModals();
+  const { showSheet, showToast } = useFeedback();
   const [, setRefresh] = useState({});
 
   useFocusEffect(
@@ -56,9 +64,9 @@ export default function BehaviorDetailScreen() {
     }, [])
   );
 
-  const behavior = behaviors.find(b => b.id === id as string);
-  const behaviorCheckIns = (behavior
-    ? checkIns.filter(c => c.behaviorId === behavior.id).sort((a, b) => b.at - a.at)
+  const behavior = behaviors.find((b) => b.id === (id as string));
+  const recentCheckIns = (behavior
+    ? checkIns.filter((c) => c.behaviorId === behavior.id).sort((a, b) => b.at - a.at)
     : []
   ).slice(0, 20);
 
@@ -66,31 +74,47 @@ export default function BehaviorDetailScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Text style={[styles.errorText, { color: colors.text }]}>
-          State not found
+          Behavior not found
         </Text>
       </View>
     );
   }
 
   const streak = getStreak(behavior.id);
+  const isEliminate = behavior.kind === 'eliminate';
+  const reflectionCount =
+    behavior.captureSpec?.type === 'reflection'
+      ? countReflections(behaviors, entries, behavior.id)
+      : 0;
+
+  // Last 14 days of consistency (oldest → today).
+  const last14 = lastNDaysStatus(checkIns, behavior.id, 14);
+
+  // Pull Mode (REP-7): focus sessions are offered for eliminate behaviors.
+  const focusDone = isEliminate ? completedSessions(getFocusSessions(behavior.id)) : [];
+  const lastFocusRate = focusDone[0] ? driftsPer30Min(focusDone[0]) : null;
 
   const handleEdit = () => {
     router.push({ pathname: '/create', params: { id: behavior.id } });
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete State', 'Are you sure? This cannot be undone.', [
-      { text: 'Cancel' },
-      {
-        text: 'Delete',
-        onPress: async () => {
-          await cancelForBehavior(behavior.id);
-          await deleteBehavior(behavior.id);
-          router.back();
+    showSheet({
+      title: 'Delete behavior',
+      message: 'Are you sure? This cannot be undone.',
+      actions: [
+        { label: 'Cancel', style: 'cancel' },
+        {
+          label: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await cancelForBehavior(behavior.id);
+            await deleteBehavior(behavior.id);
+            router.back();
+          },
         },
-        style: 'destructive',
-      },
-    ]);
+      ],
+    });
   };
 
   const handleToggleBookmark = async () => {
@@ -109,7 +133,6 @@ export default function BehaviorDetailScreen() {
   };
 
   const handleCheckInLongPress = (item: CheckIn) => {
-    const isEliminate = behavior.kind === 'eliminate';
     const yesLabel = isEliminate ? 'Caught it' : 'Practiced';
     const triedLabel = isEliminate ? 'Struggled' : 'Showed up';
     const noLabel = 'Skipped';
@@ -117,95 +140,96 @@ export default function BehaviorDetailScreen() {
       if (next === item.result) return;
       void updateCheckIn({ ...item, result: next });
     };
-    Alert.alert('Change this check-in', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      ...(item.result !== 'yes' ? [{ text: yesLabel, onPress: () => change('yes') }] : []),
-      ...(item.result !== 'tried' ? [{ text: triedLabel, onPress: () => change('tried') }] : []),
-      ...(item.result !== 'no' ? [{ text: noLabel, onPress: () => change('no') }] : []),
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => void deleteCheckIn(item.id),
-      },
-    ]);
+    showSheet({
+      title: 'Change this check-in',
+      actions: [
+        ...(item.result !== 'yes' ? [{ label: yesLabel, onPress: () => change('yes') }] : []),
+        ...(item.result !== 'tried' ? [{ label: triedLabel, onPress: () => change('tried') }] : []),
+        ...(item.result !== 'no' ? [{ label: noLabel, onPress: () => change('no') }] : []),
+        {
+          label: 'Delete',
+          style: 'destructive' as const,
+          onPress: () => void deleteCheckIn(item.id),
+        },
+        { label: 'Cancel', style: 'cancel' as const },
+      ],
+    });
   };
 
   const handleTestNotification = async () => {
     try {
       await sendTestNotification(behavior);
-      Alert.alert('Test Notification Sent', 'Check your notifications in 1 second');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send test notification');
+      showToast('Test notification sent — check in 1 second');
+    } catch {
+      showToast('Failed to send test notification');
     }
   };
 
-  const isPaused = behavior.pausedUntil != null && behavior.pausedUntil > Date.now();
+  const isPaused = isBehaviorPaused(behavior);
 
   const pauseUntil = (resumeAt: number) =>
     Promise.all([
-      updateBehavior({ ...behavior, pausedUntil: resumeAt }),
+      updateBehavior({ ...behavior, pausedUntil: resumeAt, pausedIndefinitely: false }),
       cancelForBehavior(behavior.id),
     ]);
 
-  const DAY_MS = 24 * 60 * 60 * 1000;
+  const pauseIndefinitely = () =>
+    Promise.all([
+      updateBehavior({ ...behavior, pausedUntil: undefined, pausedIndefinitely: true }),
+      cancelForBehavior(behavior.id),
+    ]);
 
   const handlePausePress = () => {
     if (isPaused) {
-      Alert.alert(
-        'Resume now?',
-        `${behavior.title} is paused until ${formatPausedUntil(behavior.pausedUntil!)}.`,
-        [
-          { text: 'Stay paused', style: 'cancel' },
+      const pausedMsg = behavior.pausedIndefinitely
+        ? `${behavior.title} is paused until you turn it back on.`
+        : `${behavior.title} is paused until ${formatPausedUntil(behavior.pausedUntil!)}.`;
+      showSheet({
+        title: 'Resume now?',
+        message: pausedMsg,
+        actions: [
           {
-            text: 'Resume now',
+            label: 'Resume now',
             onPress: () =>
               Promise.all([
-                updateBehavior({ ...behavior, pausedUntil: undefined }),
+                updateBehavior({ ...behavior, pausedUntil: undefined, pausedIndefinitely: false }),
                 rescheduleAll({ force: true }),
               ]),
           },
-        ]
-      );
+          { label: 'Stay paused', style: 'cancel' },
+        ],
+      });
       return;
     }
 
-    Alert.alert(
-      'Pause this state',
-      'Reminders stop; your streak and history stay. Pick a length — you can resume any time.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Until tonight', onPress: () => pauseUntil(endOfLocalDay()) },
-        { text: '1 day', onPress: () => pauseUntil(Date.now() + DAY_MS) },
-        { text: '3 days', onPress: () => pauseUntil(Date.now() + 3 * DAY_MS) },
-        { text: '1 week', onPress: () => pauseUntil(Date.now() + 7 * DAY_MS) },
-      ]
-    );
+    showSheet({
+      title: 'Pause this behavior',
+      message:
+        'Reminders stop; your streak and history stay. Pick a length — you can resume any time.',
+      actions: [
+        { label: 'Until tonight', onPress: () => pauseUntil(endOfLocalDay()) },
+        { label: '1 day', onPress: () => pauseUntil(Date.now() + DAY_MS) },
+        { label: '3 days', onPress: () => pauseUntil(Date.now() + 3 * DAY_MS) },
+        { label: '1 week', onPress: () => pauseUntil(Date.now() + 7 * DAY_MS) },
+        { label: 'Until I turn it back on', onPress: () => pauseIndefinitely() },
+        { label: 'Cancel', style: 'cancel' },
+      ],
+    });
   };
 
+  const windowLabel =
+    behavior.window.from === '00:00' && behavior.window.to === '23:59'
+      ? 'All day'
+      : `${behavior.window.from} – ${behavior.window.to}`;
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.content}
+    >
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {behavior.title}
-            </Text>
-          </View>
-          {__DEV__ && (
-            <Pressable
-              onPress={handleTestNotification}
-              style={[styles.testButton, { borderColor: colors.border }]}
-              accessibilityLabel="Send test notification"
-            >
-              <Text
-                style={[styles.testButtonText, { color: colors.textMuted }]}
-              >
-                Test
-              </Text>
-            </Pressable>
-          )}
-        </View>
-        <Text style={[styles.message, { color: colors.text }]}>
+        <Text style={[styles.title, { color: colors.text }]}>{behavior.title}</Text>
+        <Text style={[styles.message, { color: colors.textMuted }]}>
           {behavior.pingMessage}
         </Text>
         {isPaused ? (
@@ -217,7 +241,9 @@ export default function BehaviorDetailScreen() {
           >
             <IconSymbol name="pause.fill" size={12} color={colors.warning} />
             <Text style={[styles.pausedChipText, { color: colors.warning }]}>
-              Paused until {formatPausedUntil(behavior.pausedUntil!)}
+              {behavior.pausedIndefinitely
+                ? 'Paused — tap Resume'
+                : `Paused until ${formatPausedUntil(behavior.pausedUntil!)}`}
             </Text>
           </View>
         ) : null}
@@ -228,242 +254,293 @@ export default function BehaviorDetailScreen() {
             accessibilityLabel="Read the guide"
           >
             <IconSymbol name="book.fill" size={14} color={colors.tint} />
-            <Text style={[styles.guideLinkText, { color: colors.tint }]}>
+            <Text style={[styles.guideLinkText, { color: colors.accentText }]}>
               Read the guide
             </Text>
           </Pressable>
         ) : null}
       </View>
 
-      <View style={[styles.streakCard, { backgroundColor: colors.tint }]}>
-        <Text style={styles.streakLabel}>
+      <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.heroStage, { color: colors.accentText }]}>
           {stageLabel(deriveStage(behavior.level, streak))}
         </Text>
-        <Text style={styles.streakValue}>{streak}</Text>
-        <Text style={styles.streakDays}>day streak</Text>
+        <Text style={[styles.heroValue, { color: colors.text }]}>{streak}</Text>
+        <Text style={[styles.heroDays, { color: colors.textMuted }]}>day streak</Text>
+        <View style={styles.dots}>
+          {last14.map((s, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                {
+                  backgroundColor:
+                    s === 'yes'
+                      ? colors.tint
+                      : s === 'tried'
+                        ? colors.warning
+                        : s === 'no'
+                          ? colors.stateDisabledStripe
+                          : colors.surfaceMuted,
+                },
+              ]}
+            />
+          ))}
+        </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Details
-        </Text>
-        <View style={[styles.detailItem, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.detailLabel, { color: colors.text }]}>Time Window</Text>
-          <Text style={[styles.detailValue, { color: colors.text }]}>
-            {behavior.window.from === '00:00' && behavior.window.to === '23:59'
-              ? 'All day'
-              : `${behavior.window.from} – ${behavior.window.to}`}
-          </Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Details</Text>
+        <View style={[styles.row, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.rowKey, { color: colors.textMuted }]}>Time window</Text>
+          <Text style={[styles.rowVal, { color: colors.text }]}>{windowLabel}</Text>
         </View>
-        <View style={[styles.detailItem, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.detailLabel, { color: colors.text }]}>Interval</Text>
-          <Text style={[styles.detailValue, { color: colors.text }]}>
+        <View style={[styles.row, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.rowKey, { color: colors.textMuted }]}>Interval</Text>
+          <Text style={[styles.rowVal, { color: colors.text }]}>
             every {behavior.intervalMinutes} min
           </Text>
         </View>
-        <View style={[styles.detailItem, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.detailLabel, { color: colors.text }]}>Level</Text>
-          <Text style={[styles.detailValue, { color: colors.text }]}>
+        <View style={[styles.row, styles.rowLast]}>
+          <Text style={[styles.rowKey, { color: colors.textMuted }]}>Level</Text>
+          <Text style={[styles.rowVal, { color: colors.text }]}>
             L{behavior.level} · {stageLabel(deriveStage(behavior.level, streak))}
           </Text>
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Recent Check-ins
+      {isEliminate ? (
+        <>
+          <Pressable
+            onPress={() => router.push({ pathname: '/focus', params: { behaviorId: behavior.id } })}
+            style={({ pressed }) => [
+              styles.focusButton,
+              { backgroundColor: colors.tint },
+              pressed && { opacity: PRESSED_OPACITY },
+            ]}
+            accessibilityLabel="Start focus session"
+            accessibilityHint="Silences reminders and counts the drifts you catch"
+          >
+            <IconSymbol name="timer" size={18} color={colors.textOnBrand} />
+            <Text style={[styles.focusButtonText, { color: colors.textOnBrand }]}>
+              Start focus session
+            </Text>
+          </Pressable>
+          {focusDone.length > 0 ? (
+            <Text style={[styles.focusSummary, { color: colors.textMuted }]}>
+              {focusDone.length} session{focusDone.length === 1 ? '' : 's'}
+              {lastFocusRate != null ? ` · last ${lastFocusRate.toFixed(1)} drifts/30m` : ''}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+
+      {/* Actions sit above the check-in log so they're reachable without
+          scrolling past a long history. */}
+      <View style={styles.actionRow}>
+        <ActionChip
+          icon={isPaused ? 'play.fill' : 'pause.fill'}
+          label={isPaused ? 'Resume' : 'Pause'}
+          colors={colors}
+          onPress={handlePausePress}
+        />
+        <ActionChip
+          icon={behavior.bookmarked ? 'bookmark.fill' : 'bookmark'}
+          label={behavior.bookmarked ? 'Saved' : 'Bookmark'}
+          colors={colors}
+          active={behavior.bookmarked}
+          onPress={handleToggleBookmark}
+        />
+        <ActionChip
+          icon="archivebox.fill"
+          label="Archive"
+          colors={colors}
+          onPress={handleArchive}
+        />
+        {__DEV__ ? (
+          <ActionChip
+            icon="bell.fill"
+            label="Test ping"
+            colors={colors}
+            onPress={handleTestNotification}
+          />
+        ) : null}
+      </View>
+
+      <Pressable
+        onPress={handleEdit}
+        style={[
+          styles.editButton,
+          { backgroundColor: colors.tintSoft, borderColor: colors.tintMuted },
+        ]}
+        accessibilityLabel="Edit behavior"
+      >
+        <IconSymbol name="pencil" size={16} color={colors.accentText} />
+        <Text style={[styles.editButtonText, { color: colors.accentText }]}>
+          Edit behavior
         </Text>
-        {behaviorCheckIns.length === 0 ? (
-          <Text style={[styles.emptyText, { color: colors.text }]}>
+      </Pressable>
+
+      <Pressable
+        onPress={handleDelete}
+        style={styles.deleteLink}
+        accessibilityLabel="Delete behavior"
+        accessibilityHint="Permanently removes this behavior and all its history"
+      >
+        <IconSymbol name="trash.fill" size={14} color={colors.danger} />
+        <Text style={[styles.deleteLinkText, { color: colors.danger }]}>Delete behavior</Text>
+      </Pressable>
+
+      {reflectionCount > 0 ? (
+        <Pressable
+          onPress={() =>
+            router.push({ pathname: '/reflections', params: { behaviorId: behavior.id } })
+          }
+          style={[
+            styles.reflectionsLink,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${reflectionCount} reflections`}
+        >
+          <IconSymbol name="note.text" size={16} color={colors.accentText} />
+          <Text style={[styles.reflectionsLinkText, { color: colors.text }]}>
+            {reflectionCount} {reflectionCount === 1 ? 'reflection' : 'reflections'}
+          </Text>
+          <IconSymbol name="chevron.right" size={16} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+
+      <FeedbackButton
+        context={{ kind: 'behavior', id: behavior.id, title: behavior.title }}
+        colors={colors}
+      />
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+          Recent check-ins
+        </Text>
+        {recentCheckIns.length === 0 ? (
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
             No check-ins yet
           </Text>
         ) : (
-          <FlatList
-            scrollEnabled={false}
-            data={behaviorCheckIns}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => {
-              const date = new Date(item.at);
-              const timeStr = date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
-              const dateStr = date.toLocaleDateString();
+          recentCheckIns.map((item) => {
+            const date = new Date(item.at);
+            const timeStr = date.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            });
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const meta = {
+              yes: {
+                bg: colors.successSoft,
+                stripe: colors.success,
+                labelColor: colors.accentText,
+                glyph: isEliminate ? '✓ Caught it' : '✓ Practiced',
+              },
+              tried: {
+                bg: colors.warningSoft,
+                stripe: colors.warning,
+                labelColor: colors.warning,
+                glyph: isEliminate ? '◐ Struggled' : '◐ Showed up',
+              },
+              no: {
+                bg: colors.surfaceMuted,
+                stripe: colors.stateDisabledStripe,
+                labelColor: colors.textMuted,
+                glyph: '× Skipped',
+              },
+            }[item.result];
 
-              const isEliminate = behavior.kind === 'eliminate';
-              const resultStyle = {
-                yes: {
-                  bg: colors.successSoft,
-                  stripe: colors.success,
-                  labelColor: colors.success,
-                  glyph: isEliminate ? '✓ Caught it' : '✓ Practiced',
-                },
-                tried: {
-                  bg: colors.warningSoft,
-                  stripe: colors.warning,
-                  labelColor: colors.warning,
-                  glyph: isEliminate ? '◐ Struggled' : '◐ Showed up',
-                },
-                no: {
-                  bg: colors.surfaceMuted,
-                  stripe: colors.textMuted,
-                  labelColor: colors.text,
-                  glyph: '× Skipped',
-                },
-              }[item.result];
-
-              return (
-                <Pressable
-                  onLongPress={() => handleCheckInLongPress(item)}
-                  delayLongPress={400}
-                  accessibilityLabel={`Check-in: ${resultStyle.glyph}, ${dateStr} ${timeStr}`}
-                  accessibilityHint="Long-press to change or delete"
-                  style={[
-                    styles.checkInItem,
-                    {
-                      backgroundColor: resultStyle.bg,
-                      borderLeftColor: resultStyle.stripe,
-                    },
-                  ]}
-                >
-                  <View style={styles.checkInHeader}>
-                    <Text
-                      style={[
-                        styles.checkInResult,
-                        { color: resultStyle.labelColor },
-                      ]}
-                    >
-                      {resultStyle.glyph}
-                    </Text>
-                    <Text style={[styles.checkInTime, { color: colors.text }]}>
-                      {dateStr} {timeStr}
-                    </Text>
-                  </View>
-                  {item.note && (
-                    <Text style={[styles.checkInNote, { color: colors.text }]}>
-                      {item.note}
-                    </Text>
-                  )}
-                </Pressable>
-              );
-            }}
-          />
+            return (
+              <Pressable
+                key={item.id}
+                onLongPress={() => handleCheckInLongPress(item)}
+                delayLongPress={400}
+                accessibilityLabel={`Check-in: ${meta.glyph}, ${dateStr} ${timeStr}`}
+                accessibilityHint="Long-press to change or delete"
+                style={[
+                  styles.checkInItem,
+                  { backgroundColor: meta.bg, borderLeftColor: meta.stripe },
+                ]}
+              >
+                <View style={styles.checkInHeader}>
+                  <Text style={[styles.checkInResult, { color: meta.labelColor }]}>
+                    {meta.glyph}
+                  </Text>
+                  <Text style={[styles.checkInTime, { color: colors.textMuted }]}>
+                    {dateStr} · {timeStr}
+                  </Text>
+                </View>
+                {item.note ? (
+                  <Text style={[styles.checkInNote, { color: colors.text }]}>{item.note}</Text>
+                ) : null}
+              </Pressable>
+            );
+          })
         )}
-      </View>
-
-      <View style={styles.actionButtons}>
-        {/* Primary actions — frequently used, non-destructive */}
-        <Pressable
-          onPress={handleEdit}
-          style={[styles.actionButton, { backgroundColor: colors.tint }]}
-          accessibilityLabel="Edit state"
-        >
-          <Text
-            style={[styles.actionButtonText, { color: colors.textOnBrand }]}
-          >
-            Edit
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={handleToggleBookmark}
-          style={[
-            styles.actionButton,
-            {
-              borderColor: colors.tint,
-              borderWidth: 1,
-              backgroundColor: 'transparent',
-            },
-          ]}
-          accessibilityLabel={
-            behavior.bookmarked ? 'Remove bookmark' : 'Bookmark state'
-          }
-        >
-          <Text style={[styles.actionButtonText, { color: colors.tint }]}>
-            {behavior.bookmarked ? '★ Bookmarked' : '☆ Bookmark'}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={handlePausePress}
-          style={[
-            styles.actionButton,
-            {
-              borderColor: colors.warning,
-              borderWidth: 1,
-              backgroundColor: isPaused ? colors.warningSoft : 'transparent',
-            },
-          ]}
-          accessibilityLabel={isPaused ? 'Resume state' : 'Pause state'}
-          accessibilityHint={
-            isPaused
-              ? 'Resume reminders for this state'
-              : 'Stop reminders temporarily without losing your streak'
-          }
-        >
-          <Text style={[styles.actionButtonText, { color: colors.warning }]}>
-            {isPaused ? '▶ Resume' : '⏸ Pause'}
-          </Text>
-        </Pressable>
-
-        {/* Visual separator before destructive group */}
-        <View style={styles.actionDivider} />
-
-        {/* Destructive / archival actions — separated by spacing */}
-        <Pressable
-          onPress={handleArchive}
-          style={[styles.actionButton, { backgroundColor: colors.surfaceMuted }]}
-          accessibilityLabel="Archive state"
-        >
-          <Text style={[styles.actionButtonText, { color: colors.text }]}>
-            Archive
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={handleDelete}
-          style={[styles.actionButton, { backgroundColor: colors.danger }]}
-          accessibilityLabel="Delete state"
-          accessibilityHint="Permanently removes this state and all its history"
-        >
-          <Text style={[styles.actionButtonText, { color: colors.textOnBrand }]}>
-            Delete
-          </Text>
-        </Pressable>
       </View>
     </ScrollView>
   );
 }
 
+function ActionChip({
+  icon,
+  label,
+  colors,
+  active,
+  onPress,
+}: {
+  icon: ComponentProps<typeof IconSymbol>['name'];
+  label: string;
+  colors: ThemeColors;
+  active?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.actionChip,
+        {
+          borderColor: active ? colors.tint : colors.border,
+          backgroundColor: active ? colors.tintSoft : 'transparent',
+        },
+      ]}
+      accessibilityLabel={label}
+    >
+      <IconSymbol name={icon} size={19} color={active ? colors.accentText : colors.textMuted} />
+      <Text
+        style={[styles.actionChipLabel, { color: active ? colors.accentText : colors.textMuted }]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  content: {
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    paddingBottom: Space.xxxl,
   },
   header: {
-    padding: Space.xl,
-    paddingBottom: 0,
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.lg,
   },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.md,
-    marginBottom: Space.sm,
-  },
-  title: { ...Type.h1 },
-  testButton: {
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + 2,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-  },
-  testButtonText: { ...Type.caption, fontWeight: '600' },
-  message: { ...Type.body, marginBottom: Space.sm },
+  title: { ...Type.display2 },
+  message: { ...Type.body, marginTop: Space.sm },
   guideLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs,
-    marginTop: Space.sm,
+    marginTop: Space.md,
   },
-  guideLinkText: {
-    ...Type.bodyBold,
-  },
+  guideLinkText: { ...Type.bodyBold },
   pausedChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -471,81 +548,136 @@ const styles = StyleSheet.create({
     gap: Space.xs,
     paddingHorizontal: Space.sm,
     paddingVertical: Space.xs,
-    marginTop: Space.sm,
+    marginTop: Space.md,
     borderRadius: Radius.sm,
     borderWidth: 1,
   },
   pausedChipText: { ...Type.caption, fontWeight: '600' },
-  streakCard: {
-    margin: Space.xl,
-    padding: Space.xxl,
-    borderRadius: Radius.md,
+  hero: {
+    marginHorizontal: Space.xl,
+    marginTop: Space.xl,
+    paddingVertical: Space.xl,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
     alignItems: 'center',
   },
-  streakLabel: {
-    color: 'white',
-    ...Type.body,
-    marginBottom: Space.xs,
+  heroStage: { ...Type.caption, fontWeight: '600' },
+  heroValue: { ...Type.display, marginVertical: 2 },
+  heroDays: { ...Type.body },
+  dots: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: Space.lg,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
-  streakValue: {
-    color: 'white',
-    ...Type.display,
-  },
-  streakDays: {
-    color: 'white',
-    ...Type.body,
+  dot: {
+    width: 13,
+    height: 13,
+    borderRadius: 4,
   },
   section: {
     paddingHorizontal: Space.xl,
-    marginBottom: Space.xl,
+    marginTop: Space.xl,
   },
   sectionTitle: {
-    ...Type.h2,
-    marginBottom: Space.md,
+    ...Type.caption,
+    fontWeight: '600',
+    marginBottom: Space.sm,
   },
-  detailItem: {
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: Space.md,
     borderBottomWidth: 1,
   },
-  detailLabel: { ...Type.body },
-  detailValue: { ...Type.bodyBold },
+  rowLast: { borderBottomWidth: 0 },
+  rowKey: { ...Type.body },
+  rowVal: { ...Type.bodyBold },
   emptyText: {
-    textAlign: 'center',
-    paddingVertical: Space.xl,
     ...Type.body,
+    paddingVertical: Space.lg,
   },
   checkInItem: {
     padding: Space.md,
     borderRadius: Radius.sm,
     marginBottom: Space.sm,
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
   },
   checkInHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: Space.xs,
+    alignItems: 'center',
   },
   checkInResult: { ...Type.bodyBold },
   checkInTime: { ...Type.caption },
   checkInNote: { ...Type.caption, marginTop: Space.xs },
-  actionButtons: {
-    paddingHorizontal: Space.xl,
-    paddingBottom: Space.xl,
+  actionRow: {
+    flexDirection: 'row',
     gap: Space.sm,
+    paddingHorizontal: Space.xl,
+    marginTop: Space.xxl,
   },
-  actionDivider: {
-    height: Space.xl,
+  actionChip: {
+    flex: 1,
+    alignItems: 'center',
+    gap: Space.xs,
+    paddingVertical: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    minHeight: 64,
+    justifyContent: 'center',
   },
-  actionButton: {
-    padding: Space.md,
+  actionChipLabel: { ...Type.micro, letterSpacing: 0 },
+  editButton: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    marginHorizontal: Space.xl,
+    marginTop: Space.md,
+    paddingVertical: Space.lg,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  editButtonText: { ...Type.bodyBold },
+  focusButton: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    marginHorizontal: Space.xl,
+    marginTop: Space.xl,
+    paddingVertical: Space.lg,
     borderRadius: Radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
   },
-  actionButtonText: {
-    ...Type.bodyBold,
+  focusButtonText: { ...Type.bodyBold },
+  focusSummary: { ...Type.caption, textAlign: 'center', marginTop: Space.sm, marginHorizontal: Space.xl },
+  reflectionsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    marginHorizontal: Space.xl,
+    marginTop: Space.xl,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    minHeight: 52,
   },
+  reflectionsLinkText: { ...Type.bodyBold, flex: 1 },
+  deleteLink: {
+    flexDirection: 'row',
+    gap: Space.xs,
+    alignSelf: 'center',
+    alignItems: 'center',
+    marginTop: Space.lg,
+    padding: Space.sm,
+  },
+  deleteLinkText: { ...Type.caption, fontWeight: '600' },
   errorText: {
     textAlign: 'center',
     ...Type.body,

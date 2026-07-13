@@ -12,6 +12,8 @@ import {
   dateKey,
   hashSeed,
   mulberry32,
+  isReminderMuteActive,
+  hasActiveFocusSession,
   SCHEDULE_LEAD_MS,
 } from './scheduler-core';
 import {
@@ -46,6 +48,9 @@ Notifications.setNotificationHandler({
 });
 
 export async function setupNotificationCategory(): Promise<void> {
+  // Notification categories/channels are native-only; the underlying APIs
+  // throw on web. Skip cleanly so the web build (and dev preview) don't crash.
+  if (Platform.OS === 'web') return;
   if (!categoryRegistered) {
     await Notifications.setNotificationCategoryAsync(CHECKIN_CATEGORY, [
       {
@@ -97,6 +102,9 @@ function buildCandidatesForBehavior(
   quietHours?: { from: string; to: string }
 ): Candidate[] {
   const results: Candidate[] = [];
+  // Indefinite pause (REP-34): no timestamp to filter against, so skip the
+  // behavior entirely — "always skip" until the user manually resumes.
+  if (behavior.pausedIndefinitely) return results;
   const baseDate = new Date(now);
   const windowFromMin =
     setLocalTimeOnDate(baseDate, behavior.window.from) - startOfDay(baseDate).getTime();
@@ -191,6 +199,15 @@ export async function rescheduleAll(options?: { force?: boolean }): Promise<void
   const store = useStore.getState();
   await cancelAllScheduled();
 
+  // Global mute (REP-35): everything is cancelled above; schedule nothing until
+  // un-muted. Honored here so launch + foreground reschedules both stay silent.
+  if (isReminderMuteActive(store.appProfile, now)) return;
+
+  // A live Pull-mode focus session (REP-7) is a self-imposed DND — a posture
+  // ping mid-deep-work is the exact distraction being measured. Stay silent
+  // until the session ends (or the safety cap elapses).
+  if (hasActiveFocusSession(store.focusSessions, now)) return;
+
   const active = store.behaviors.filter((b) => !b.hidden);
   if (active.length === 0) return;
 
@@ -281,6 +298,29 @@ export async function sendTestNotification(behavior: Behavior): Promise<void> {
   await store.addReminderAttempt(attempt);
 }
 
+/**
+ * A one-off real notification used only by onboarding (REP-39) so a new user can
+ * feel a ping. It carries no check-in category actions and creates no attempt —
+ * tapping it simply walks the onboarding tour forward (handled in _layout). On
+ * web there are no local banners, so this is a clean no-op.
+ */
+export async function sendOnboardingPing(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const content: Notifications.NotificationContentInput = {
+    title: 'Reprogrammer',
+    body: 'This is a ping. Tap it to continue your setup.',
+    sound: true,
+    data: { onboardingDemo: true },
+  };
+  if (Platform.OS === 'android') {
+    (content as any).channelId = ANDROID_CHANNEL_ID;
+  }
+  await Notifications.scheduleNotificationAsync({
+    content,
+    trigger: { type: 'timeInterval', seconds: 1, repeats: false } as any,
+  });
+}
+
 export async function handleNotificationAction(
   behaviorId: string,
   attemptId: string,
@@ -305,6 +345,7 @@ export async function handleNotificationAction(
     behaviorId,
     at: Date.now(),
     result,
+    updatedAt: Date.now(),
   };
   await store.addCheckIn(checkIn);
   await handleCheckInResponse(behaviorId, attemptId, result);

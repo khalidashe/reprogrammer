@@ -8,7 +8,9 @@ const practiceTypeValidator = v.union(
   v.literal("mental"),
   v.literal("physical"),
   v.literal("learning"),
-  v.literal("dual"),
+  v.literal("mental_physical"),
+  v.literal("mental_learning"),
+  v.literal("physical_learning"),
 );
 
 const domainValidator = v.union(
@@ -90,6 +92,7 @@ export default defineSchema({
     level: v.number(),
     lastLevelUpStreak: v.number(),
     pausedUntil: v.optional(v.number()),
+    pausedIndefinitely: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
     hidden: v.boolean(),
@@ -113,6 +116,22 @@ export default defineSchema({
     .index("by_userId_and_clientId", ["userId", "clientId"])
     .index("by_userId_and_behavior", ["userId", "behaviorClientId"]),
 
+  // Typed capture values (REP-5). A wholly-private entity: every row can carry
+  // personal writing (reflection / CBT text in `fields`), so it only syncs once
+  // the user has accepted privacy-sync consent — see services/sync-policy.ts.
+  entries: defineTable({
+    userId: v.id("users"),
+    clientId: v.string(),
+    behaviorClientId: v.string(),
+    at: v.number(),
+    value: v.number(),
+    fields: v.optional(v.record(v.string(), v.string())),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_and_clientId", ["userId", "clientId"]),
+
   reminderAttempts: defineTable({
     userId: v.id("users"),
     clientId: v.string(),
@@ -133,10 +152,20 @@ export default defineSchema({
     hasOnboarded: v.boolean(),
     userName: v.optional(v.string()),
     userBio: v.optional(v.string()),
+    // Free-text goals (REP-41). Private-tier field — gated on consent.
+    goals: v.optional(v.string()),
     lastLapseAt: v.optional(v.number()),
     lastLapseAcknowledged: v.optional(v.boolean()),
     quietHours: v.optional(v.object({ from: v.string(), to: v.string() })),
     notificationsDenied: v.optional(v.boolean()),
+    remindersMutedUntil: v.optional(
+      v.union(v.number(), v.literal("indefinite")),
+    ),
+    // Privacy-sync consent (REP-30 Phase 2). Presence gates the private tier:
+    // entries + the free-text fields (journal / note / userBio / goals).
+    privacySyncConsent: v.optional(
+      v.object({ version: v.string(), acceptedAt: v.number() }),
+    ),
     updatedAt: v.number(),
   }).index("by_userId", ["userId"]),
 });

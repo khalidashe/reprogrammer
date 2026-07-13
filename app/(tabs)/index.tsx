@@ -8,20 +8,26 @@ import {
   Type,
   Space,
   Radius,
+  PRESSED_OPACITY,
+  controlSelected,
   type ThemeColors,
 } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import useStore from '@/store/useStore';
 import { useCallback, useState, type ComponentProps } from 'react';
-import { Alert } from 'react-native';
 import type { Behavior } from '@/types';
 import { deriveStage, stageLabel } from '@/services/levels';
+import { practiceTypeIcons } from '@/services/library-content';
+import { lastNDaysStatus, type DayStatus } from '@/services/consistency';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { cancelForBehavior, rescheduleAll } from '@/services/notifications';
-import { endOfLocalDay } from '@/services/scheduler-core';
+import { endOfLocalDay, isBehaviorPaused, isReminderMuteActive } from '@/services/scheduler-core';
+import { pickStreakLossCopy } from '@/services/streak-loss-copy';
+import { useFeedback } from '@/components/ui/feedback';
 
 const RELAPSE_BANNER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CONTENT_MAX_WIDTH = 640;
 
 function todayWeekday(): number {
   return new Date().getDay(); // 0 = Sunday
@@ -60,6 +66,7 @@ export default function DashboardScreen() {
   } = useStore();
   const router = useRouter();
   const { openGuide } = useContentModals();
+  const { showSheet } = useFeedback();
   const [, setRefresh] = useState({});
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -75,7 +82,7 @@ export default function DashboardScreen() {
   const todayEnd = todayStart + 24 * 60 * 60 * 1000;
   const today = todayWeekday();
 
-  // Today's progress across all active states (for the header).
+  // Today's progress across all active behaviors (for the header).
   // 'tried' counts as engagement — showing up is the practice.
   const todaysCheckInsCount = checkIns.filter(
     (c) =>
@@ -86,9 +93,13 @@ export default function DashboardScreen() {
   const todaysAttemptsCount = reminderAttempts.filter(
     (a) => a.scheduledFor >= todayStart && a.scheduledFor < todayEnd && a.phase === 'initial'
   ).length;
+  const progressPct = todaysAttemptsCount
+    ? Math.min(100, Math.round((todaysCheckInsCount / todaysAttemptsCount) * 100))
+    : 0;
 
   const handleCreate = () => router.push('/create');
   const handleOpenProfile = () => router.push('/settings');
+  const handleOpenReview = () => router.push('/review');
 
   // --- Select-mode handlers ---
 
@@ -121,15 +132,25 @@ export default function DashboardScreen() {
   };
 
   const selectedBehaviors = activeBehaviors.filter((b) => selectedIds.has(b.id));
-  const anySelectedPaused = selectedBehaviors.some(
-    (b) => b.pausedUntil != null && b.pausedUntil > Date.now()
-  );
+  const anySelectedPaused = selectedBehaviors.some((b) => isBehaviorPaused(b));
 
   const bulkPauseUntil = async (resumeAt: number) => {
     await Promise.all(
       selectedBehaviors.map((b) =>
         Promise.all([
-          updateBehavior({ ...b, pausedUntil: resumeAt }),
+          updateBehavior({ ...b, pausedUntil: resumeAt, pausedIndefinitely: false }),
+          cancelForBehavior(b.id),
+        ])
+      )
+    );
+    exitSelectMode();
+  };
+
+  const bulkPauseIndefinitely = async () => {
+    await Promise.all(
+      selectedBehaviors.map((b) =>
+        Promise.all([
+          updateBehavior({ ...b, pausedUntil: undefined, pausedIndefinitely: true }),
           cancelForBehavior(b.id),
         ])
       )
@@ -140,25 +161,26 @@ export default function DashboardScreen() {
   const handleBulkPause = () => {
     if (selectedIds.size === 0) return;
     const count = selectedIds.size;
-    Alert.alert(
-      `Pause ${count} ${count === 1 ? 'state' : 'states'}`,
-      'Reminders stop; streaks and history stay. Pick a length.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Until tonight', onPress: () => bulkPauseUntil(endOfLocalDay()) },
-        { text: '1 day', onPress: () => bulkPauseUntil(Date.now() + DAY_MS) },
-        { text: '3 days', onPress: () => bulkPauseUntil(Date.now() + 3 * DAY_MS) },
-        { text: '1 week', onPress: () => bulkPauseUntil(Date.now() + 7 * DAY_MS) },
-      ]
-    );
+    showSheet({
+      title: `Pause ${count} ${count === 1 ? 'behavior' : 'behaviors'}`,
+      message: 'Reminders stop; streaks and history stay. Pick a length.',
+      actions: [
+        { label: 'Until tonight', onPress: () => bulkPauseUntil(endOfLocalDay()) },
+        { label: '1 day', onPress: () => bulkPauseUntil(Date.now() + DAY_MS) },
+        { label: '3 days', onPress: () => bulkPauseUntil(Date.now() + 3 * DAY_MS) },
+        { label: '1 week', onPress: () => bulkPauseUntil(Date.now() + 7 * DAY_MS) },
+        { label: 'Until I turn it back on', onPress: () => bulkPauseIndefinitely() },
+        { label: 'Cancel', style: 'cancel' },
+      ],
+    });
   };
 
   const handleBulkResume = async () => {
     if (selectedIds.size === 0) return;
     await Promise.all(
       selectedBehaviors
-        .filter((b) => b.pausedUntil != null)
-        .map((b) => updateBehavior({ ...b, pausedUntil: undefined }))
+        .filter((b) => b.pausedUntil != null || b.pausedIndefinitely)
+        .map((b) => updateBehavior({ ...b, pausedUntil: undefined, pausedIndefinitely: false }))
     );
     await rescheduleAll({ force: true });
     exitSelectMode();
@@ -167,13 +189,12 @@ export default function DashboardScreen() {
   const handleBulkArchive = () => {
     if (selectedIds.size === 0) return;
     const count = selectedIds.size;
-    Alert.alert(
-      `Archive ${count} ${count === 1 ? 'state' : 'states'}?`,
-      'Archived states are hidden but keep their history. You can restore them later.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showSheet({
+      title: `Archive ${count} ${count === 1 ? 'behavior' : 'behaviors'}?`,
+      message: 'Archived behaviors are hidden but keep their history. You can restore them later.',
+      actions: [
         {
-          text: 'Archive',
+          label: 'Archive',
           onPress: async () => {
             await Promise.all(
               selectedBehaviors.map((b) =>
@@ -186,20 +207,20 @@ export default function DashboardScreen() {
             exitSelectMode();
           },
         },
-      ]
-    );
+        { label: 'Cancel', style: 'cancel' },
+      ],
+    });
   };
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
     const count = selectedIds.size;
-    Alert.alert(
-      `Delete ${count} ${count === 1 ? 'state' : 'states'}?`,
-      'This cannot be undone. Check-in history for these states will be removed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showSheet({
+      title: `Delete ${count} ${count === 1 ? 'behavior' : 'behaviors'}?`,
+      message: 'This cannot be undone. Check-in history for these behaviors will be removed.',
+      actions: [
         {
-          text: 'Delete',
+          label: 'Delete',
           style: 'destructive',
           onPress: async () => {
             await Promise.all(
@@ -211,8 +232,9 @@ export default function DashboardScreen() {
             exitSelectMode();
           },
         },
-      ]
-    );
+        { label: 'Cancel', style: 'cancel' },
+      ],
+    });
   };
 
   const showRelapseBanner =
@@ -227,6 +249,16 @@ export default function DashboardScreen() {
 
   const handleDismissRelapseBanner = () => {
     void updateAppProfile({ lastLapseAcknowledged: true });
+  };
+
+  // Stable for a given lapse (seeded by its timestamp), varied across lapses.
+  const relapseCopy = pickStreakLossCopy(appProfile.lastLapseAt ?? 0);
+
+  const remindersMuted = isReminderMuteActive(appProfile);
+
+  const handleUnmute = async () => {
+    await updateAppProfile({ remindersMutedUntil: undefined });
+    await rescheduleAll({ force: true });
   };
 
   return (
@@ -262,23 +294,38 @@ export default function DashboardScreen() {
             >
               <IconSymbol name="person.fill" size={20} color={colors.textMuted} />
             </Pressable>
-            <View style={styles.headerCenter}>
+            <Pressable
+              style={styles.headerCenter}
+              onPress={handleOpenReview}
+              accessibilityRole="button"
+              accessibilityLabel="Open weekly review"
+            >
               <Text style={[styles.dateText, { color: colors.text }]}>{formatToday()}</Text>
               {todaysAttemptsCount > 0 ? (
-                <Text style={[styles.progressText, { color: colors.textMuted }]}>
-                  {todaysCheckInsCount} of {todaysAttemptsCount} practiced today
-                </Text>
+                <>
+                  <Text style={[styles.progressText, { color: colors.textMuted }]}>
+                    {todaysCheckInsCount} of {todaysAttemptsCount} practiced today
+                  </Text>
+                  <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { backgroundColor: colors.tint, width: `${progressPct}%` },
+                      ]}
+                    />
+                  </View>
+                </>
               ) : (
                 <Text style={[styles.progressText, { color: colors.textMuted }]}>
                   {activeBehaviors.length} active{' '}
-                  {activeBehaviors.length === 1 ? 'state' : 'states'}
+                  {activeBehaviors.length === 1 ? 'behavior' : 'behaviors'}
                 </Text>
               )}
-            </View>
+            </Pressable>
             <Pressable
               onPress={handleCreate}
               style={[styles.addButton, { backgroundColor: colors.tint }]}
-              accessibilityLabel="Add state"
+              accessibilityLabel="Add behavior"
             >
               <IconSymbol name="plus" size={22} color={colors.textOnBrand} />
             </Pressable>
@@ -287,6 +334,39 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.gridScroll}>
+        {remindersMuted ? (
+          <View
+            style={[
+              styles.permissionBanner,
+              { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.permissionBannerBody}>
+              <Text style={[styles.relapseBannerTitle, { color: colors.text }]}>
+                All reminders muted
+              </Text>
+              <Text style={[styles.relapseBannerSub, { color: colors.textMuted }]}>
+                Every ping is paused until you turn it back on.
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleUnmute}
+              style={({ pressed }) => [
+                styles.permissionBannerCta,
+                { ...controlSelected(colors), borderWidth: 1 },
+                pressed && { opacity: PRESSED_OPACITY },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Unmute all reminders"
+            >
+              <Text
+                style={[styles.permissionBannerCtaText, { color: colors.accentText }]}
+              >
+                Unmute
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         {appProfile.notificationsDenied ? (
           <View
             style={[
@@ -309,10 +389,12 @@ export default function DashboardScreen() {
             </View>
             <Pressable
               onPress={() => void Linking.openSettings()}
-              style={[
+              style={({ pressed }) => [
                 styles.permissionBannerCta,
                 { backgroundColor: colors.danger },
+                pressed && { opacity: PRESSED_OPACITY },
               ]}
+              accessibilityRole="button"
               accessibilityLabel="Open notification settings"
             >
               <Text
@@ -335,23 +417,31 @@ export default function DashboardScreen() {
           >
             <Pressable
               onPress={handleOpenRelapseGuide}
-              style={styles.relapseBannerBody}
+              style={({ pressed }) => [
+                styles.relapseBannerBody,
+                pressed && { opacity: PRESSED_OPACITY },
+              ]}
+              accessibilityRole="button"
               accessibilityLabel="Open the When You Slip guide"
               accessibilityHint="Compassionate restart practice after a missed day"
             >
               <Text style={[styles.relapseBannerTitle, { color: colors.text }]}>
-                Yesterday was hard.
+                {relapseCopy.title}
               </Text>
               <Text
                 style={[styles.relapseBannerSub, { color: colors.textMuted }]}
               >
-                A short read on how to come back without making it bigger than it is.
+                {relapseCopy.body}
               </Text>
             </Pressable>
             <Pressable
               onPress={handleDismissRelapseBanner}
-              style={styles.relapseBannerDismiss}
+              style={({ pressed }) => [
+                styles.relapseBannerDismiss,
+                pressed && { opacity: PRESSED_OPACITY },
+              ]}
               hitSlop={8}
+              accessibilityRole="button"
               accessibilityLabel="Dismiss restart prompt"
             >
               <IconSymbol name="xmark" size={16} color={colors.textMuted} />
@@ -366,34 +456,41 @@ export default function DashboardScreen() {
             ]}
           >
             <Text style={[styles.emptyHeadline, { color: colors.text }]}>
-              No states yet
+              No behaviors yet
             </Text>
             <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
-              States are the behaviors you choose to practice. Browse the catalog or
+              Behaviors are the patterns you choose to practice. Browse the catalog or
               create one from scratch.
             </Text>
             <View style={styles.emptyCtaRow}>
               <Pressable
                 onPress={() => router.push('/(tabs)/states')}
-                style={[
+                style={({ pressed }) => [
                   styles.emptyCta,
                   { backgroundColor: colors.tint },
+                  pressed && { opacity: PRESSED_OPACITY },
                 ]}
-                accessibilityLabel="Browse states catalog"
+                accessibilityRole="button"
+                accessibilityLabel="Browse behaviors catalog"
               >
                 <Text
                   style={[styles.emptyCtaText, { color: colors.textOnBrand }]}
                 >
-                  Browse states
+                  Browse behaviors
                 </Text>
               </Pressable>
               <Pressable
                 onPress={handleCreate}
-                style={styles.emptyCta}
-                accessibilityLabel="Create state from scratch"
+                style={({ pressed }) => [
+                  styles.emptyCta,
+                  { borderColor: colors.border, borderWidth: 1 },
+                  pressed && { opacity: PRESSED_OPACITY },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Create behavior from scratch"
               >
                 <Text
-                  style={[styles.emptyCtaText, { color: colors.textMuted }]}
+                  style={[styles.emptyCtaText, { color: colors.text }]}
                 >
                   Create from scratch
                 </Text>
@@ -408,6 +505,7 @@ export default function DashboardScreen() {
                 behavior={b}
                 today={today}
                 streak={getStreak(b.id)}
+                week={lastNDaysStatus(checkIns, b.id, 7)}
                 colors={colors}
                 selectMode={selectMode}
                 isSelected={selectedIds.has(b.id)}
@@ -416,7 +514,7 @@ export default function DashboardScreen() {
               />
             ))}
 
-            {/* Empty "+" tile to add a state directly from the grid. Hidden
+            {/* Empty "+" tile to add a behavior directly from the grid. Hidden
                 during selection — the top-bar Create button is also gone there. */}
             {!selectMode && (
               <Pressable
@@ -424,13 +522,13 @@ export default function DashboardScreen() {
                 style={[
                   styles.tile,
                   styles.emptyTile,
-                  { borderColor: colors.border, backgroundColor: colors.surface },
+                  { borderColor: colors.border, backgroundColor: 'transparent' },
                 ]}
-                accessibilityLabel="Add a new state"
+                accessibilityLabel="Add a new behavior"
               >
-                <IconSymbol name="plus" size={32} color={colors.textMuted} />
+                <IconSymbol name="plus" size={30} color={colors.textMuted} />
                 <Text style={[styles.emptyLabel, { color: colors.textMuted }]}>
-                  Add state
+                  Add behavior
                 </Text>
               </Pressable>
             )}
@@ -504,7 +602,7 @@ function BulkActionButton({
       onPress={onPress}
       disabled={disabled}
       style={[styles.bulkAction, { opacity: disabled ? 0.35 : 1 }]}
-      accessibilityLabel={`${label} selected states`}
+      accessibilityLabel={`${label} selected behaviors`}
       accessibilityState={{ disabled }}
     >
       <IconSymbol name={icon} size={22} color={color} />
@@ -517,6 +615,7 @@ interface TileProps {
   behavior: Behavior;
   today: number;
   streak: number;
+  week: DayStatus[];
   colors: ThemeColors;
   selectMode: boolean;
   isSelected: boolean;
@@ -528,19 +627,39 @@ function StateTile({
   behavior,
   today,
   streak,
+  week,
   colors,
   selectMode,
   isSelected,
   onPress,
   onLongPress,
 }: TileProps) {
-  const isPaused = behavior.pausedUntil != null && behavior.pausedUntil > Date.now();
+  const isPaused = isBehaviorPaused(behavior);
   const isActiveToday = behavior.activeDays.includes(today);
   const isEnabled = !isPaused && isActiveToday;
+  const isEliminate = behavior.kind === 'eliminate';
   const stage = deriveStage(behavior.level, streak);
-  const textColor = isEnabled ? colors.stateEnabledText : colors.stateDisabledText;
-  const accentColor =
-    behavior.kind === 'eliminate' ? colors.warning : colors.tint;
+  const isHabitual = stage === 'habitual';
+  const practiceIcons = behavior.practiceType
+    ? practiceTypeIcons(behavior.practiceType)
+    : [];
+
+  // Colour for a single day-cell in the week strip. Habitual behaviors get the
+  // brighter celebrate green so mastery reads as a reward, not just another row.
+  const weekCellColor = (s: DayStatus): string => {
+    switch (s) {
+      case 'yes':
+        return isHabitual ? colors.tintCelebrate : colors.tint;
+      case 'tried':
+        return colors.warning;
+      case 'no':
+        return colors.stateDisabledStripe;
+      default:
+        return colors.surfaceMuted;
+    }
+  };
+
+  const practicedThisWeek = week.filter((s) => s === 'yes' || s === 'tried').length;
 
   const labelSuffix = selectMode
     ? isSelected
@@ -556,59 +675,90 @@ function StateTile({
       style={[
         styles.tile,
         {
-          backgroundColor: isEnabled ? colors.stateEnabledBg : colors.stateDisabledBg,
-          overflow: 'hidden',
+          backgroundColor: colors.surface,
+          borderColor: isHabitual ? colors.tintMuted : colors.border,
+          borderWidth: 1,
         },
-        isSelected && {
-          borderWidth: 3,
-          borderColor: colors.tint,
-        },
+        !isEnabled && { opacity: 0.55 },
+        isSelected && { borderColor: colors.tint, borderWidth: 2 },
       ]}
       accessibilityLabel={`${behavior.title}, ${
-        behavior.kind === 'eliminate' ? 'Eliminate' : 'Adopt'
+        isEliminate ? 'Eliminate' : 'Adopt'
       }, ${isPaused ? 'Paused' : stageLabel(stage)}, ${
         streak > 0 ? `${streak} day streak` : 'no current streak'
-      }${labelSuffix}`}
+      }, ${practicedThisWeek} of 7 days active this week${labelSuffix}`}
       accessibilityHint={
-        selectMode ? 'Toggles selection' : 'Opens state details. Long-press to select.'
+        selectMode ? 'Toggles selection' : 'Opens behavior details. Long-press to select.'
       }
     >
-      {!isEnabled && <DiagonalStripes color={colors.stateDisabledStripe} />}
-
-      {/* 3pt kind accent bar (left edge) */}
-      <View
-        pointerEvents="none"
-        style={[styles.kindAccent, { backgroundColor: accentColor }]}
-      />
-
-      <View style={styles.tileContent}>
-        <View style={styles.tileTopRow}>
-          <Text
-            numberOfLines={2}
-            style={[styles.tileTitle, { color: textColor }]}
-          >
-            {behavior.title}
-          </Text>
-          {streak > 0 && (
-            <View style={styles.streakBadge}>
-              <IconSymbol name="flame.fill" size={12} color={colors.warning} />
-              <Text style={[styles.streakNumber, { color: colors.warning }]}>
-                {streak}
-              </Text>
-            </View>
-          )}
+      <View style={styles.tileTop}>
+        <View style={styles.ptypeRow}>
+          {practiceIcons.map((iconName, i) => (
+            <IconSymbol
+              key={i}
+              name={iconName as ComponentProps<typeof IconSymbol>['name']}
+              size={15}
+              color={colors.textMuted}
+            />
+          ))}
         </View>
+        <Text
+          style={[
+            styles.kindLabel,
+            { color: isEliminate ? colors.danger : colors.textMuted },
+          ]}
+        >
+          {isEliminate ? 'Eliminate' : 'Adopt'}
+        </Text>
+      </View>
 
-        <View style={styles.tileFooter}>
-          <Text style={[styles.stageText, { color: textColor }]}>
-            {isPaused ? 'Paused' : stageLabel(stage)}
-          </Text>
-          <Text style={[styles.tileWindow, { color: textColor }]}>
-            {behavior.window.from === '00:00' && behavior.window.to === '23:59'
-              ? 'All day'
-              : `${behavior.window.from}–${behavior.window.to}`}
-          </Text>
-        </View>
+      <Text numberOfLines={2} style={[styles.tileTitle, { color: colors.text }]}>
+        {behavior.title}
+      </Text>
+      <Text numberOfLines={1} style={[styles.tileCue, { color: colors.textMuted }]}>
+        {behavior.pingMessage}
+      </Text>
+
+      <View style={styles.tileSpacer} />
+
+      <View style={styles.weekStrip}>
+        {week.map((s, i) => (
+          <View key={i} style={[styles.weekCell, { backgroundColor: weekCellColor(s) }]} />
+        ))}
+      </View>
+
+      <View style={styles.tileFooter}>
+        {streak > 0 ? (
+          <View style={styles.streakRow}>
+            <IconSymbol name="flame.fill" size={13} color={colors.warning} />
+            <Text style={[styles.streakNum, { color: colors.warning }]}>{streak}</Text>
+            <Text numberOfLines={1} style={[styles.streakLbl, { color: colors.textMuted }]}>
+              {streak === 1 ? 'day' : 'days'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.streakRow}>
+            <IconSymbol name="play.fill" size={10} color={colors.textMuted} />
+            <Text style={[styles.startLbl, { color: colors.textMuted }]}>Start today</Text>
+          </View>
+        )}
+
+        {isPaused ? (
+          <View style={[styles.stagePill, { backgroundColor: colors.warningSoft }]}>
+            <Text style={[styles.stagePillText, { color: colors.warning }]}>Paused</Text>
+          </View>
+        ) : isHabitual ? (
+          <View style={[styles.stagePill, styles.stagePillCelebrate, { backgroundColor: colors.tintSoft }]}>
+            <IconSymbol name="sparkles" size={10} color={colors.accentText} />
+            <Text style={[styles.stagePillText, { color: colors.accentText }]}>Habitual</Text>
+          </View>
+        ) : (
+          <View style={[styles.stagePill, { backgroundColor: colors.surfaceMuted }]}>
+            <Text style={[styles.stagePillText, { color: colors.textMuted }]}>
+              {stageLabel(stage)}
+            </Text>
+          </View>
+        )}
       </View>
 
       {selectMode ? (
@@ -631,30 +781,6 @@ function StateTile({
   );
 }
 
-/**
- * Renders a diagonal-stripe overlay for paused/inactive state tiles.
- * Uses lightweight rotated View bars so we don't depend on SVG or images.
- */
-function DiagonalStripes({ color }: { color: string }) {
-  const bars = Array.from({ length: 14 });
-  return (
-    <View pointerEvents="none" style={styles.stripesContainer}>
-      {bars.map((_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.stripeBar,
-            {
-              top: i * 18 - 80,
-              backgroundColor: color,
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -665,6 +791,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     paddingBottom: Space.md,
     gap: Space.md,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   profileButton: {
     width: 44,
@@ -683,6 +812,17 @@ const styles = StyleSheet.create({
     ...Type.caption,
     marginTop: 2,
   },
+  progressTrack: {
+    height: 4,
+    borderRadius: Radius.pill,
+    marginTop: 7,
+    overflow: 'hidden',
+    maxWidth: 220,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: Radius.pill,
+  },
   addButton: {
     width: 44,
     height: 44,
@@ -693,6 +833,9 @@ const styles = StyleSheet.create({
   gridScroll: {
     padding: Space.lg,
     paddingTop: Space.sm,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   relapseBanner: {
     flexDirection: 'row',
@@ -700,14 +843,14 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     padding: Space.md,
     marginBottom: Space.md,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
   },
   permissionBanner: {
     gap: Space.sm,
     padding: Space.md,
     marginBottom: Space.md,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
   },
   permissionBannerBody: {
@@ -717,7 +860,10 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   permissionBannerCtaText: { ...Type.bodyBold },
   relapseBannerBody: {
@@ -735,63 +881,92 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   tile: {
-    width: `${(100 - 4) / 2}%`, // two columns with gap
+    width: `${(100 - 4) / 2}%`,
+    minWidth: 150,
+    minHeight: 138,
     aspectRatio: 1,
     borderRadius: Radius.lg,
     padding: Space.md,
-    paddingLeft: Space.md + 6, // room for kind accent bar
     justifyContent: 'space-between',
+    overflow: 'hidden',
   },
-  kindAccent: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    zIndex: 1,
-  },
-  tileContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-    zIndex: 1,
-  },
-  tileTopRow: {
+  tileTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: Space.sm,
+    alignItems: 'center',
+  },
+  ptypeRow: {
+    flexDirection: 'row',
+    gap: Space.xs,
+  },
+  kindLabel: {
+    ...Type.micro,
+    letterSpacing: 0,
   },
   tileTitle: {
     ...Type.bodyBold,
-    flex: 1,
+    marginTop: Space.sm,
   },
-  streakBadge: {
+  tileCue: {
+    ...Type.caption,
+    marginTop: 2,
+  },
+  tileSpacer: {
+    flex: 1,
+    minHeight: Space.sm,
+  },
+  weekStrip: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: Space.sm,
+  },
+  weekCell: {
+    flex: 1,
+    height: 7,
+    borderRadius: 3,
+  },
+  streakRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: Space.xs,
+    flexShrink: 1,
   },
-  streakNumber: {
+  streakNum: {
+    ...Type.bodyBold,
+  },
+  streakLbl: {
     ...Type.caption,
-    fontWeight: '700',
+  },
+  startLbl: {
+    ...Type.caption,
   },
   tileFooter: {
-    gap: Space.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm,
   },
-  stageText: {
-    ...Type.caption,
-    fontWeight: '600',
+  stagePill: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.sm,
+    flexShrink: 0,
   },
-  tileWindow: {
+  stagePillCelebrate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  stagePillText: {
     ...Type.micro,
-    opacity: 0.85,
+    letterSpacing: 0,
   },
   emptyTile: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
     gap: Space.xs,
-    paddingLeft: Space.md, // override tile's paddingLeft hack
   },
   emptyLabel: {
     ...Type.caption,
@@ -826,25 +1001,12 @@ const styles = StyleSheet.create({
     paddingVertical: Space.md,
     borderRadius: Radius.md,
     minWidth: 130,
+    minHeight: 44,
     alignItems: 'center',
-  },
-  emptyCtaSecondary: {
-    borderWidth: 1,
+    justifyContent: 'center',
   },
   emptyCtaText: {
     ...Type.bodyBold,
-  },
-  stripesContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  stripeBar: {
-    position: 'absolute',
-    left: -60,
-    width: 300,
-    height: 6,
-    opacity: 0.25,
-    transform: [{ rotate: '-45deg' }],
   },
   selectBadge: {
     position: 'absolute',
@@ -875,6 +1037,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
     minWidth: 64,
+    minHeight: 44,
   },
   bulkActionLabel: { ...Type.caption, fontWeight: '600' },
 });

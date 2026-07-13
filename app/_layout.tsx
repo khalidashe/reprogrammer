@@ -10,10 +10,12 @@ import {
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
+import { useConvexAuth } from 'convex/react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import useStore from '@/store/useStore';
@@ -23,10 +25,16 @@ import {
   rescheduleAll,
   setupNotificationCategory,
 } from '@/services/notifications';
+import { AnimatedSplash } from '@/components/animated-splash';
 import { ContentModalsProvider } from '@/components/library/content-modals-provider';
+import { FeedbackProvider } from '@/components/ui/feedback';
 import { convex } from '@/services/convex-client';
 import { authSecureStorage } from '@/services/secure-storage';
 import { useCloudSyncBootstrap } from '@/hooks/useCloudSyncBootstrap';
+
+// Hold the native splash until the JS splash has painted, so the >R_ mark hands
+// off seamlessly into the blinking-cursor AnimatedSplash (REP-43).
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   return (
@@ -49,25 +57,45 @@ function AppShell() {
   const pathname = usePathname();
   const isHydrated = useStore((state) => state.isHydrated);
   const appProfile = useStore((state) => state.appProfile);
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
 
   useCloudSyncBootstrap();
 
+  // Reveal the JS tree (AnimatedSplash, then the app) once it has mounted.
   useEffect(() => {
-    if (!isHydrated) return;
-    if (!appProfile.hasOnboarded && pathname !== '/onboarding') {
-      router.replace('/onboarding');
-    } else if (appProfile.hasOnboarded && pathname === '/onboarding') {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  // Launch gate (REP-46). The account is a hard wall: every user signs up
+  // before reaching the app. `useConvexAuth` reads the cached token, so a
+  // signed-in user still passes this gate offline.
+  useEffect(() => {
+    if (!isHydrated || authLoading) return;
+
+    if (!appProfile.hasOnboarded) {
+      // New users run the teaching flow; the sign-up wall sits at its end.
+      if (pathname !== '/onboarding') router.replace('/onboarding');
+    } else if (!isAuthenticated) {
+      // Onboarded but signed out (signed out in Settings, or an expired
+      // session): the account is mandatory, so re-gate at the sign-in wall.
+      if (pathname !== '/auth') router.replace('/auth');
+    } else if (pathname === '/onboarding' || pathname === '/auth') {
+      // Signed in and onboarded: leave the gate screens for the app.
       router.replace('/(tabs)');
     }
-  }, [isHydrated, appProfile.hasOnboarded, pathname, router]);
+  }, [isHydrated, authLoading, appProfile.hasOnboarded, isAuthenticated, pathname, router]);
 
   useEffect(() => {
     const setup = async () => {
       await useStore.getState().hydrate();
-      const granted = await requestNotificationPermission();
-      await useStore.getState().updateAppProfile({ notificationsDenied: !granted });
+      // New users grant notifications inside onboarding, after the priming step
+      // explains why. Only returning (onboarded) users get the prompt at launch.
+      if (useStore.getState().appProfile.hasOnboarded) {
+        const granted = await requestNotificationPermission();
+        await useStore.getState().updateAppProfile({ notificationsDenied: !granted });
+      }
       await setupNotificationCategory();
 
       notificationListener.current = Notifications.addNotificationReceivedListener(
@@ -79,11 +107,21 @@ function AppShell() {
 
       responseListener.current = Notifications.addNotificationResponseReceivedListener(
         (response) => {
-          const { behaviorId, attemptId, phase } = response.notification.request.content.data as {
+          const data = response.notification.request.content.data as {
             behaviorId?: string;
             attemptId?: string;
             phase?: string;
+            onboardingDemo?: boolean;
           };
+
+          // Onboarding's demo ping just walks the first-run tour forward (REP-39):
+          // route back into onboarding and jump to the logging-options step.
+          if (data.onboardingDemo) {
+            router.navigate({ pathname: '/onboarding', params: { demo: 'logging' } });
+            return;
+          }
+
+          const { behaviorId, attemptId, phase } = data;
           const actionId = response.actionIdentifier;
 
           if (!behaviorId || !attemptId) return;
@@ -123,23 +161,38 @@ function AppShell() {
   }, [router]);
 
   if (!isHydrated || !fontsLoaded) {
-    return null;
+    return <AnimatedSplash />;
   }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <ContentModalsProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
-          <Stack.Screen name="create" options={{ presentation: 'modal', title: 'Create State' }} />
-          <Stack.Screen name="behavior/[id]" options={{ title: 'State' }} />
-          <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
-          <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
-          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        </Stack>
-      </ContentModalsProvider>
+      <FeedbackProvider>
+        <ContentModalsProvider>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="checkin" options={{ presentation: 'modal', title: 'Check In' }} />
+            <Stack.Screen name="create" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen
+              name="focus"
+              options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen name="behavior/[id]" options={{ title: 'Behavior' }} />
+            <Stack.Screen name="auth" options={{ presentation: 'modal', title: 'Sign In' }} />
+            <Stack.Screen name="paywall" options={{ presentation: 'modal', title: 'Reprogrammer Pro' }} />
+            <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+            <Stack.Screen name="goals" options={{ presentation: 'modal', title: 'Your goals' }} />
+            <Stack.Screen
+              name="privacy-sync-consent"
+              options={{ presentation: 'modal', title: 'Private sync' }}
+            />
+            <Stack.Screen name="how-it-works" options={{ title: 'How it works' }} />
+            <Stack.Screen name="manage-behaviors" options={{ title: 'Saved & archived' }} />
+            <Stack.Screen name="review" options={{ title: 'Weekly review' }} />
+            <Stack.Screen name="reflections" options={{ title: 'Reflections' }} />
+          </Stack>
+        </ContentModalsProvider>
+      </FeedbackProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
   );
