@@ -31,15 +31,12 @@ service cloud.firestore {
 
     // The user's own appProfiles doc (single profile doc).
     function myProfile() {
-      return get(/databases/$(database)/documents/users/$(uid)/appProfiles/profile);
+      return get(/databases/$(database)/documents/users/$(uid())/appProfiles/profile);
     }
     function hasPrivacyConsent() {
-      return isSignedIn() && myProfile.data.privacySyncConsent != null;
-    }
-
-    // Free-text fields that count as the consent-gated private tier.
-    function isPrivateField(field) {
-      return field in ['journal', 'note', 'userBio', 'goals'];
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(uid())/appProfiles/profile)
+        && myProfile().data.privacySyncConsent != null;
     }
 
     // True if this write touches a private field (create/update/delete).
