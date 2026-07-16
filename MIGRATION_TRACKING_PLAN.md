@@ -48,7 +48,7 @@ Create each as an issue in that project, apply the `firebase-migration` label, a
 - **FB-2 — `cloud-sync.ts` → Firestore SDK (pull-on-foreground preserved)** (§1, §4, §8)
   - **BLOCKER: REP-53** must merge first. Keep `pullAll()` one-shot `getDocs` on resume + `pushWithRetry` idempotent upsert (`setDoc(..., {merge:true})`). Do NOT switch to always-on `onSnapshot` (would be a cost regression — see §1).
 - **FB-3 — `ai.ts` Convex action → Callable Cloud Function** (§7)
-  - `onCall` verifies Firebase Auth UID + Pro entitlement (RevenueCat/Firestore) before calling Anthropic. **Downgrade model** from `claude-opus-4-7` (used for a 2–5 word task) to Haiku-class. Gate on the same consent as FB-5.
+  - `onCall` verifies Firebase Auth UID + Pro entitlement (RevenueCat/Firestore) before calling the Nous inference API (`Hermes-4.3-36B`, OpenAI-compatible). Key held as the `NOUS_API_KEY` function secret. Gate on the same consent as FB-5.
 - **FB-4 — `@convex-dev/auth` → Firebase Auth** (§5)
   - Firebase **UID** becomes `userId` on every doc (replaces Convex `v.id("users")`). `useIsPro.ts` reads entitlement from Firestore/RevenueCat; preserve `isLoading → treat as free` to avoid paywall flash. Preserve "signed-in ≠ Pro" distinction.
 - **FB-5 — `convex/` schema → Firestore security rules + Functions** (§2, §6)

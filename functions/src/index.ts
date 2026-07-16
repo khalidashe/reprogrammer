@@ -9,11 +9,17 @@ initializeApp();
 const db = getFirestore();
 
 /**
- * Secret: Anthropic API key. Set with:
- *   firebase functions:secrets:set ANTHROPIC_API_KEY
+ * Secret: Nous Research API key. Set with:
+ *   firebase functions:secrets:set NOUS_API_KEY
  * (No plaintext in code — Critical-Mistakes §7 / repo hygiene.)
  */
-const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
+const nousApiKey = defineSecret('NOUS_API_KEY');
+
+// Nous inference API (OpenAI-compatible). Hermes-4.3-36B is the smallest/fastest
+// Hermes model — ideal for a 2–5 word refinement. No reasoning prompt + no
+// <think> prefill => the model replies directly (not in reasoning mode).
+const NOUS_URL = 'https://inference-api.nousresearch.com/v1/chat/completions';
+const NOUS_MODEL = 'Hermes-4.3-36B';
 
 const SYSTEM_PROMPT = `You are a professional assistant that refines behavior descriptions for a habit tracking app.
 Return JSON with refined versions. Be direct, specific, and professional.
@@ -23,13 +29,13 @@ Avoid motivational phrases or cheesy language. Keep suggestions practical and cl
  * refineBehavior — Firebase Callable Cloud Function (FB-3).
  *
  * Verifies the caller's Firebase Auth UID and Pro entitlement (read from their
- * Firestore subscription doc) BEFORE calling Anthropic. Uses a Haiku-class
- * model — the old claude-opus-4-7 was massive overkill for a 2–5 word
+ * Firestore subscription doc) BEFORE calling the Nous inference API. Uses
+ * Hermes-4.3-36B — the smallest/fastest Hermes model, ample for a 2–5 word
  * refinement. Same JSON-only parse + fallback-to-input behavior as before.
  */
 export const refineBehavior = onCall(
   {
-    secrets: [anthropicApiKey],
+    secrets: [nousApiKey],
     // Run in the same region as your project to keep auth/Firestore local.
     region: 'us-central1',
   },
@@ -60,9 +66,9 @@ export const refineBehavior = onCall(
       throw new HttpsError('invalid-argument', 'currentTitle and currentMessage are required.');
     }
 
-    const key = anthropicApiKey.value();
+    const key = nousApiKey.value();
     if (!key) {
-      throw new HttpsError('failed-precondition', 'Server is missing ANTHROPIC_API_KEY.');
+      throw new HttpsError('failed-precondition', 'Server is missing NOUS_API_KEY.');
     }
 
     const userPrompt = `The user is creating a behavior to track with:
@@ -81,29 +87,33 @@ Return ONLY valid JSON:
   "message": "short refined message"
 }`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(NOUS_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        // Cheap, fast model — same quality for this micro-task, fraction of cost.
-        model: 'claude-haiku-4-5',
+        model: NOUS_MODEL,
         max_tokens: 300,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
+        // Low temp keeps a micro-refinement tight and deterministic.
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new HttpsError('internal', `Anthropic API error: ${response.status} - ${errorText}`);
+      throw new HttpsError('internal', `Nous API error: ${response.status} - ${errorText}`);
     }
 
-    const data = (await response.json()) as { content?: Array<{ text?: string }> };
-    const responseText = data.content?.[0]?.text?.trim();
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const responseText = data.choices?.[0]?.message?.content?.trim();
     if (!responseText) {
       throw new HttpsError('internal', 'Empty response from AI.');
     }

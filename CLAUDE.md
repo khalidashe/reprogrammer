@@ -11,7 +11,7 @@ rules (server trust), not just the client.
 
 The AI refinement runs as a Firebase Callable Cloud Function
 (`functions/src/index.ts`, `refineBehavior`) — verifies Auth UID + Pro
-entitlement before calling Anthropic (Haiku-class model).
+entitlement before calling the Nous inference API (Hermes-4.3-36B).
 
 **Why Firebase:** we migrated from Convex for Google-ecosystem consolidation —
 one console/login, Crashlytics + FCM already in use. NOT a cost decision; the

@@ -10,10 +10,9 @@ export interface RefinedBehavior {
  * Calls the Firebase Callable Cloud Function `refineBehavior` (FB-3).
  *
  * The function verifies the caller's Firebase Auth UID + Pro entitlement
- * (read from their Firestore subscription doc) before calling Anthropic, so a
- * free / signed-out user gets a clean error. The model is Haiku-class (set in
- * the function) — far cheaper than the old claude-opus-4-7 for a 2–5 word
- * refinement. Callers should still gate the UI on `useIsPro()` and route free
+ * (read from their Firestore subscription doc) before calling the Nous
+ * inference API (Hermes-4.3-36B), so a free / signed-out user gets a clean
+ * error. Callers should still gate the UI on `useIsPro()` and route free
  * users to the paywall before invoking this.
  */
 export function useRefineBehavior() {
