@@ -11,34 +11,39 @@
 
 import { Platform } from 'react-native';
 
-/** Raw brand palette: neon-green */
-export const NeonGreen = {
-  50: '#ebffe8',
-  100: '#c1ffb6',
-  200: '#a3ff93',
-  300: '#79ff62',
-  400: '#5fff43',
-  500: '#37ff14',
-  600: '#32e812',
-  700: '#27b50e',
-  800: '#1e8c0b',
-  900: '#176b08',
+/** Raw brand palette: shadcn Green (50–950). Calm, not neon. */
+export const Green = {
+  50: '#f0fdf4',
+  100: '#dcfce7',
+  200: '#bbf7d0',
+  300: '#86efac',
+  400: '#4ade80',
+  500: '#22c55e',
+  600: '#16a34a',
+  700: '#15803d',
+  800: '#166534',
+  900: '#14532d',
 } as const;
 
-/** Raw palette: neutrals (1 = white, 13 = black) */
-export const Neutrals = {
+/**
+ * Raw palette: Mist neutrals (1 = white, 13 = black).
+ * Standard grays with a faint green undertone so surfaces feel cohesive
+ * with the brand without sacrificing the light/dark contrast of the old
+ * pure-gray scale.
+ */
+export const Mist = {
   1: '#ffffff',
-  2: '#fcfcfc',
-  3: '#f5f5f5',
-  4: '#f0f0f0',
-  5: '#d9d9d9',
-  6: '#bfbfbf',
-  7: '#8c8c8c',
-  8: '#595959',
-  9: '#454545',
-  10: '#262626',
-  11: '#1f1f1f',
-  12: '#141414',
+  2: '#fafbfa',
+  3: '#f4f6f4',
+  4: '#eef1ee',
+  5: '#dde2dd',
+  6: '#c3c9c3',
+  7: '#8f978f',
+  8: '#5f665f',
+  9: '#4a514a',
+  10: '#2c322c',
+  11: '#232923',
+  12: '#161916',
   13: '#000000',
 } as const;
 
@@ -221,16 +226,27 @@ export function controlResting(c: ThemeColors): { backgroundColor: string; borde
  * Use these as `{ ...Type.body }` spread into style objects, with `color`
  * applied separately at the call site.
  */
+/**
+ * Typography scale — 5 steps + a reserved display token.
+ * Each token carries its Inter family weight so that `fontWeight` resolves to
+ * the real loaded face instead of synthesizing from the regular cut.
+ *   body/caption       → Inter (400)
+ *   bodyBold/micro     → Inter_600SemiBold
+ *   h1/h2/display      → Inter_700Bold
+ *   display2           → Inter_800ExtraBold
+ * Spread these (`{ ...Type.body }`) into style objects; apply `color` separately.
+ */
 export const Type = {
-  h1: { fontSize: 24, lineHeight: 30, fontWeight: '700' as const },
-  h2: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const },
-  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' as const },
-  bodyBold: { fontSize: 15, lineHeight: 22, fontWeight: '600' as const },
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const },
+  h1: { fontSize: 24, lineHeight: 30, fontWeight: '700' as const, fontFamily: 'Inter_700Bold' },
+  h2: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const, fontFamily: 'Inter_700Bold' },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' as const, fontFamily: 'Inter' },
+  bodyBold: { fontSize: 15, lineHeight: 22, fontWeight: '600' as const, fontFamily: 'Inter_600SemiBold' },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const, fontFamily: 'Inter' },
   micro: {
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '600' as const,
+    fontFamily: 'Inter_600SemiBold',
     letterSpacing: 0.5,
   },
   /**
@@ -241,10 +257,11 @@ export const Type = {
     fontSize: 28,
     lineHeight: 34,
     fontWeight: '800' as const,
+    fontFamily: 'Inter_800ExtraBold',
     letterSpacing: -0.5,
   },
   /** Streak / milestone moment — reserved. */
-  display: { fontSize: 48, lineHeight: 54, fontWeight: '700' as const },
+  display: { fontSize: 48, lineHeight: 54, fontWeight: '700' as const, fontFamily: 'Inter_700Bold' },
 } as const;
 
 /**
@@ -266,11 +283,11 @@ export const Space = {
 
 /**
  * Border radius scale. `xs` for inputs/small chips, `pill` for fully-rounded
- * affordances.
+ * affordances. Tuned to the shadcn "Default" radius language.
  */
 export const Radius = {
   xs: 8, // inputs, small chips
-  sm: 6, // badges, pills, chips
+  sm: 10, // badges, pills, chips
   md: 12, // buttons, cards, inputs
   lg: 20, // tiles, modals
   pill: 9999, // fully rounded
@@ -286,27 +303,33 @@ export const Layout = {
   tileWidthPct: 48, // (100 - gridGapPct) / 2
 } as const;
 
+/**
+ * Font families. `sans` resolves to Inter once it has been loaded by
+ * expo-font in app/_layout.tsx; until then RN falls back to the system font.
+ */
+/**
+ * Font families. `sans` resolves to the Inter regular face once loaded by
+ * expo-font in app/_layout.tsx. The weighted cuts (Inter_500Medium,
+ * Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold) are referenced
+ * directly from the `Type` tokens so headings/bold text use the true weights.
+ */
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
+    sans: 'Inter',
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
+    sans: 'Inter',
     serif: 'serif',
-    rounded: 'normal',
+    rounded: 'Inter',
     mono: 'monospace',
   },
   web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    sans: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    rounded: "Inter, 'SF Pro Rounded', Meiryo, sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });

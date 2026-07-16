@@ -1,6 +1,14 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from '@expo-google-fonts/inter';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
@@ -36,6 +44,13 @@ export default function RootLayout() {
 
 function AppShell() {
   const colorScheme = useColorScheme();
+  const [fontsLoaded] = useFonts({
+    Inter: Inter_400Regular,
+    Inter_500Medium: Inter_500Medium,
+    Inter_600SemiBold: Inter_600SemiBold,
+    Inter_700Bold: Inter_700Bold,
+    Inter_800ExtraBold: Inter_800ExtraBold,
+  });
   const router = useRouter();
   const pathname = usePathname();
   const isHydrated = useStore((state) => state.isHydrated);
@@ -143,7 +158,7 @@ function AppShell() {
     };
   }, [router]);
 
-  if (!isHydrated) {
+  if (!isHydrated || !fontsLoaded) {
     return <AnimatedSplash />;
   }
 

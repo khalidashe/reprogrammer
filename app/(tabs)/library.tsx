@@ -6,267 +6,183 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, type ThemeColors } from '@/constants/theme';
 import {
   LIBRARY_GUIDES,
-  LIBRARY_PROGRAMS,
-  categoriesWithContent,
-  categoryLabel,
-  categoryTagline,
-  guideCategory,
-  isCrossBook,
-  sourceBooksFor,
+  domainLabel,
   type LibraryGuide,
-  type LibraryProgram,
 } from '@/services/library-content';
-import type { LibraryCategory } from '@/types';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useContentModals } from '@/components/library/content-modals-provider';
 import { SearchBar } from '@/components/library/search-bar';
 import { useIsPro } from '@/hooks/useIsPro';
+import { cardStyle, ScreenHeader, Pill, SectionTitle } from '@/components/ui/primitives';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { FREE_GUIDE_IDS } from '@/constants/limits';
+import type { Domain } from '@/types';
 
-const CONTENT_MAX_WIDTH = 640;
-const FOUNDATION: LibraryCategory = 'foundation';
+/**
+ * Library groupings. Each group collects guides by domain under a labeled
+ * header, rendered as a horizontal scroll. Extend freely.
+ */
+const LIBRARY_GROUPS: { title: string; domains: Domain[] }[] = [
+  { title: 'Mind & Wellness', domains: ['emotional'] },
+  { title: 'Career & Focus', domains: ['professional'] },
+  { title: 'Body & Presence', domains: ['physical'] },
+  { title: 'Social & Connection', domains: ['social'] },
+];
 
-type CategoryFilter = LibraryCategory | 'all';
+const GROUPED_DOMAINS = new Set(LIBRARY_GROUPS.flatMap((g) => g.domains));
 
 export default function LibraryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
-  const { openGuide, openProgram } = useContentModals();
+  const { openGuide } = useContentModals();
   const router = useRouter();
   const { isPro } = useIsPro();
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<CategoryFilter>('all');
+  const [searchActive, setSearchActive] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    'Mind & Wellness': true,
+    'Career & Focus': true,
+    'Body & Presence': true,
+    'Social & Connection': true,
+  });
 
-  // Stable: derived from static content.
-  const categoriesPresent = useMemo(() => categoriesWithContent(), []);
+  const toggleGroup = (title: string) =>
+    setExpandedGroups((prev) => ({ ...prev, [title]: !prev[title] }));
+
+  const closeSearch = () => {
+    setQuery('');
+    setSearchActive(false);
+  };
+
   const q = query.trim().toLowerCase();
+  const filteredGuides = useMemo(() => {
+    if (!q) return LIBRARY_GUIDES;
+    return LIBRARY_GUIDES.filter(
+      (g) =>
+        g.title.toLowerCase().includes(q) ||
+        g.summary.toLowerCase().includes(q) ||
+        domainLabel(g.domain).toLowerCase().includes(q)
+    );
+  }, [q]);
 
-  // Category sections, each with its programs (books) and guides. Books lead,
-  // then guides. Empty sections (and, under search, non-matching ones) drop out.
-  const sections = useMemo(() => {
-    const matchProgram = (p: LibraryProgram) =>
-      !q ||
-      p.title.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      (p.book?.author.toLowerCase().includes(q) ?? false) ||
-      sourceBooksFor(p).some((b) => b.author.toLowerCase().includes(q)) ||
-      categoryLabel(p.category).toLowerCase().includes(q);
-    const matchGuide = (g: LibraryGuide) =>
-      !q ||
-      g.title.toLowerCase().includes(q) ||
-      g.summary.toLowerCase().includes(q) ||
-      categoryLabel(guideCategory(g.id)).toLowerCase().includes(q);
-
-    const cats = category === 'all' ? categoriesPresent : [category];
-    return cats
-      .map((cat) => ({
-        category: cat,
-        programs: LIBRARY_PROGRAMS.filter((p) => p.category === cat && matchProgram(p)),
-        guides: LIBRARY_GUIDES.filter((g) => guideCategory(g.id) === cat && matchGuide(g)),
-      }))
-      .filter((s) => s.programs.length + s.guides.length > 0);
-  }, [q, category, categoriesPresent]);
+  const groupedGuides = useMemo(() => {
+    const inGroup = filteredGuides.filter((g) => GROUPED_DOMAINS.has(g.domain));
+    const ungrouped = filteredGuides.filter((g) => !GROUPED_DOMAINS.has(g.domain));
+    return { inGroup, ungrouped };
+  }, [filteredGuides]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Space.md }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Library</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {LIBRARY_GUIDES.length} guides · {LIBRARY_PROGRAMS.length} programs · start with The Foundation
-        </Text>
-      </View>
-
-      <SearchBar
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Search the library…"
+      <ScreenHeader
+        title="Library"
+        subtitle={`${LIBRARY_GUIDES.length} guides — research-grounded, with practice drills.`}
         colors={colors}
+        insetsTop={insets.top}
+        right={
+          !searchActive ? (
+            <Pressable
+              onPress={() => setSearchActive(true)}
+              style={[styles.searchTrigger, { backgroundColor: colors.surfaceMuted }]}
+              hitSlop={8}
+              accessibilityLabel="Search guides"
+            >
+              <IconSymbol name="magnifyingglass" size={20} color={colors.textMuted} />
+            </Pressable>
+          ) : undefined
+        }
       />
 
-      <View style={styles.chipRowWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          <FilterChip
-            label="All"
-            active={category === 'all'}
-            colors={colors}
-            onPress={() => setCategory('all')}
-          />
-          {categoriesPresent.map((c) => (
-            <FilterChip
-              key={c}
-              label={categoryLabel(c)}
-              active={category === c}
-              colors={colors}
-              onPress={() => setCategory(c)}
-            />
-          ))}
-        </ScrollView>
-      </View>
+      {searchActive ? (
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search guides…"
+          colors={colors}
+          autoFocus
+          onCancel={closeSearch}
+        />
+      ) : null}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {sections.length === 0 ? (
+        {filteredGuides.length === 0 ? (
           <Text style={[styles.noMatches, { color: colors.textMuted }]}>
             No matches — try a different term.
           </Text>
         ) : (
-          sections.map((section) => (
-            <View key={section.category} style={styles.section}>
-              <SectionHeader category={section.category} colors={colors} />
-              {section.programs.map((p) => (
-                <ProgramCard
-                  key={p.id}
-                  program={p}
-                  colors={colors}
-                  onPress={() => openProgram(p.id)}
-                />
-              ))}
-              {section.guides.map((g) => {
-                const locked = !isPro && !FREE_GUIDE_IDS.has(g.id);
-                return (
-                  <GuideCard
-                    key={g.id}
-                    guide={g}
+          <>
+            {LIBRARY_GROUPS.map((group) => {
+              const guides = groupedGuides.inGroup.filter((g) =>
+                group.domains.includes(g.domain)
+              );
+              if (guides.length === 0) return null;
+              const expanded = !!expandedGroups[group.title];
+              const visible = expanded ? guides : guides.slice(0, 3);
+              return (
+                <View key={group.title} style={styles.group}>
+                  <SectionTitle
+                    title={group.title}
                     colors={colors}
-                    locked={locked}
-                    onPress={() =>
-                      locked ? router.push('/paywall') : openGuide(g.id)
+                    right={
+                      <Pressable
+                        onPress={() => toggleGroup(group.title)}
+                        hitSlop={8}
+                        accessibilityLabel={
+                          expanded ? `Collapse ${group.title}` : `View all ${group.title}`
+                        }
+                      >
+                        <Text style={[styles.viewAll, { color: colors.tint }]}>
+                          {expanded ? 'Show less' : `View all (${guides.length})`}
+                        </Text>
+                      </Pressable>
                     }
                   />
-                );
-              })}
-            </View>
-          ))
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.hScroll}
+                  >
+                    {visible.map((guide) => (
+                      <View key={guide.id} style={styles.guideRowH}>
+                        <GuideCardRow
+                          guide={guide}
+                          colors={colors}
+                          isPro={isPro}
+                          router={router}
+                          openGuide={openGuide}
+                        />
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              );
+            })}
+          </>
         )}
-        <Text style={[styles.disclaimer, { color: colors.textMuted }]}>
-          Educational, not professional advice.
-        </Text>
       </ScrollView>
     </View>
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  colors,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  colors: ThemeColors;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.chip,
-        active
-          ? { backgroundColor: colors.tintSoft, borderColor: 'transparent' }
-          : { borderColor: colors.border },
-      ]}
-      accessibilityLabel={`Filter by ${label}`}
-      accessibilityState={{ selected: active }}
-    >
-      <Text
-        style={[styles.chipText, { color: active ? colors.accentText : colors.textMuted }]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function SectionHeader({
-  category,
-  colors,
-}: {
-  category: LibraryCategory;
-  colors: ThemeColors;
-}) {
-  const isFoundation = category === FOUNDATION;
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionTitleRow}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {categoryLabel(category)}
-        </Text>
-        {isFoundation && (
-          <View style={[styles.startHerePill, { backgroundColor: colors.tintSoft }]}>
-            <Text style={[styles.startHereText, { color: colors.accentText }]}>
-              START HERE
-            </Text>
-          </View>
-        )}
-      </View>
-      <Text style={[styles.sectionTagline, { color: colors.textMuted }]}>
-        {categoryTagline(category)}
-      </Text>
-    </View>
-  );
-}
-
-function ProgramCard({
-  program,
-  colors,
-  onPress,
-}: {
-  program: LibraryProgram;
-  colors: ThemeColors;
-  onPress: () => void;
-}) {
-  const meta = isCrossBook(program)
-    ? `Cross-book · ${program.sourceProgramIds!.length} books`
-    : program.book
-      ? `Book · ${program.book.author}`
-      : `Program · ${program.guideIds.length} guides`;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      accessibilityLabel={`${program.title}, ${program.book ? 'book program' : 'program'}`}
-      accessibilityHint="Opens the program"
-    >
-      <View style={styles.cardTitleRow}>
-        <View style={[styles.programBadge, { backgroundColor: colors.tintSoft }]}>
-          <IconSymbol name="book.fill" size={13} color={colors.accentText} />
-        </View>
-        <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]}>
-          {program.title}
-        </Text>
-        <IconSymbol name="chevron.right" size={18} color={colors.textMuted} />
-      </View>
-      <Text style={[styles.cardMeta, { color: colors.textMuted }]}>{meta}</Text>
-      <Text style={[styles.cardBody, { color: colors.textMuted }]} numberOfLines={2}>
-        {program.description}
-      </Text>
-    </Pressable>
-  );
-}
-
-function GuideCard({
+function GuideCardRow({
   guide,
   colors,
-  locked,
-  onPress,
+  isPro,
+  router,
+  openGuide,
 }: {
   guide: LibraryGuide;
   colors: ThemeColors;
-  locked: boolean;
-  onPress: () => void;
+  isPro: boolean;
+  router: ReturnType<typeof useRouter>;
+  openGuide: ReturnType<typeof useContentModals>['openGuide'];
 }) {
+  const locked = !isPro && !FREE_GUIDE_IDS.has(guide.id);
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => (locked ? router.push('/paywall') : openGuide(guide.id))}
       style={[
         styles.card,
-        { backgroundColor: colors.surface, borderColor: colors.border },
-        locked && { opacity: 0.62 },
+        cardStyle(colors, locked ? 'muted' : 'brandSoft'),
       ]}
       accessibilityLabel={
         locked
@@ -276,22 +192,13 @@ function GuideCard({
       accessibilityHint={locked ? 'Opens the upgrade screen' : 'Opens the full guide'}
     >
       <View style={styles.cardTitleRow}>
-        <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]}>
+        <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>
           {guide.title}
         </Text>
-        {locked ? (
-          <View style={[styles.proPill, { backgroundColor: colors.tintSoft }]}>
-            <IconSymbol name="lock.fill" size={11} color={colors.accentText} />
-            <Text style={[styles.proPillText, { color: colors.accentText }]}>Pro</Text>
-          </View>
-        ) : (
-          <IconSymbol name="chevron.right" size={18} color={colors.textMuted} />
-        )}
+        {locked && <Pill label="PRO" colors={colors} tone="brand" color={colors.tint} />}
       </View>
-      <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
-        {guide.estimatedMinutes} min read
-      </Text>
-      <Text style={[styles.cardBody, { color: colors.textMuted }]} numberOfLines={2}>
+      <Pill label={`${domainLabel(guide.domain)} · ${guide.estimatedMinutes} min`} colors={colors} tone="muted" />
+      <Text style={[styles.cardBody, { color: colors.text }]} numberOfLines={2}>
         {guide.summary}
       </Text>
     </Pressable>
@@ -300,89 +207,47 @@ function GuideCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: Space.lg,
-    paddingBottom: Space.md,
-    width: '100%',
-    maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: 'center',
-  },
-  title: { ...Type.h1 },
-  subtitle: { ...Type.caption, marginTop: Space.xs },
-  chipRowWrap: {
-    width: '100%',
-    maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: 'center',
-  },
-  chipRow: {
-    paddingHorizontal: Space.lg,
-    paddingTop: Space.sm,
-    paddingBottom: Space.xs,
-    gap: Space.xs,
-  },
-  chip: {
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + 2,
+  searchTrigger: {
+    width: 40,
+    height: 40,
     borderRadius: Radius.pill,
-    borderWidth: 1,
-    minHeight: 34,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  chipText: { ...Type.caption, fontWeight: '500' },
   scrollContent: {
     padding: Space.lg,
     paddingTop: Space.md,
-    gap: Space.xl,
-    width: '100%',
-    maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: 'center',
+    gap: Space.md,
   },
-  section: { gap: Space.md },
-  sectionHeader: { gap: Space.xxs, marginBottom: Space.xxs },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
-  sectionTitle: { ...Type.h2 },
-  sectionTagline: { ...Type.caption },
-  startHerePill: {
-    paddingHorizontal: Space.sm,
-    paddingVertical: 3,
-    borderRadius: Radius.sm,
+  group: {
+    gap: Space.md,
+    marginTop: Space.lg - 2,
   },
-  startHereText: { ...Type.micro },
+  hScroll: {
+    paddingHorizontal: Space.lg,
+    gap: Space.md,
+  },
+  guideRowH: {
+    width: 280,
+  },
+  viewAll: {
+    ...Type.micro,
+    fontWeight: '600',
+  },
   noMatches: {
     ...Type.body,
     textAlign: 'center',
     paddingVertical: Space.xxl,
   },
-  disclaimer: {
-    ...Type.micro,
-    textAlign: 'center',
-    paddingTop: Space.xl,
-    paddingBottom: Space.lg,
-  },
   card: {
-    borderRadius: Radius.lg,
+    width: 280,
+    height: 120,
+    borderRadius: Radius.md,
     borderWidth: 1,
     padding: Space.md,
     gap: Space.xs,
   },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   cardTitle: { ...Type.bodyBold },
-  programBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  proPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: Space.sm,
-    paddingVertical: 3,
-    borderRadius: Radius.sm,
-  },
-  proPillText: { ...Type.micro, letterSpacing: 0 },
-  cardMeta: { ...Type.micro, letterSpacing: 0, marginTop: 2 },
-  cardBody: { ...Type.caption, marginTop: Space.xs },
+  cardBody: { ...Type.caption, marginTop: Space.xxs },
 });

@@ -1,4 +1,4 @@
-import { View, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Type, Space, Radius, PRESSED_OPACITY, type ThemeColors } from '@/constants/theme';
 
@@ -8,6 +8,8 @@ interface SearchBarProps {
   placeholder?: string;
   colors: ThemeColors;
   accessibilityLabel?: string;
+  autoFocus?: boolean;
+  onCancel?: () => void;
 }
 
 export function SearchBar({
@@ -16,6 +18,8 @@ export function SearchBar({
   placeholder = 'Search…',
   colors,
   accessibilityLabel,
+  autoFocus = false,
+  onCancel,
 }: SearchBarProps) {
   return (
     <View
@@ -34,6 +38,7 @@ export function SearchBar({
         autoCorrect={false}
         autoCapitalize="none"
         clearButtonMode="never"
+        autoFocus={autoFocus}
         accessibilityLabel={accessibilityLabel ?? placeholder}
         returnKeyType="search"
       />
@@ -46,6 +51,16 @@ export function SearchBar({
           accessibilityLabel="Clear search"
         >
           <IconSymbol name="xmark" size={14} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+      {onCancel ? (
+        <Pressable
+          onPress={onCancel}
+          hitSlop={8}
+          style={styles.cancelButton}
+          accessibilityLabel="Cancel search"
+        >
+          <Text style={[Type.body, { color: colors.tint }]}>Cancel</Text>
         </Pressable>
       ) : null}
     </View>
@@ -70,6 +85,11 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: Space.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    paddingLeft: Space.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
