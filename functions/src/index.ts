@@ -1,8 +1,8 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { onCall, HttpsError, onRequest } from 'firebase-functions/v2/cloud-functions';
-import { defineSecretVersion } from 'firebase-functions/v2/params';
+import { onCall, HttpsError, onRequest } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 
 // Initialize the Admin SDK once (uses the function's default credentials).
 initializeApp();
@@ -13,7 +13,7 @@ const db = getFirestore();
  *   firebase functions:secrets:set ANTHROPIC_API_KEY
  * (No plaintext in code — Critical-Mistakes §7 / repo hygiene.)
  */
-const anthropicApiKey = defineSecretVersion('ANTHROPIC_API_KEY');
+const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 
 const SYSTEM_PROMPT = `You are a professional assistant that refines behavior descriptions for a habit tracking app.
 Return JSON with refined versions. Be direct, specific, and professional.
