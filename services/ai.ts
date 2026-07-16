@@ -1,5 +1,5 @@
-import { useAction } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFirebaseApp } from '@/services/firebase';
 
 export interface RefinedBehavior {
   title: string;
@@ -7,19 +7,28 @@ export interface RefinedBehavior {
 }
 
 /**
- * Returns a function that calls the server-side AI refine action.
+ * Calls the Firebase Callable Cloud Function `refineBehavior` (FB-3).
  *
- * The action requires the caller to be a signed-in Pro user; the server
- * throws "AI refinement is a Pro feature." otherwise. Callers should gate
- * the UI on `useIsPro()` and route free users to the paywall before
- * invoking this.
+ * The function verifies the caller's Firebase Auth UID + Pro entitlement
+ * (read from their Firestore subscription doc) before calling Anthropic, so a
+ * free / signed-out user gets a clean error. The model is Haiku-class (set in
+ * the function) — far cheaper than the old claude-opus-4-7 for a 2–5 word
+ * refinement. Callers should still gate the UI on `useIsPro()` and route free
+ * users to the paywall before invoking this.
  */
 export function useRefineBehavior() {
-  const refine = useAction(api.ai.refineBehavior);
   return async (
     currentTitle: string,
     currentMessage: string,
   ): Promise<RefinedBehavior> => {
-    return await refine({ currentTitle, currentMessage });
+    const app = getFirebaseApp();
+    if (!app) throw new Error('Firebase is not configured.');
+    const functions = getFunctions(app);
+    const refine = httpsCallable<{ currentTitle: string; currentMessage: string }, RefinedBehavior>(
+      functions,
+      'refineBehavior',
+    );
+    const result = await refine({ currentTitle, currentMessage });
+    return result.data;
   };
 }

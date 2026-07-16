@@ -1,7 +1,7 @@
 import { View, Text, Pressable, StyleSheet, ScrollView, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { useConvexAuth } from 'convex/react';
+import { useFirebaseAuth } from '@/services/firebase-auth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -75,7 +75,7 @@ export default function OnboardingScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const { addBehavior, setOnboarded, updateAppProfile, appProfile } = useStore();
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useFirebaseAuth();
 
   const params = useLocalSearchParams<{ demo?: string }>();
   const [step, setStep] = useState<Step>('welcome');
