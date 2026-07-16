@@ -33,3 +33,6 @@ expo-env.d.ts
 # @end expo-cli
 # Dev convenience: generated Expo LAN QR for iPhone testing
 expo-qr-*.png
+
+# Expo web build artifact
+index.html

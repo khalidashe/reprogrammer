@@ -1,0 +1,107 @@
+rules_version = '2';
+
+/**
+ * Firestore security rules — Reprogrammer (FB-5 / Critical-Mistakes §2, §6).
+ *
+ * Data model: subcollections under users/{uid}.
+ *   users/{uid}/behaviors/{clientId}
+ *   users/{uid}/checkIns/{clientId}
+ *   users/{uid}/entries/{clientId}          <- wholly-private tier
+ *   users/{uid}/reminderAttempts/{clientId}
+ *   users/{uid}/appProfiles/profile          <- single doc (consent lives here)
+ *   users/{uid}/subscriptions/profile         <- single doc (entitlement)
+ *
+ * PRIVACY BOUNDARY (server trust, not just client gate):
+ *   - A write to `entries`, or to the free-text fields journal / note /
+ *     userBio / goals on any row, is DENIED unless the requesting user's
+ *     appProfiles.privacySyncConsent is present.
+ *   - Every user can only read/write their own {uid} subtree.
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Authenticated user id.
+    function uid() {
+      return request.auth.uid;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // The user's own appProfiles doc (single profile doc).
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(uid)/appProfiles/profile);
+    }
+    function hasPrivacyConsent() {
+      return isSignedIn() && myProfile.data.privacySyncConsent != null;
+    }
+
+    // Free-text fields that count as the consent-gated private tier.
+    function isPrivateField(field) {
+      return field in ['journal', 'note', 'userBio', 'goals'];
+    }
+
+    // True if this write touches a private field (create/update/delete).
+    function writeTouchesPrivateField() {
+      // For create/update, inspect the incoming data's keys.
+      return request.resource.data.keys().hasAny(['journal', 'note', 'userBio', 'goals']);
+    }
+
+    // User subtree root.
+    match /users/{userId} {
+      // Only the owner may touch their subtree.
+      allow read, write: if isSignedIn() && userId == uid();
+
+      // ---- appProfiles (single doc) ----
+      match /appProfiles/{docId} {
+        // Anyone signed in can write their own profile — BUT private fields
+        // (userBio, goals) require consent. Consent itself can be set (so a
+        // user can turn private sync ON), and can be removed (turn OFF).
+        allow read: if isSignedIn() && userId == uid();
+        allow write: if isSignedIn()
+                      && userId == uid()
+                      && (request.resource.data.keys().hasAny(['userBio', 'goals'])
+                          ? hasPrivacyConsent()
+                          : true);
+      }
+
+      // ---- subscriptions (single doc) ----
+      // Client may read; only the backend (admin) writes entitlement. The
+      // Cloud Function / webhook writes it with admin credentials, which
+      // bypass these rules. Block client writes entirely.
+      match /subscriptions/{docId} {
+        allow read: if isSignedIn() && userId == uid();
+        allow write: if false;
+      }
+
+      // ---- behaviors ----
+      match /behaviors/{clientId} {
+        allow read: if isSignedIn() && userId == uid();
+        allow write: if isSignedIn()
+                      && userId == uid()
+                      && (writeTouchesPrivateField() ? hasPrivacyConsent() : true);
+      }
+
+      // ---- checkIns ----
+      match /checkIns/{clientId} {
+        allow read: if isSignedIn() && userId == uid();
+        allow write: if isSignedIn()
+                      && userId == uid()
+                      && (writeTouchesPrivateField() ? hasPrivacyConsent() : true);
+      }
+
+      // ---- reminderAttempts (no private fields) ----
+      match /reminderAttempts/{clientId} {
+        allow read, write: if isSignedIn() && userId == uid();
+      }
+
+      // ---- entries (wholly-private entity) ----
+      match /entries/{clientId} {
+        // MUST have consent to write. Never readable/writable without it.
+        allow read: if isSignedIn() && userId == uid() && hasPrivacyConsent();
+        allow write: if isSignedIn() && userId == uid() && hasPrivacyConsent();
+      }
+    }
+  }
+}

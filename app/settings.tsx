@@ -11,10 +11,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
-import { useAuthActions } from '@convex-dev/auth/react';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   Colors,
@@ -38,6 +34,10 @@ import { deriveStage } from '@/services/levels';
 import { rescheduleAll } from '@/services/notifications';
 import { isReminderMuteActive } from '@/services/scheduler-core';
 import { hhmmToDate, dateToHHmm, formatTimeForDisplayString } from '@/utils/time';
+import { signOutFirebase } from '@/services/firebase-auth-actions';
+import { deleteAccountFirestore } from '@/services/firestore-account';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { getFirebaseAuth } from '@/services/firebase';
 
 const MANAGE_URL = Platform.select({
   ios: 'https://apps.apple.com/account/subscriptions',
@@ -50,9 +50,7 @@ export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { isPro, isSignedIn } = useIsPro();
-  const user = useQuery(api.users.getCurrentUser);
-  const deleteAccount = useMutation(api.account.deleteAccount);
-  const { signOut } = useAuthActions();
+  const authUser = getFirebaseAuth()?.currentUser ?? null;
   const { behaviors, checkIns, appProfile, updateAppProfile, getStreak } = useStore();
   const { showToast } = useFeedback();
   const [, setRefresh] = useState({});
@@ -124,7 +122,7 @@ export default function SettingsScreen() {
     } catch {
       // ignore — RC may not be configured
     }
-    await signOut();
+    await signOutFirebase();
   };
 
   const resetLocalData = async () => {
@@ -159,7 +157,7 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteAccount({});
+              await deleteAccountFirestore();
             } catch (e: any) {
               showToast(`Couldn't delete account — ${e?.message ?? 'please try again.'}`);
               return;
@@ -169,7 +167,7 @@ export default function SettingsScreen() {
             } catch {
               // ignore — RC may not be configured
             }
-            await signOut();
+            await signOutFirebase();
             await resetLocalData();
           },
         },
@@ -327,7 +325,7 @@ export default function SettingsScreen() {
           <>
             <Row
               label="Signed in"
-              value={user?.email ?? user?.name ?? 'Account'}
+              value={authUser?.email ?? authUser?.displayName ?? 'Account'}
               colors={colors}
             />
             <Row

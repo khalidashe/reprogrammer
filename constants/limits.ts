@@ -1,10 +1,10 @@
 /**
  * Free-tier limit on the number of active (non-hidden, non-deleted) states.
  *
- * Must stay in sync with `FREE_TIER_STATE_CAP` in convex/behaviors.ts — the
- * server is the authoritative check; the client uses this constant to gate
- * the UI before submit so we don't make the user fill out a whole form just
- * to be rejected.
+ * Client-gated UI cap (no server enforcement for this particular limit). The
+ * client uses this constant to gate the UI before submit so we don't make the
+ * user fill out a whole form just to be rejected. Keep in sync with any
+ * server-side check if one is added later.
  */
 export const FREE_TIER_STATE_CAP = 3;
 

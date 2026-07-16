@@ -6,6 +6,7 @@ import { mergeById } from '@/services/sync-merge';
 import { preserveLocalPrivateFields } from '@/services/sync-policy';
 import type { AppProfile, Behavior, CheckIn } from '@/types';
 import { useIsPro } from './useIsPro';
+import { useFirebaseAuth } from '@/services/firebase-auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -28,6 +29,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 export function useCloudSyncBootstrap() {
   const { isPro, isSignedIn, isLoading } = useIsPro();
+  const { userId } = useFirebaseAuth();
   const isHydrated = useStore((s) => s.isHydrated);
   const privacyConsent = useStore((s) => s.appProfile.privacySyncConsent);
   const bootstrapped = useRef(false);
@@ -35,6 +37,7 @@ export function useCloudSyncBootstrap() {
   useEffect(() => {
     if (isLoading || !isHydrated) return;
 
+    cloudSync.setUid(userId);
     cloudSync.setConsented(privacyConsent !== undefined);
 
     const eligible = isSignedIn && isPro;
@@ -48,7 +51,7 @@ export function useCloudSyncBootstrap() {
     bootstrapped.current = true;
 
     void runSync({ pushLocalFirst: true });
-  }, [isPro, isSignedIn, isLoading, isHydrated, privacyConsent]);
+  }, [isPro, isSignedIn, isLoading, isHydrated, privacyConsent, userId]);
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {

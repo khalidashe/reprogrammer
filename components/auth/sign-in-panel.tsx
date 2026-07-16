@@ -1,10 +1,13 @@
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { useState } from 'react';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useAuthActions } from '@convex-dev/auth/react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
 import { useFeedback } from '@/components/ui/feedback';
+import {
+  signInWithApple,
+  signInWithGoogle,
+} from '@/services/firebase-auth-actions';
 
 const AppleAuthenticationButtonType = AppleAuthentication.AppleAuthenticationButtonType;
 const AppleAuthenticationButtonStyle = AppleAuthentication.AppleAuthenticationButtonStyle;
@@ -15,30 +18,19 @@ interface SignInPanelProps {
 }
 
 /**
- * Apple + Google sign-in buttons with their auth calls and error handling.
- * Shared by the standalone `/auth` screen and the onboarding account wall
- * (REP-46) so the sign-in logic lives in exactly one place.
+ * Apple + Google sign-in via Firebase Auth (FB-4).
+ * Shared by the standalone `/auth` screen and the onboarding account wall.
  */
 export function SignInPanel({ onSignedIn }: SignInPanelProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signIn } = useAuthActions();
   const { showSheet } = useFeedback();
   const [busy, setBusy] = useState<'apple' | 'google' | null>(null);
 
   const handleApple = async () => {
     setBusy('apple');
     try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-      if (!credential.identityToken) {
-        throw new Error('Apple did not return an identity token.');
-      }
-      await signIn('apple', { idToken: credential.identityToken });
+      await signInWithApple();
       onSignedIn();
     } catch (e: any) {
       if (e?.code !== 'ERR_REQUEST_CANCELED') {
@@ -56,7 +48,7 @@ export function SignInPanel({ onSignedIn }: SignInPanelProps) {
   const handleGoogle = async () => {
     setBusy('google');
     try {
-      await signIn('google');
+      await signInWithGoogle();
       onSignedIn();
     } catch (e: any) {
       showSheet({

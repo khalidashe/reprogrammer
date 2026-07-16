@@ -14,8 +14,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
-import { ConvexAuthProvider } from '@convex-dev/auth/react';
-import { useConvexAuth } from 'convex/react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import useStore from '@/store/useStore';
@@ -28,8 +26,8 @@ import {
 import { AnimatedSplash } from '@/components/animated-splash';
 import { ContentModalsProvider } from '@/components/library/content-modals-provider';
 import { FeedbackProvider } from '@/components/ui/feedback';
-import { convex } from '@/services/convex-client';
-import { authSecureStorage } from '@/services/secure-storage';
+import { FirebaseAuthProvider } from '@/services/firebase-auth';
+import { useFirebaseAuth } from '@/services/firebase-auth';
 import { useCloudSyncBootstrap } from '@/hooks/useCloudSyncBootstrap';
 
 // Hold the native splash until the JS splash has painted, so the >R_ mark hands
@@ -38,9 +36,9 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   return (
-    <ConvexAuthProvider client={convex} storage={authSecureStorage}>
+    <FirebaseAuthProvider>
       <AppShell />
-    </ConvexAuthProvider>
+    </FirebaseAuthProvider>
   );
 }
 
@@ -57,7 +55,7 @@ function AppShell() {
   const pathname = usePathname();
   const isHydrated = useStore((state) => state.isHydrated);
   const appProfile = useStore((state) => state.appProfile);
-  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+  const { isAuthenticated, isLoading: authLoading } = useFirebaseAuth();
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
 

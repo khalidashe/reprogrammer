@@ -1,7 +1,5 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMutation } from 'convex/react';
-import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Type, Space, Radius, PRESSED_OPACITY } from '@/constants/theme';
 import { useIsPro } from '@/hooks/useIsPro';
@@ -9,6 +7,8 @@ import useStore from '@/store/useStore';
 import { cloudSync } from '@/services/cloud-sync';
 import { PRIVACY_SYNC_CONSENT_VERSION } from '@/services/sync-policy';
 import { haptics } from '@/services/haptics';
+import { getFirebaseAuth } from '@/services/firebase';
+import { recordPrivacyConsent, revokePrivacyConsent } from '@/services/firestore-sync';
 
 /**
  * Privacy-sync consent (REP-30 Phase 2). The explicit gate for the private tier
@@ -26,14 +26,13 @@ export default function PrivacySyncConsentScreen() {
   const { isPro, isSignedIn } = useIsPro();
   const consent = useStore((s) => s.appProfile.privacySyncConsent);
   const updateAppProfile = useStore((s) => s.updateAppProfile);
-  const recordConsent = useMutation(api.appProfiles.recordPrivacyConsent);
-  const revokeConsent = useMutation(api.appProfiles.revokePrivacyConsent);
 
   const isOn = consent !== undefined;
   const gated = !isSignedIn || !isPro;
 
   const accept = async () => {
-    await recordConsent({ version: PRIVACY_SYNC_CONSENT_VERSION });
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (uid) await recordPrivacyConsent(uid, PRIVACY_SYNC_CONSENT_VERSION);
     cloudSync.setConsented(true);
     await updateAppProfile({
       privacySyncConsent: {
@@ -55,7 +54,8 @@ export default function PrivacySyncConsentScreen() {
   };
 
   const revoke = async () => {
-    await revokeConsent({});
+    const uid = getFirebaseAuth()?.currentUser?.uid;
+    if (uid) await revokePrivacyConsent(uid);
     cloudSync.setConsented(false);
     await updateAppProfile({ privacySyncConsent: undefined });
     haptics.selection();

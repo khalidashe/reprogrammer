@@ -9,9 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { useQuery } from 'convex/react';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
-import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   Colors,
@@ -31,6 +29,7 @@ import {
   restorePurchases,
 } from '@/services/revenuecat';
 import { useFeedback } from '@/components/ui/feedback';
+import { useFirebaseAuth } from '@/services/firebase-auth';
 
 const BULLETS = [
   'Build as many behaviors as you like',
@@ -43,9 +42,9 @@ export default function PaywallScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const userId = useQuery(api.users.getCurrentUserId);
-  const isSignedIn = userId != null;
   const { showSheet } = useFeedback();
+  const { userId } = useFirebaseAuth();
+  const isSignedIn = userId != null;
 
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [loading, setLoading] = useState(true);

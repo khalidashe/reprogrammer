@@ -1,13 +1,16 @@
-<!-- convex-ai-start -->
+<!-- firebase-ai-start -->
 
-This project uses [Convex](https://convex.dev) as its backend.
+This project uses [Firebase](https://firebase.google.com) as its backend:
+Firebase Auth (Apple + Google) and Cloud Firestore for cross-device sync.
 
-When working on Convex code, **always read
-`convex/_generated/ai/guidelines.md` first** for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
+Data model (subcollections, scopes reads + rules — no composite indexes):
+`users/{uid}/{behaviors,checkIns,entries,reminderAttempts,appProfiles,subscriptions}`.
+The private tier (entries + free-text fields journal/note/userBio/goals) is
+gated on `appProfiles.privacySyncConsent` — enforced in Firestore security
+rules (server trust), not just the client.
 
-Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install`.
+The AI refinement runs as a Firebase Callable Cloud Function
+(`functions/src/index.ts`, `refineBehavior`) — verifies Auth UID + Pro
+entitlement before calling Anthropic (Haiku-class model).
 
-<!-- convex-ai-end -->
+<!-- firebase-ai-end -->
